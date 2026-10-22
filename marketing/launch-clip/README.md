@@ -719,7 +719,9 @@ buried with everything else you saved, and never watch it again" (round
 every other save, all grey. "Unless you
 save it to Machina" floods them with the app's category colours and
 gathers them into the mark, and the real app reads the reel, sums it up,
-files it by topic, and shows it on its graph tied to two earlier saves.
+files it by topic, and shows it on its graph tied to two earlier saves
+(round 17: reached the app's own way, the card's ⋯ menu, "See in graph",
+the card shrinking into its dot).
 "Now every save is one question away." (rounds 10 to 12, the bridge, over
 Ask's opening screen), "So, ask it anything, and get the answer, with the
 proof.": a real question about the three saves the graph just tied
@@ -745,6 +747,8 @@ python3 audio/synth-vo.py savethis && python3 audio/vo-to-44k.py out/vo/savethis
 node audio/savethis-score.mjs && node audio/mix-vo.mjs savethis
 node audio/savethis-verify.mjs           # bans, windows, voice over music, −14 LUFS, the loop
 npx remotion render src/index.ts MachinaSaveThis out/savethis/master.mp4 --crf=14
+# (round 17) the same reel without the paper fades at the screens' edges
+npx remotion render src/index.ts MachinaSaveThisNoFade out/savethis/master_nofade.mp4 --crf=14
 ```
 
 | Time | Picture | On screen | Voice | Sound |
@@ -760,11 +764,14 @@ npx remotion render src/index.ts MachinaSaveThis out/savethis/master.mp4 --crf=1
 | 0:08.4 | The mark lands on the processing card's own mark as the real app irises open: a share of this reel arriving | | | whoosh |
 | 0:08.9 | The pill, a phase a beat: Fetching the link, Reading the page, Writing the summary, Searching connections, Organizing & tagging | It reads every save, / from any app, | "It reads every save, from any app," | the band; a tick a phase |
 | 0:11.2 | "Saved to Machina"; the card: its cover is this reel's frame 0; its summary lifts on "sums it up", its topic chip on "files it by topic" | understands it, sums it up, / files it by topic, | "understands it, sums it up, files it by topic," | bell |
-| 0:13.1 | Cut on "topic" to the app's graph (round 14: only the three, no map of every save first): the new save's dot, just tapped, its ties to two older saves lit and titled (Four Thousand Weeks and the procrastination talk), the rest receded, as the app's own camera settles on them | and connects it to / what you've saved before. | "and connects it to what you've saved before." | a tick; two linked notes on "connects" |
+| 0:12.8 | (Round 17) On "topic" the thumb presses the card's ⋯ and its actions sheet rises, the app's own | | | a tick |
+| 0:13.5 | "See in graph" lifts and is pressed, on "connects" | and connects it to / what you've saved before. | "and connects it to what you've saved before." | a tick |
+| 0:13.7 | The sheet goes at once (as in the app) and the card lifts off the feed and shrinks into its own dot, turning its orange, as the app's graph opens under it (round 14: only the three, no map of every save first): its ties to two older saves lit and titled (Four Thousand Weeks and the procrastination talk), the rest receded, as the app's own camera settles on them | | | |
+| 0:14.2 | The card lands: its dot pings once | | | two linked notes, a low swell |
 | 0:15.6 | Cut to Ask opening, settled and held still (rounds 14 and 15: its whole mark, its own header), "What do you want to recall? Answers come only from your 23 saves, with sources you can open.", and the one-tap questions it suggests about the saves; one slow push from here to the proof | Now every save is / one question away. | "Now every save is one question away." | a click, a light note; the drums out |
 | 0:18.3 | "So," over Ask opening; on "ask" the question is sent and the chat takes the opening's place in the same shot (round 14: no cut to the composer and back): "What connects my 3 saves about procrastination?" | So, ask it anything, / and get the answer, / with the proof. | "So, ask it anything, and get the answer, with the proof." | a click, a low note |
 | 0:18.7 | The answer streams under the question ("All three agree: …"), drawn from the three | | | |
-| 0:21.0 | On "proof": the camera settles on the answer and the saves it came from, cited (Tim Urban's talk, Four Thousand Weeks, this reel); the paper rises over the question | | | the band lands, full |
+| 0:21.0 | On "proof": the camera settles on the answer and the saves it came from, cited (Tim Urban's talk, Four Thousand Weeks, this reel, an X post from @machinaapp: round 17); the paper rises over the question | | | the band lands, full |
 | 0:21.5 | (Round 13) On the next beat each citation is highlighted in turn, an 8th apart: it pops forward and two ink rings leave its edge like a sonar ping; then held, half a second longer than round 12 | | | a rising ping on each |
 | 0:22.9 | The app dissolves into the paper; the app's own launch mark draws in (corner ticks, brackets closing, the point striking on "Machina"), the wordmark wipes in, then the tagline word by word, on one line (round 13) | MACHINA / Everything you save, finally useful. | "Machina. Everything you save, finally useful." | the brand's impact, lighter; shimmer |
 | 0:27.1 | The lockup holds to the last frame on a slow push (round 13: the last frame is the logo) | This time, / you'll watch it again. | "This time, you'll watch it again." | the drums out, the pad up to the hook's register; a bell rings over the loop |
@@ -773,9 +780,10 @@ npx remotion render src/index.ts MachinaSaveThis out/savethis/master.mp4 --crf=1
 **What is real and what is not.** Every app pixel is the shipped app on
 `main` (2026-10-21), captured by `capture/shoot.mjs savethisClip`: the
 share-sheet placeholder card, the pill's real phase labels, the card,
-the app's graph (round 4: the Home view switcher's Graph, then a tap on the
-new save's dot, which lights its ties to two saves dated before it,
-`SAVETHIS.related`, with the app's own focus, labels and camera glide),
+the app's graph (round 17: the card's own ⋯, then "See in graph", which
+opens the graph focused on the new save and lights its ties to two saves
+dated before it, `SAVETHIS.related`, with the app's own focus, labels and
+camera glide; until round 16, Home's Graph view and a tap on the dot),
 and Ask (round 6: the tab, a real question typed, the answer streamed
 from three saves with their citations; round 12: the question asks about
 the three saves the graph just tied together). The take still records
@@ -790,9 +798,13 @@ drawing unchanged). Scripted, as in every capture: the backend
 sources, every claim in it taken from the three cards' own summaries). The one card
 written for this reel is the reel's own save (`SAVETHIS` in
 `capture/library.mjs`): what the app would make of this post, with the
-brand handle `@machinaapp` (the X handle; an Instagram handle is not
-recorded anywhere). The iOS share sheet and Instagram's UI are not
-captured, so they are not shown. No recipe cards in this account (owner,
+brand handle `@machinaapp`, as an X post (`x.com/machinaapp`; round 17:
+Machina has no Instagram account, so the citation must not send anyone
+looking for one). The iOS share sheet and Instagram's UI are not
+captured, so they are not shown. One move is the reel's, not the app's:
+the card shrinking into its dot (in the app the sheet closes and the
+graph fades in); every pixel in it is the card's own, from the frame
+before its sheet rose. No recipe cards in this account (owner,
 2026-10-02).
 
 **Two deliberate breaks from the house rules.** The last word is the
@@ -832,6 +844,19 @@ highlight: each pops forward on its ping and two ink rings leave its edge
 concentric with it). The pings sit on the beat after "proof" is said, and
 the score strikes them back up through the mix's duck under the voice (it
 mirrors `mix-vo.mjs`'s envelope), so the three land alike.
+
+**Captions and the no-fade edition (round 17).** The owner read the
+captions' mask roll at 0:05 as a rendering glitch on a phone: each line
+now fades up into place as it is said, and the line before is gone first
+(the kit's `KineticLine clean`); nothing is ever sliced. And the paper
+fades over the screens' top and bottom hid the iOS status bar, so
+`MachinaSaveThisNoFade` keeps the same reel, sound and timing without
+them: every screen whose top is in frame hangs just under the captions,
+status bar and rounded corners in view, as on a phone (the card, the
+graph and the proof framed wider, the graph opening in the very screen
+the feed leaves); the pill is still framed close, the screen's top far
+above, and there each caption line sits on a paper pill, Instagram's own
+way of setting type over a picture. Hook and sign-off are unchanged.
 
 **Voice.** Gemini TTS, Sulafat, per-line direction (the timeline is the
 script). Two lines were re-voiced quicker (run 2: the shaft line read

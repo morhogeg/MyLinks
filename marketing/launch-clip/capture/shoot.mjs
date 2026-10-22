@@ -777,7 +777,7 @@ const takes = {
     // focused on it, its ties to the saves before it lit (the app's own
     // card-to-graph route; no tap on its dot needed)
     const CARD = page.locator('main article.surface-card', { hasText: S.title });
-    const SHEET = { ...RECTS, more: ['main article.surface-card button[aria-label="Actions"]'], sheet: ['[role=dialog]'], seeInGraph: ['[role=dialog] *', 'See in graph'] };
+    const SHEET = { ...RECTS, more: ['main article.surface-card button[aria-label="Actions"]'], sheet: ['[role=menu]'], seeInGraph: ['[role=menuitem]', 'See in graph'] };
     await t.snap({ rects: SHEET });
     t.mark('moreTap');
     await visible(CARD.locator('button[aria-label="Actions"]')).click();

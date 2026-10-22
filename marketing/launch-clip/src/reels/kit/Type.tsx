@@ -59,10 +59,11 @@ export const KineticLine: React.FC<{
   /** with `clean`: the frame the previous line is gone by; this one never
    *  shows before it, so two lines never share the band */
   enterAt?: number;
-  /** with `clean`: a soft glow of this tone around the type */
-  halo?: string;
-}> = ({ text, frame, from, to, starts, size = 64, sizes, width = 940, align = 'center', color = INK, weight = 600, font = sans, tracking = '-0.028em', clean = false, enterAt, halo }) => {
-  if (clean) return <CleanLine {...{ text, frame, from, to, starts, size, sizes, width, align, color, weight, font, tracking, enterAt, halo }} />;
+  /** with `clean`: each line on a pill of this tone (at `alpha`), for type
+   *  set over UI with no paper band under it */
+  plate?: Plate;
+}> = ({ text, frame, from, to, starts, size = 64, sizes, width = 940, align = 'center', color = INK, weight = 600, font = sans, tracking = '-0.028em', clean = false, enterAt, plate }) => {
+  if (clean) return <CleanLine {...{ text, frame, from, to, starts, size, sizes, width, align, color, weight, font, tracking, enterAt, plate }} />;
   // (2026-10-04, owner: the word-by-word blur reveal read "dated and laggy";
   // the full captions stay, in the Headline motion) each LINE rises out of
   // its own mask in one decisive move (HEAD_IN frames, ease-out quint, no
@@ -165,6 +166,11 @@ export const Kicker: React.FC<{ text: string; frame: number; from: number; to: n
 const CLEAN_IN = 6;
 const CLEAN_OUT = 3;
 
+/** a clean line's pill: a #RRGGBB tone, and how much of it is up (0–1) */
+export type Plate = { tone: string; alpha: number };
+const rgba = (hex: string, a: number) =>
+  `rgba(${parseInt(hex.slice(1, 3), 16)},${parseInt(hex.slice(3, 5), 16)},${parseInt(hex.slice(5, 7), 16)},${a.toFixed(3)})`;
+
 const CleanLine: React.FC<{
   text: string;
   frame: number;
@@ -180,14 +186,27 @@ const CleanLine: React.FC<{
   font: string;
   tracking: string;
   enterAt?: number;
-  halo?: string;
-}> = ({ text, frame, from, to, starts, size, sizes, width, align, color, weight, font, tracking, enterAt, halo }) => {
+  plate?: Plate;
+}> = ({ text, frame, from, to, starts, size, sizes, width, align, color, weight, font, tracking, enterAt, plate }) => {
   if (frame > to) return null;
+  // the pills (one a line, as Instagram sets type on a background) grow out
+  // of the line's own padding, so the type sits exactly where it does bare
+  const p = plate && plate.alpha > 0.002 ? plate : undefined;
   const lines = text.split('\n').map((l) => l.split(' ').filter(Boolean));
   const out = 1 - EASE_IN_OUT(Math.min(1, Math.max(0, (frame - (to - CLEAN_OUT)) / CLEAN_OUT)));
   let w = -1;
   return (
-    <div style={{ width, display: 'flex', flexDirection: 'column', alignItems: align === 'center' ? 'center' : 'flex-start', gap: 2 }}>
+    <div
+      style={{
+        width,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: align === 'center' ? 'center' : 'flex-start',
+        gap: 2,
+        // one shadow under the pills together
+        filter: p ? `drop-shadow(0 8px 18px rgba(16,24,40,${(0.16 * p.alpha).toFixed(3)}))` : undefined,
+      }}
+    >
       {lines.map((words, li) => {
         const firstWord = w + 1;
         w += words.length;
@@ -206,9 +225,10 @@ const CleanLine: React.FC<{
               letterSpacing: tracking,
               color,
               textAlign: align,
-              padding: '0.06em 0.1em 0.14em',
-              margin: '-0.06em 0 -0.14em',
-              textShadow: halo ? `0 0 10px ${halo}, 0 0 18px ${halo}, 0 0 28px ${halo}, 0 0 40px ${halo}` : undefined,
+              padding: p ? '0.12em 0.4em 0.18em' : '0.06em 0.1em 0.14em',
+              margin: p ? '-0.12em 0 -0.18em' : '-0.06em 0 -0.14em',
+              borderRadius: p ? '0.36em' : undefined,
+              background: p ? rgba(p.tone, p.alpha) : undefined,
             }}
           >
             {words.join(' ')}

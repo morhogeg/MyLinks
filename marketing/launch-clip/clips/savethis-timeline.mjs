@@ -54,8 +54,13 @@ export const HITS = {
   phase0: beat(19), // the real pipeline, a phase a beat…
   done: beat(24), // …and the card, read
   // (owner, round 14: the cut from the whole graph to the three was too
-  // much) only the three: the new save and its ties to two older saves, lit
-  graph: beat(28), // "…by topic,": CUT to the graph, the new save's ties lit
+  // much) only the three: the new save and its ties to two older saves, lit;
+  // (owner, round 17: the hard cut did not show how you get there) the
+  // card's own way in: its ⋯, its actions sheet's "See in graph", and the
+  // card shrinking into its dot as the app's graph opens on it
+  moreTap: beat(27.5), // "…topic,": the thumb on the card's ⋯, its actions sheet rising
+  graphPick: beat(29), // "See in graph", pressed on "connects"
+  graph: beat(29) + 4, // the sheet gone, the card shrinks into its dot as the graph opens on it, its ties lit
   connect: beat(29), // "…connects it to what you've saved before"
   // (rounds 10, 11) the bridge: what all that reading adds up to, over
   // Ask's own opening screen, its suggestions questions about the saves

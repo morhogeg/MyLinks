@@ -1,6 +1,6 @@
 import React from 'react';
 import { AbsoluteFill } from 'remotion';
-import { KineticLine, Kicker } from './Type';
+import { KineticLine, Kicker, type Plate } from './Type';
 
 /**
  * The narration, on screen. Every reel caption is a KineticLine revealed on
@@ -55,10 +55,10 @@ export const Captions: React.FC<{
   showKickers?: boolean;
   /** lines fade in and out, never cut by a mask (KineticLine `clean`) */
   clean?: boolean;
-  /** with `clean`: a soft glow of this tone around the type, for lines set
-   *  over UI with no paper band under them */
-  halo?: string;
-}> = ({ frame, fps, captions, timing, kickers = [], showCaptions = true, showKickers = true, clean = false, halo }) => (
+  /** with `clean`: each line on a pill of this tone, for lines set over UI
+   *  with no paper band under them */
+  plate?: Plate;
+}> = ({ frame, fps, captions, timing, kickers = [], showCaptions = true, showKickers = true, clean = false, plate }) => (
   <AbsoluteFill style={{ pointerEvents: 'none' }}>
     {showKickers &&
       kickers.map((k) => (
@@ -100,7 +100,7 @@ export const Captions: React.FC<{
               width={c.place === 'hook' ? 960 : 980}
               clean={clean}
               enterAt={clean && before ? before.to + 1 : undefined}
-              halo={halo}
+              plate={plate}
             />
           </div>
         );
