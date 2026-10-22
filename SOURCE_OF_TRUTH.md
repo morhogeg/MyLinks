@@ -2637,6 +2637,33 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-22 (round 14) — SAVE THIS: one graph shot, the whole Ask mark,
+  one Ask shot, "with your saves from countless apps" (owner: "graph: show
+  just the 2nd one, a bit longer; the jump from the first graph to the
+  second is overwhelming"; "the Machina logo in Ask should be the full logo,
+  not just the frame part"; "instead of 'with all the others' say something
+  like 'with all your saves from countless apps'"; "the question written,
+  then a jump to the question and the answer: just do one frame").** Branch
+  `claude/reel-save-this`. The graph is one shot of the new save's dot and
+  its two lit, titled ties, joined twenty capture frames after the take's
+  tap (the app's glide in on them mostly done), on a slow push, 2.6s. Ask
+  opening now plays the app's own launch of its mark to the end: the reel
+  had held a frame from mid-launch, brackets only; the take types the
+  question below the frame meanwhile, and the camera steps with the app's
+  12pt layout shift so the screen holds still. The Ask beat is one shot: on
+  "ask" the question is sent and the chat takes the opening's place in the
+  same framing (a three-frame cross-fade), the answer streaming a chunk every
+  two frames; the composer shot is gone. "Right down there, with your saves
+  from countless apps." (the quicker of two reads, 5% faster with Rubber
+  Band): 80 words, no cut moved. Two pushes of the narration request started
+  no workflow run, so `narration-tts.yml` can now also be started by hand
+  (`workflow_dispatch`); run 51 voiced it. 28.5s. **Verified:** gates (bans,
+  windows, every line 12.9 to 19.5dB over the music, −14.04 LUFS, −1.26
+  dBTP, audio seam step 0.014 against the score's own 0.105); every third
+  frame from the heap to the proof and the changed shots again after the
+  push tweak; every frame pair scanned for one-frame flashes (none); the
+  encode (854 frames, 28.47s, −14.0 LUFS, −1.1 dBTP). **Not verified:**
+  listened to.
 - **2026-10-22 (round 13) — SAVE THIS: the logo to the last frame, a ping
   on each citation (owner: "final frame: the Machina logo, keep 'this time
   you'll watch it'"; "the graph lingers a bit too long"; "the proof should
