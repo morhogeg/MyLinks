@@ -810,14 +810,26 @@ sitting in a world; the vignette is a breath; the well stays grey.)
 and the score is rendered twice in a row with the second copy kept, so
 its reverb and delay tails ring on into the start.
 
+**Finish (round 11, a frame-by-frame pass over the render).** Under the
+graph, paper over the frame's foot (Instagram's caption zone): the app's
+own tab bar rode just under the edge and its focus panel slid up as the
+thumb tapped. On the composer shot the screen has no studio shadow or
+glass edge (`AppShot`'s `edge`), so its foot, mid-frame there, melts into
+paper of its own tone instead of a grey band. And the dive's replica
+brings a margin of plain paper, which covers the card's grey letterbox
+and hairline as they shrink past the frame's edges in the last frames
+(they outlined the frame for a moment); at the hand-over it lies wholly
+outside the frame, so frame 0 is untouched.
+
 **Voice.** Gemini TTS, Sulafat, per-line direction (the timeline is the
 script). Two lines were re-voiced quicker (run 2: the shaft line read
 3.84s, the tagline 3.13s). Lines are resampled to 44.1kHz with soxr
 before the mix (`audio/vo-to-44k.py`): the mix's linear interpolation
 of 24kHz voice is the REVISIT clip's "metallic" sizzle. Then de-essed
 (`audio/vo-deess.py`, round 11): two takes hit the "s" of "save" as hard
-as the vowels, a hiss on a phone; only the band above 4.5kHz, only where
-it runs over −12.5 dBFS, so the other lines come back bit for bit.
+as the vowels, a hiss on a phone, and one sprayed its top octave; two
+bands (above 4.5kHz, then above 9.5kHz), each only where it runs over its
+threshold, so the other lines come back bit for bit.
 
 ## Motion language
 

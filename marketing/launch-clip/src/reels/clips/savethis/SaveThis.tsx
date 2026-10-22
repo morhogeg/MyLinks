@@ -65,6 +65,17 @@ export const SaveThis: React.FC<{
           }}
         />
       )}
+      {/* (round 11) under the graph, paper over the frame's foot (Instagram's
+          caption zone, well below the dots): the app's tab bar rides just
+          under the edge, and its focus panel slides up as the thumb taps */}
+      {f >= HITS.graph && f < HITS.knows && (
+        <AbsoluteFill
+          style={{
+            pointerEvents: 'none',
+            background: `linear-gradient(0deg, ${GRADE.tone} 0px, ${GRADE.tone} 200px, ${clearOf(GRADE.tone)} 330px)`,
+          }}
+        />
+      )}
       {/* (round 7) on the proof, the paper rises over the question bubble
           (the camera is down on the answer and its citations): above the
           answer's first line nothing but the tagline. (round 11) As the

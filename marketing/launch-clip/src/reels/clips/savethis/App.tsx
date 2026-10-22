@@ -284,6 +284,10 @@ export const App: React.FC<{ f: number }> = ({ f }) => {
   const v = inGraph ? { x: 0, y: 0 } : camVelocity(appKeys, f, 1);
   // the iris: a circle from the card's mark, open by the time it lands
   const r = prog(f, S.iris - 1, S.iris + 18, EASE_IN_OUT);
+  // (round 11) the composer shot frames the screen's foot mid-frame: no
+  // studio shadow and no glass edge there, so the screen (the paper's own
+  // tone) melts into the paper and the composer floats on it
+  const bare = f >= S.askTap && f < S.send;
   const iris = r < 0.999 ? { x: center(MARK).x, y: center(MARK).y, r: 6 + r * 790 } : null;
   // (round 6) the proof: each citation lifts as it lands, one by one, and
   // lets go before the thumb opens this reel's
@@ -296,7 +300,7 @@ export const App: React.FC<{ f: number }> = ({ f }) => {
   const upAsk = f >= SAVES_AT - 2 && f < S.askTap ? prog(f, SAVES_AT - 2, SAVES_AT + 10, EASE_MODAL) : 0;
   return (
     <AbsoluteFill>
-      <AppShot take={T} i={i} cam={cam} motion={{ x: v.x, y: v.y }} iris={iris} shadow={r}>
+      <AppShot take={T} i={i} cam={cam} motion={{ x: v.x, y: v.y }} iris={iris} shadow={bare ? 0 : r} edge={bare ? 0 : 1}>
         {/* (round 3) "sums it up": its summary; "files it by topic": its topic */}
         {f >= SUMS_AT - 4 && f < S.graph && (
           <Lift take={T} i={i} rect={SUMMARY} radius={10} lift={Math.max(upSum, 0.002)} rise={1.5} grow={0.012} ring={0.6 * upSum} />

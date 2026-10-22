@@ -32,6 +32,9 @@ export const AppShot: React.FC<{
   opacity?: number;
   /** 0–1 how far the studio shadow reaches (depth off the paper). */
   shadow?: number;
+  /** 0–1 the glass edge's strength (0 with no shadow: the screen melts into
+   *  paper of its own tone, its edges unseen). */
+  edge?: number;
   /** screen-space gaussian blur, px (depth of field for a screen pushed back). */
   blur?: number;
   /** 0–1 darken (a screen pushed behind something). */
@@ -55,6 +58,7 @@ export const AppShot: React.FC<{
   children,
   opacity = 1,
   shadow = 1,
+  edge = 1,
   blur = 0,
   dim = 0,
   focus,
@@ -200,7 +204,7 @@ export const AppShot: React.FC<{
           )}
         </div>
         {/* the glass edge */}
-        {!iris && (
+        {!iris && edge > 0 && (
           <div
             style={{
               position: 'absolute',
@@ -209,7 +213,7 @@ export const AppShot: React.FC<{
               width: box.w,
               height: box.h,
               borderRadius: box.r,
-              boxShadow: `inset 0 0 0 ${Math.max(1, 0.6 * zoom) / s}px rgba(16,24,40,0.10)`,
+              boxShadow: `inset 0 0 0 ${Math.max(1, 0.6 * zoom) / s}px rgba(16,24,40,${0.1 * edge})`,
             }}
           />
         )}
