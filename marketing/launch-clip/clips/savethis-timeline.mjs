@@ -112,9 +112,14 @@ export const CAPTIONS = [
   // (owner, round 7: no "weeks later"; the problem in one line, then Ask
   // as its payoff) over the feed, flicked past every other save…
   { at: HITS.issue, to: HITS.askTap, text: 'But you’ll never\nrewatch them all.', style: 'Honest and a little wry, a small shrug in the voice; quick and light, no drawn-out words.', pace: PACE },
-  // …so: Ask, on a real question; the answer, and the saves it came from
-  { at: HITS.askTap + 3, to: HITS.send + 6, text: 'So ask your saves anything.', style: 'Easy and sure, like the obvious fix; quick and light, one breath.', pace: PACE },
-  { at: HITS.send + 7, to: HITS.tagline - 6, text: 'Get the answer,\nand the proof.', style: 'Pleased and sure, two quick beats: "Get the answer," then "and the proof" landing with a small smile; no drawn-out words.', pace: PACE },
+  // (owner, round 8: the step from the problem to Ask was missing, and
+  // "the answer, and the proof" never said who gets it) the link: it has
+  // already been through every save; over the Ask screen ("What do you want
+  // to recall? Answers come only from your saves, with sources you can open.")
+  { at: 483, to: 516, text: 'Machina already did.', style: 'Knowing and warm, the twist, with a small smile: the name light, "already did" landing with quiet confidence; quick, no drawn-out words.', pace: PACE },
+  // …so ask it: the question types on "ask it anything", the answer streams
+  // on "get the answer", the saves it came from land on "proof"
+  { at: 518, to: 604, text: 'So ask it anything,\nand get the answer,\nwith the proof.', style: 'Easy and clear, like explaining the simplest thing: three light beats, each landing cleanly, a small lift on "proof"; brisk, no drawn-out words.', pace: PACE },
   // the name and the tagline, said once, over the answer and its proof
   // (owner, round 2: the name in the voice); the drawn wordmark wipes in on
   // "Machina"
