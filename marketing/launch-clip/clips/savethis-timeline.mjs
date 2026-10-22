@@ -107,10 +107,10 @@ export const CAPTIONS = [
   // graph: the thumb taps the new save's dot and its ties to older saves light
   { at: 372, to: 432, text: 'and connects it to\nwhat you’ve saved before.', style: 'Clear and genuinely pleased, flowing on from the line before; a little lift on "connects", landing warmly on "saved before".', pace: PACE },
   { at: 434, to: 514, text: 'Weeks later, buried\nunder everything else,', style: 'Storytelling, quick and a touch dramatic; trailing on into the next line.', pace: PACE },
-  { at: 518, to: 554, text: 'type what you remember.', style: 'Easy and casual, like the simplest thing in the world.', pace: PACE },
-  // (owner, round 5: the search showed the result but nobody said it) the
-  // payoff, on the card coming back: found, from a half-memory, not its title
-  { at: 556, to: 624, text: 'There it is,\nexactly the one you meant.', style: 'The payoff, warm and quietly delighted: a small reveal on "There it is", then quick and sure, a light lift on "exactly"; no drawn-out words.', pace: PACE },
+  // (owner, round 6: show Ask, not finding) a real question about the
+  // saves; the answer, and the saves it came from cited under it: the proof
+  { at: 518, to: 566, text: 'ask your saves anything.', style: 'Easy and inviting, the turn of the story: light and quick, a small lift on "anything"; no drawn-out words.', pace: PACE },
+  { at: 580, to: 640, text: 'Get the answer,\nand the proof.', style: 'Pleased and sure, two quick beats: "Get the answer," then "and the proof" landing with a small smile; no drawn-out words.', pace: PACE },
   // the find: the name and the tagline, said once, over the save it just
   // brought back (owner, round 2: the name in the voice); the drawn wordmark
   // wipes in on "Machina"

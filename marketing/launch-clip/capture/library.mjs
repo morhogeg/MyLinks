@@ -618,15 +618,19 @@ export const SAVETHIS = {
   query: 'never watch it again',
   hits: ['savethis'],
   /**
-   * (round 6: Ask, not search) what the viewer remembers of it, asked: the
-   * hook's own words, half-remembered. The answer is what Ask Machina writes
-   * from the card (its summary, its source, when it was saved), grounded in
-   * it alone: one citation, this reel.
+   * (owner, round 6: show Ask, not finding; a real question on real saves)
+   * Ask Machina, asked about putting things off: the answer is drawn from
+   * three saves and says so, each a citation (the proof). Every claim is in
+   * its card's summary: Tim Urban's talk (the goals with no deadline quietly
+   * never happen), Four Thousand Weeks (choosing what to neglect is the
+   * skill) and this reel (most saved posts never get watched again), the
+   * last citation, which the reel opens and dives into.
    */
   ask: {
-    question: 'The video that said I’d never watch it again?',
-    answer: 'You saved it three weeks ago: **You’re going to save this video**, from @machinaapp. Its point: most saved posts never get watched again.',
-    sources: ['savethis'],
+    question: 'What do my saves say about putting things off?',
+    answer:
+      'They agree: what has no deadline quietly never happens. Tim Urban’s talk shows why, Four Thousand Weeks says to choose what to neglect, and one reel puts it plainly: most saved posts never get watched again.',
+    sources: ['procrastinator', 'fourthousand', 'savethis'],
   },
   /**
    * The saves it connects to (owner, round 2: show what the read is FOR): the

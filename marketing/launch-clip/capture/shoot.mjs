@@ -599,9 +599,10 @@ const takes = {
   //     (back to Card after, unrecorded);
   //  2. three weeks later: it is dated back, and the saves made since land
   //     on top of it one by one, the way the feed receives them;
-  //  3. (round 6) Ask: the hook's own words, half-remembered, asked; the
-  //     answer streams from the saves, citing this reel, and its citation
-  //     opens the card on its cover (the poster, whole).
+  //  3. (round 6) Ask: a real question about putting things off; the
+  //     answer streams from three saves, each cited (the proof), this reel
+  //     the last, whose citation opens its card on its cover (the poster,
+  //     whole).
   // No cooking content in this reel (owner, 2026-10-02): the two recipe
   // cards and their collection are out of the account for this take. All
   // app motion is rolled at 60fps (the reel plays it at real speed, two
@@ -813,10 +814,11 @@ const takes = {
     t.mark('buried');
     await roll60(40);
 
-    // 3. (round 6: Ask, not search) the Ask tab; the question in the
-    // viewer's own half-memory, typed a character a 60fps frame; the answer
-    // streamed from the saves, citing this reel; its citation opens the
-    // card, whose cover (the poster, whole) the reel dives into
+    // 3. (round 6: Ask, not search) the Ask tab; a real question, typed a
+    // character a 60fps frame; the answer streamed from three saves, each a
+    // citation; this reel's citation opens its card, whose cover (the
+    // poster, whole) the reel dives into
+    const cite = (id) => `button[title="${[...CARDS, S].find((c) => c.id === id).title}"]`;
     const ASKR = {
       askTab: R.askTab,
       composer: R.composer,
@@ -824,7 +826,9 @@ const takes = {
       // the question's bubble and the answer (their message rows' content)
       bubble: ['[data-msg-idx="0"] > div'],
       answer: ['[data-msg-idx="1"] > div'],
-      chip: [`button[title="${S.title}"]`],
+      cite1: [cite(S.ask.sources[0])],
+      cite2: [cite(S.ask.sources[1])],
+      cite3: [cite(S.ask.sources[2])],
       graphChip: ['button', 'Graph'],
     };
     const rollAsk = (n) => t.roll(n, { rects: ASKR, step: 1000 / 60 });
@@ -847,9 +851,9 @@ const takes = {
     await t.thaw();
     await page.keyboard.press('Enter');
     for (let k = 0; k < 80 && !server.chatOpen(); k++) await page.waitForTimeout(25);
-    // (the first chunk is "You saved": chunks end on a word)
-    server.advanceChat(6);
-    await until('You saved');
+    // (chunks end on a word: wait for the answer's first one)
+    server.advanceChat(4);
+    await until(S.ask.answer.split(' ')[0]);
     await t.freeze();
     t.mark('answer');
     for (let done = false; !done; ) {
