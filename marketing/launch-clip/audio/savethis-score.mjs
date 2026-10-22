@@ -8,9 +8,10 @@
  * thud on the heap; the heap rushes up a riser into the brand's impact on
  * "Machina"; the band comes in under the reading (a tick on each phase, a
  * bell on "Saved to Machina") and the graph, holds its breath for the
- * question, and lands, full, on the Ask answer's proof. The dive rises into
- * the poster, and the poster is as bare as the hook, because it IS the
- * hook: the reel loops.
+ * question, and lands, full, on the Ask answer's proof and stays full under
+ * the sign-off (the brand's impact again, lighter, as the app's mark strikes);
+ * the mark opens on a breath of air into the poster, and the poster is as
+ * bare as the hook, because it IS the hook: the reel loops.
  *
  * THE LOOP: the arrangement is rendered twice in a row and the second copy
  * kept, so the reverb and delay tails of the end ring on into the start,
@@ -23,7 +24,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BAR_FRAMES, BEAT, BEAT_FRAMES, CAPTIONS, CHORDS, FPS, HITS, RISERS, TOTAL_FRAMES, TOTAL_SEC, TYPE_FRAMES } from '../clips/savethis-timeline.mjs';
+import { BAR_FRAMES, BEAT, BEAT_FRAMES, CAPTIONS, CHORDS, FPS, HITS, MARK_STRIKE, RISERS, TOTAL_FRAMES, TOTAL_SEC, TYPE_FRAMES } from '../clips/savethis-timeline.mjs';
 import { SR, createSynth } from './synth.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -62,13 +63,13 @@ const VOICINGS = {
 const chordAt = (frame) => VOICINGS[CHORDS.filter(([f]) => f <= frame).at(-1)[1]];
 
 /** the band's density along the story: bare hook, the fall, the turn, the
- *  reading and the graph, the asking held, the proof full, the dive, the
- *  bare poster */
+ *  reading and the graph, the asking held, the proof and the sign-off full,
+ *  the mark opening, the bare poster */
 const density = (f) =>
-  f < H.drop ? 0.18 : f < H.land ? 0.3 : f < H.gather ? 0.36 : f < H.markStrike ? 0.5 : f < H.phase0 ? 0.42 : f < H.knows ? 0.85 : f < H.proof ? 0.6 : f < H.citeTap ? 1 : f < H.poster ? 0.7 : 0.2;
+  f < H.drop ? 0.18 : f < H.land ? 0.3 : f < H.gather ? 0.36 : f < H.markStrike ? 0.5 : f < H.phase0 ? 0.42 : f < H.knows ? 0.85 : f < H.proof ? 0.6 : f < H.opens ? 1 : f < H.poster ? 0.7 : 0.2;
 const DRUMS = [
   [H.phase0, H.knows],
-  [H.proof, H.citeTap + 7],
+  [H.proof, H.opens],
 ];
 const drumsAt = (f) => DRUMS.some(([a, b]) => f >= a && f < b);
 
@@ -184,9 +185,12 @@ const arrange = (o) => {
   [0, 4, 8].forEach((d, k) => pluck(t(H.proof + 2 + d), [76, 79, 83][k], 0.06, (k - 1) * 0.3, 0.4));
   shimmer(t(clearOfVoice(H.proof, 10)), [76, 83, 88], 0.045);
 
-  // ── the dive: the thumb on this reel's citation, its card, a rise into the poster
-  tick(t(H.citeTap), 0.12, 1.1);
-  whoosh(t(H.citeTap) + 0.05, 0.85, 0.07, 0);
+  // ── (round 12) the sign-off: the app's mark draws in on paper, its point
+  // striking as the name is said (the brand's impact, lighter than the
+  // opening's), then the mark opens across the hook into the poster
+  impact(t(MARK_STRIKE), 0.22);
+  shimmer(t(MARK_STRIKE) + 0.06, [79, 84, 88, 91], 0.04);
+  whoosh(t(H.opens + 10), 0.8, 0.045, 0);
   sub(t(H.poster), 33, 0.3, 0.7);
   bell(t(clearOfVoice(H.poster + 2, 4)), 81, 0.06, -0.1, 2.6);
 

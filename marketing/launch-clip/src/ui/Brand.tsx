@@ -184,5 +184,21 @@ export const AnimatedMark: React.FC<{
   );
 };
 
+/** The locked mark opening: the launch's close run the other way and on, the
+ *  brackets `spread` viewBox units further out each side, the point at `dot`
+ *  (0–1). At spread 0 and dot 1 it is AnimatedMark at u = 1, so one hands
+ *  over to the other without a seam; past the travel box it draws on
+ *  (overflow visible). */
+export const OpeningMark: React.FC<{ spread: number; dot: number; style?: React.CSSProperties }> = ({ spread, dot, style }) => {
+  const [l, r] = bracketPaths(spread);
+  return (
+    <svg viewBox={VIEWBOX_ROAM} style={{ overflow: 'visible', ...style }} fill="currentColor">
+      <path d={l} />
+      <path d={r} />
+      {dot > 0 && <circle cx={CX} cy={CY} r={R_HI * dot} opacity={dot} />}
+    </svg>
+  );
+};
+
 /** Frames the app's launch arrival takes (LAUNCH_MS 1300 at 30fps). */
 export const MARK_LAUNCH_FRAMES = 39;

@@ -629,10 +629,12 @@ export const SAVETHIS = {
    * skill) and this reel (most saved posts never get watched again), the
    * last citation, which the reel opens and dives into.
    */
+  // (owner, round 12: the answer cites three saves, so the question asks
+  // about three: the same three the graph just tied together)
   ask: {
-    question: 'What do my saves say about putting things off?',
+    question: 'What connects my 3 saves about procrastination?',
     answer:
-      'They agree: what has no deadline quietly never happens. Tim Urban’s talk shows why, Four Thousand Weeks says to choose what to neglect, and one reel puts it plainly: most saved posts never get watched again.',
+      'All three agree: what has no deadline quietly never happens. Tim Urban’s talk shows why, Four Thousand Weeks says to choose what to neglect, and one reel puts it plainly: most saved posts never get watched again.',
     sources: ['procrastinator', 'fourthousand', 'savethis'],
   },
   /**

@@ -21,18 +21,17 @@ import VO from './savethis-vo.json';
  *          new one already among them, its layout settling; the thumb taps
  *          its dot and its ties to two older saves light up on "what you've
  *          saved before", as the app's camera glides in on them
- *  knows   (rounds 10, 11) "Now every save is one question away": CUT
+ *  knows   (rounds 10–12) "Now every save is one question away": CUT
  *          to Ask opening, its own words ("What do you want to recall?
  *          Answers come only from your 23 saves, with sources you can
  *          open.") over the questions it suggests about the saves
- *  ask     (round 9) "So ask it anything": CUT to Ask's composer, a real
- *          question bursting in; "and get the answer":
- *          sent, the answer streams from the saves; "with the proof": the
- *          three it came from land under it, cited, lifting one by one; the
- *          tagline sits above them
- *  tap     the thumb opens this reel's citation: its card, its cover the
- *          poster whole, and the camera dives into it until it IS the frame
- *          (Dive.tsx hands over to the poster itself)
+ *  ask     (round 9) "So, ask it anything": "So," over Ask opening, CUT on
+ *          "ask" to its composer, a real question bursting in (round 12:
+ *          about the three saves the graph just tied together); "and get
+ *          the answer": sent, the answer streams from them; "with the
+ *          proof": the three land under it, cited, lifting one by one
+ *  out     (round 12) on the sign-off the app dissolves into the paper and
+ *          the brand card takes the frame (EndCard.tsx)
  *
  * App motion plays at its real speed (two 60fps captures an output frame)
  * except where it must read (the result, one a frame).
@@ -82,10 +81,8 @@ export const frameAt = (f: number) => {
   if (f < S.send) return at(T, 'asking', Math.min(CHARS - 1, Math.max(0, f - S.asking) / TYPE_FRAMES));
   // …sent: the answer streams, a chunk a frame…
   if (f < S.proof) return at(T, 'answer', Math.min(STREAM - 1, f - S.send));
-  // …and the saves it came from, cited: held to the tap
-  if (f < S.citeTap) return at(T, 'sources', Math.min(47, f - S.proof));
-  // this reel's citation opens its card, at real speed
-  return at(T, 'open', Math.min(59, (f - S.citeTap) * 2));
+  // …and the saves it came from, cited: held into the sign-off
+  return at(T, 'sources', Math.min(47, f - S.proof));
 };
 
 /** where things sit on the captured screen (points) */
@@ -107,15 +104,6 @@ const PROOF = (() => {
   const cy = (ANSWER[1] + CITES[2][1] + CITES[2][3]) / 2;
   return { z, cy, fy: PROOF_LINE + 10 + (cy - ANSWER[1]) * z };
 })();
-/** (round 11) the three citations as one column (left-aligned on the
- *  screen, so centred on themselves, not on it) */
-const CITED = (() => {
-  const x0 = Math.min(...CITES.map((r) => r[0]));
-  const x1 = Math.max(...CITES.map((r) => r[0] + r[2]));
-  return { cx: (x0 + x1) / 2, cy: (CITES[0][1] + CITES[2][1] + CITES[2][3]) / 2 };
-})();
-/** the opened card's cover: the poster, whole (object-contain, measured) */
-export const COVER = rectOf(T, at(T, 'open', 59), 'poster');
 /** (round 3) the parts of the read the narrator names: its summary, its topic */
 const union = (a: number[], b: number[]): [number, number, number, number] => {
   const x = Math.min(a[0], b[0]);
@@ -131,13 +119,6 @@ const LIST_T = VO.find((v) => v.frame === LIST.at);
 const wordAt = (k: number) => LIST.at + Math.round((LIST_T?.words[k] ?? 0) * FPS);
 export const SUMS_AT = wordAt(2); // "sums"
 export const FILES_AT = wordAt(5); // "files"
-/** (round 10) the first question Ask suggests is about this very reel
- *  ("What's the gist of "You're going to save this video"?"): it lifts on
- *  "save" (its box measured on the take's held frame, 4px a point) */
-const SUGGESTION: [number, number, number, number] = [29, 374, 335, 56];
-const BRIDGE = CAPTIONS.find((c) => c.text.startsWith('Now every save'))!;
-const BRIDGE_T = VO.find((v) => v.frame === BRIDGE.at);
-const SAVES_AT = BRIDGE.at + Math.round((BRIDGE_T?.words[2] ?? 0) * FPS); // "save"
 
 /**
  * (round 4) The graph's camera. The app draws its graph to one canvas, so the
@@ -202,7 +183,7 @@ const dotAt = (i: number) => center(rectOf(T, i, 'node0'));
  * the camera goes down onto the answer and its citations, and the paper
  * (SaveThis.tsx PROOF_SCRIM) rises over the bubble.
  */
-const ASK_CAM: Record<'screen' | 'typing' | 'answer' | 'proof' | 'cited' | 'card', Cam> = {
+const ASK_CAM: Record<'screen' | 'typing' | 'answer' | 'proof', Cam> = {
   // (round 10) Ask opening: its mark, "What do you want to recall?", its
   // promise and the questions it suggests about the saves (y 210 to 570 on
   // the take), clear under the band; at least the frame's width (393pt at
@@ -212,10 +193,6 @@ const ASK_CAM: Record<'screen' | 'typing' | 'answer' | 'proof' | 'cited' | 'card
   typing: { cx: 196.5, cy: center(COMPOSER).y, z: 3.0, fx: 540, fy: 1150, rx: 0, ry: 0, rz: 0 },
   answer: { cx: 196.5, cy: BUBBLE[1] + 140, z: 2.5, fx: 540, fy: 720 + 140 * 2.5, rx: 0, ry: 0, rz: 0 },
   proof: { cx: 196.5, cy: PROOF.cy, z: PROOF.z, fx: 540, fy: PROOF.fy, rx: 0, ry: 0, rz: 0 },
-  // (round 11) the three up close, the frame's middle: the answer and its
-  // Copy/Save/Share row (to y 355 on the take) all under the paper
-  cited: { cx: CITED.cx, cy: CITED.cy, z: 3.0, fx: 540, fy: 985, rx: 0, ry: 0, rz: 0 },
-  card: { cx: center(COVER).x, cy: center(COVER).y + 40, z: 2.75, fx: 540, fy: 1060, rx: 0, ry: 0, rz: 0 },
 };
 
 /** the camera when the app opens: the processing card, its mark in frame */
@@ -227,11 +204,7 @@ export const MARK_TO = {
   size: MARK[2] * OPEN_CAM.z,
 };
 
-/** the dive's end: the cover centred and exactly the frame's width; the
- *  cover is the poster whole (9:16), so it is then exactly the frame, and
- *  its pixels ARE frame 0 (see Dive.tsx) */
-export const DIVE_CAM = { cx: center(COVER).x, cy: center(COVER).y, z: 1080 / COVER[2], fx: 540, fy: 960 };
-/** the dive lands on the poster: the hand-over IS the poster frame */
+/** the frame is the poster again from here (EndCard.tsx) */
 export const HANDOVER = S.poster;
 
 export const appKeys: Key[] = [
@@ -248,9 +221,9 @@ export const appKeys: Key[] = [
   { f: S.graph - 1, z: 2.5, ease: linear },
   // (round 4) S.graph to S.knows: the graph, on its own camera (graphCam)
   { f: S.knows - 1, ...ASK_CAM.screen },
-  // (round 10) CUT to Ask opening on "Now it knows your saves", a slow push…
+  // (rounds 10–12) CUT to Ask opening on "Now every save", a slow push…
   { f: S.knows, ...ASK_CAM.screen },
-  { f: S.askTap - 1, z: ASK_CAM.screen.z * 1.04, ease: linear },
+  { f: S.askTap - 1, z: ASK_CAM.screen.z * 1.06, ease: linear },
   // (round 9) …CUT to its composer on "So ask it anything": the question
   // bursts in
   { f: S.askTap, ...ASK_CAM.typing },
@@ -260,14 +233,9 @@ export const appKeys: Key[] = [
   { f: S.proof - 1, z: ASK_CAM.answer.z * 1.02, ease: linear },
   // the proof: down onto the three citations as they land
   { f: S.proof + 14, ...ASK_CAM.proof, ease: EASE_IN_OUT },
-  // (owner, round 11: under the tagline the chat sat still, "stuck") a slow
-  // glide in on the three, this reel's last, into the thumb opening it
-  { f: S.citeTap - 2, ...ASK_CAM.cited, ease: EASE_IN_OUT },
-  { f: S.citeTap, z: ASK_CAM.cited.z * 1.004, ease: linear },
-  // the thumb opens this reel's citation; its card rises, and the dive
-  // into its cover lands on the poster
-  { f: S.citeTap + 6, ...ASK_CAM.card, ease: EASE_MODAL },
-  { f: HANDOVER, ...DIVE_CAM, ease: EASE_IN_OUT },
+  // held, a slow push, into the sign-off (round 12: the app gives way to
+  // the brand card there)
+  { f: S.tagline + 4, z: ASK_CAM.proof.z * 1.02, ease: linear },
 ];
 
 /** the reel's emphasis on the next beat after an arrival, eased away */
@@ -275,7 +243,7 @@ const lift = (f: number, landed: number, len = 64) =>
   prog(f, landed, landed + 12, EASE_MODAL) * (1 - prog(f, landed + len - 24, landed + len, EASE_IN_OUT));
 
 export const App: React.FC<{ f: number }> = ({ f }) => {
-  if (f < S.iris - 1 || f >= S.poster) return null;
+  if (f < S.iris - 1 || f >= S.tagline + 4) return null;
   const i = frameAt(f);
   // the graph's camera rides the app's, so what it shows stays put: no
   // smear from its own travel
@@ -290,27 +258,25 @@ export const App: React.FC<{ f: number }> = ({ f }) => {
   const bare = f >= S.askTap && f < S.send;
   const iris = r < 0.999 ? { x: center(MARK).x, y: center(MARK).y, r: 6 + r * 790 } : null;
   // (round 6) the proof: each citation lifts as it lands, one by one, and
-  // lets go before the thumb opens this reel's
-  const upCite = (k: number) => (f >= S.proof ? lift(f, S.proof + 2 + 4 * k, S.citeTap - 8 - (S.proof + 2 + 4 * k)) : 0);
+  // stays up into the sign-off
+  const upCite = (k: number) => (f >= S.proof ? prog(f, S.proof + 2 + 4 * k, S.proof + 14 + 4 * k, EASE_MODAL) : 0);
+  // (round 12) the app dissolves into the paper just ahead of the sign-off,
+  // gone as the mark starts to draw
+  const gone = prog(f, S.tagline - 14, S.tagline - 6, EASE_IN_OUT);
   // the read's parts, each on the word that names it: the summary hands over
   // to the topic, which stays up into the cut to the topics' map
   const upSum = f >= SUMS_AT - 2 && f < S.graph ? lift(f, SUMS_AT - 2, S.graph - SUMS_AT + 2) : 0;
   const upTopic = f >= FILES_AT - 2 && f < S.graph ? prog(f, FILES_AT - 2, FILES_AT + 10, EASE_MODAL) : 0;
-  // (round 10) the suggestion about this reel, up on "save" into the cut
-  const upAsk = f >= SAVES_AT - 2 && f < S.askTap ? prog(f, SAVES_AT - 2, SAVES_AT + 10, EASE_MODAL) : 0;
+
   return (
     <AbsoluteFill>
-      <AppShot take={T} i={i} cam={cam} motion={{ x: v.x, y: v.y }} iris={iris} shadow={bare ? 0 : r} edge={bare ? 0 : 1}>
+      <AppShot take={T} i={i} cam={cam} motion={{ x: v.x, y: v.y }} iris={iris} shadow={bare ? 0 : r} edge={bare ? 0 : 1} opacity={1 - gone}>
         {/* (round 3) "sums it up": its summary; "files it by topic": its topic */}
         {f >= SUMS_AT - 4 && f < S.graph && (
           <Lift take={T} i={i} rect={SUMMARY} radius={10} lift={Math.max(upSum, 0.002)} rise={1.5} grow={0.012} ring={0.6 * upSum} />
         )}
         {f >= FILES_AT - 4 && f < S.graph && (
           <Lift take={T} i={i} rect={TOPIC} radius={8} lift={Math.max(upTopic, 0.002)} rise={1.5} grow={0.05} ring={0.7 * upTopic} />
-        )}
-        {/* (round 10) "every save": the suggestion about this very reel */}
-        {f >= SAVES_AT - 4 && f < S.askTap && (
-          <Lift take={T} i={i} rect={SUGGESTION} radius={14} lift={Math.max(upAsk, 0.002)} rise={1.5} grow={0.02} ring={0.6 * upAsk} />
         )}
         {/* (round 4) the thumb on the new save's dot */}
         {f >= S.connect - 9 && f < S.connect + 12 && (
@@ -319,14 +285,10 @@ export const App: React.FC<{ f: number }> = ({ f }) => {
         {/* (round 6) the question, sent */}
         {f >= S.send - 9 && f < S.send + 6 && <Tap x={center(SEND).x} y={center(SEND).y} t={prog(f, S.send - 9, S.send + 6, linear)} />}
         {/* the proof: the citations, lifted one by one (kept mounted: their own raster) */}
-        {f >= S.proof && f < S.citeTap &&
+        {f >= S.proof &&
           CITES.map((r, k) => (
             <Lift key={k} take={T} i={i} rect={r} radius={12} lift={Math.max(upCite(k), 0.002)} rise={1.5} grow={0.02} ring={0.6 * upCite(k)} />
           ))}
-        {/* this reel's citation, opened */}
-        {f >= S.citeTap - 9 && f < S.citeTap + 4 && (
-          <Tap x={center(CITES[2]).x} y={center(CITES[2]).y} t={prog(f, S.citeTap - 9, S.citeTap + 4, linear)} />
-        )}
       </AppShot>
     </AbsoluteFill>
   );

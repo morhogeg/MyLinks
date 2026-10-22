@@ -3,36 +3,36 @@
   "frame": 5,
   "text": "You\u2019re going to save this video.",
   "words": [
-   0.05,
-   0.36,
-   0.625,
-   0.758,
-   0.979,
-   1.2
+   0.06,
+   0.37,
+   0.635,
+   0.768,
+   0.989,
+   1.21
   ]
  },
  {
   "frame": 54,
   "text": "And never watch it again.",
   "words": [
-   0.06,
-   0.258,
-   0.556,
-   0.854,
-   1.003
+   0.08,
+   0.278,
+   0.576,
+   0.874,
+   1.023
   ]
  },
  {
   "frame": 100,
   "text": "Right down there, with all the others.",
   "words": [
-   0.01,
-   0.253,
-   0.576,
-   1.23,
-   1.399,
-   1.534,
-   1.67
+   0.04,
+   0.3,
+   0.637,
+   1.31,
+   1.479,
+   1.614,
+   1.75
   ]
  },
  {
@@ -90,7 +90,7 @@
   ]
  },
  {
-  "frame": 436,
+  "frame": 450,
   "text": "Now every save is one question away.",
   "words": [
    0.03,
@@ -103,24 +103,24 @@
   ]
  },
  {
-  "frame": 516,
-  "text": "So ask it anything, and get the answer, with the proof.",
+  "frame": 530,
+  "text": "So, ask it anything, and get the answer, with the proof.",
   "words": [
-   0.01,
-   0.121,
-   0.269,
-   0.38,
-   0.749,
-   0.897,
-   1.045,
-   1.193,
-   1.489,
-   1.853,
-   2.001
+   0.03,
+   0.32,
+   0.431,
+   0.564,
+   0.91,
+   1.112,
+   1.314,
+   1.586,
+   2.31,
+   2.432,
+   2.719
   ]
  },
  {
-  "frame": 602,
+  "frame": 651,
   "text": "Makeena. Everything you save, finally useful.",
   "words": [
    0.03,
@@ -132,15 +132,15 @@
   ]
  },
  {
-  "frame": 732,
+  "frame": 794,
   "text": "This time, you\u2019ll watch it again.",
   "words": [
-   0.04,
-   0.231,
-   0.8,
-   0.998,
-   1.167,
-   1.252
+   0.05,
+   0.241,
+   0.81,
+   1.008,
+   1.177,
+   1.262
   ]
  }
 ]

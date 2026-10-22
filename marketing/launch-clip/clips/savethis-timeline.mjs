@@ -8,12 +8,14 @@
  * the save falls down a shaft onto every other save; "unless you save it to
  * Machina" floods them with colour and gathers them into the mark; the REAL
  * app reads it and maps it among the saves before it (its graph): now
- * every save is one question away, so it can answer from them: Ask, a real question answered from the saves,
- * every source cited (the proof), this reel among them. The problem is said
- * once, at the top; everything after "Unless" is the answer to it (owner,
- * round 9). Its citation opens its card, whose cover is this reel's first
- * frame: the camera dives into it ("This time, you'll watch it again.") and
- * lands ON frame 0, so the reel loops into its own hook without a cut.
+ * every save is one question away, so it can answer from them: Ask, a real
+ * question about the three saves the graph just tied together, answered from
+ * them, every source cited (the proof), this reel among them. The problem is
+ * said once, at the top; everything after "Unless" is the answer to it
+ * (owner, round 9). The sign-off is the app's own mark drawing in on paper
+ * (round 12); then the mark opens, its brackets parting across the reel's
+ * own hook, and the frame is frame 0 ("This time, you'll watch it again."):
+ * the reel loops into its own hook without a cut.
  *
  * Written in OUTPUT frames on a 128.57 BPM grid, 14 frames a beat (the
  * REVISIT quick cut's pace: an organic Reel, not a feature explainer). Every
@@ -57,19 +59,27 @@ export const HITS = {
   connect: beat(28), // "…connects it to": the thumb on its dot; its ties light on "what you've saved before"
   // (rounds 10, 11) the bridge: what all that reading adds up to, over
   // Ask's own opening screen, its suggestions questions about the saves
-  knows: beat(31), // "Now every save…": CUT from the graph to Ask
-  // (round 9) Ask, the solution's last word, each part on its own word
-  askTap: beat(37), // "So ask…": CUT to Ask's composer, on the beat, as…
-  asking: beat(37), // …the question bursts in on "ask it anything"
-  send: 542, // "and get the answer": sent, the answer streams
-  proof: 574, // "with the proof": the saves it came from, cited
-  tagline: beat(43), // "Machina. Everything you save, finally useful."
-  citeTap: beat(51), // the thumb opens this reel's citation: its card…
-  poster: beat(53), // …and the dive into its cover lands ON frame 0
+  // (owner, round 12: the graph a half second longer) a beat more of it
+  knows: beat(32), // "Now every save…": CUT from the graph to Ask
+  // (round 9) Ask, the solution's last word, each part on its own word;
+  // (round 12) "So," said over Ask opening, the cut on "ask"
+  askTap: beat(38.5), // "…ask": CUT to Ask's composer, on the half beat, as…
+  asking: beat(38.5), // …the question bursts in on "ask it anything"
+  send: 566, // "and get the answer": sent, the answer streams
+  proof: 610, // "with the proof": the saves it came from, cited
+  // (owner, round 12: not the Ask chat under the tagline) the brand card
+  tagline: beat(46.5), // "Machina. Everything you save, finally useful.": the app's own mark draws in
+  opens: beat(54), // the mark settles on the hook's line and its brackets part across it…
+  poster: beat(57), // …off the frame: it is frame 0
 };
 
 /** a whole beat, so the score's pulse runs straight through the loop */
-export const TOTAL_FRAMES = beat(57);
+export const TOTAL_FRAMES = beat(61);
+
+/** (round 12) the sign-off's mark: the app's launch, a touch quicker than its
+ *  39 frames, from just before the name; its point strikes at 0.56 of it */
+export const MARK_DRAW = { from: HITS.tagline - 6, frames: 32 };
+export const MARK_STRIKE = MARK_DRAW.from + Math.round(0.56 * MARK_DRAW.frames);
 export const TOTAL_SEC = TOTAL_FRAMES / FPS;
 
 /** The cut. One beat of story per scene. */
@@ -77,8 +87,9 @@ export const SCENES = [
   { id: 'hook', from: 0, dur: HITS.drop }, // the prediction, the save
   { id: 'shaft', from: HITS.drop, dur: HITS.gather - HITS.drop }, // where saves go
   { id: 'turn', from: HITS.gather, dur: HITS.iris - HITS.gather }, // gathered into the mark
-  { id: 'app', from: HITS.iris, dur: HITS.citeTap - HITS.iris }, // read, buried, asked
-  { id: 'dive', from: HITS.citeTap, dur: HITS.poster - HITS.citeTap }, // into its cover
+  { id: 'app', from: HITS.iris, dur: HITS.tagline - HITS.iris }, // read, mapped, asked
+  { id: 'card', from: HITS.tagline, dur: HITS.opens - HITS.tagline }, // the mark, the name, the line
+  { id: 'opens', from: HITS.opens, dur: HITS.poster - HITS.opens }, // the mark opens on the hook
   { id: 'poster', from: HITS.poster, dur: TOTAL_FRAMES - HITS.poster }, // frame 0 again
 ];
 
@@ -116,22 +127,22 @@ export const CAPTIONS = [
   // again (round 9); (owner, round 11: "better than you do" read as
   // argumentative; the owner's pick of three) over Ask's own opening
   // screen, its suggestions one-tap questions about the saves
-  { at: HITS.knows + 2, to: HITS.askTap - 6, text: 'Now every save is\none question away.', style: 'Warm and easy, a small smile, flowing on from the line before; light and quick, no drawn-out words.', pace: PACE },
+  { at: HITS.knows + 2, to: HITS.askTap - 13, text: 'Now every save is\none question away.', style: 'Warm and easy, a small smile, flowing on from the line before; light and quick, no drawn-out words.', pace: PACE },
   // (owner, round 9: problem, solution, then the problem again made no
   // sense) Ask is the solution's last word, its consequence: because it has
   // read, understood and connected every save, ask it anything; the
   // question types on "ask it anything", the answer streams on "get the
   // answer", the saves it came from land on "proof"
-  { at: HITS.askTap - 2, to: HITS.tagline - 6, text: 'So ask it anything,\nand get the answer,\nwith the proof.', style: 'Confident and simple, one easy sentence in three quick beats; light and brisk, landing softly on "proof".', pace: PACE },
-  // the name and the tagline, said once, over the answer and its proof
-  // (owner, round 2: the name in the voice); the drawn wordmark wipes in on
-  // "Machina"
+  { at: HITS.askTap - 9, to: HITS.tagline - 6, runGap: 0.05, text: 'So, ask it anything,\nand get the answer,\nwith the proof.', style: 'Confident and simple: a clear, warm "So," to open, then one easy sentence in three quick beats; light and brisk, landing softly on "proof".', pace: PACE },
+  // the name and the tagline, said once (owner, round 2: the name in the
+  // voice); (owner, round 12) on paper, the app's own mark drawing in, the
+  // drawn wordmark wiping in on "Machina"
   { at: HITS.tagline, to: HITS.tagline + 100, place: 'scene', text: 'Machina.\nEverything you save,\nfinally useful.', duck: 0.4, style: 'A confident, warm sign-off; the name with a smile, then the tagline sincere but brisk, no drawn-out words.', pace: PACE },
-  // the thumb opens this reel's citation and the camera dives into its
-  // card's cover, landing on frame 0 as the reel starts again under this line. (owner,
-  // round 4: "See? You're watching it again." read as a riddle) The hook's
-  // "never watch it again", answered as a promise
-  { at: HITS.poster - 10, to: HITS.poster + 50, text: 'This time, you’ll\nwatch it again.', duck: 0.4, style: 'Warm and sure, a small smile in the voice: a promise, not a punchline. Light and quick, a short breath after "This time", landing softly on "again".', pace: PACE },
+  // the mark's brackets part across the hook and the frame is frame 0 as
+  // the reel starts again under this line. (owner, round 4: "See? You're
+  // watching it again." read as a riddle) The hook's "never watch it
+  // again", answered as a promise
+  { at: HITS.poster - 4, to: HITS.poster + 50, text: 'This time, you’ll\nwatch it again.', duck: 0.4, style: 'Warm and sure, a small smile in the voice: a promise, not a punchline. Light and quick, a short breath after "This time", landing softly on "again".', pace: PACE },
 ];
 
 /** a small letterspaced label above the line, with it (the kit's Kicker) */
@@ -141,15 +152,16 @@ export const KICKERS = [];
 export const RISERS = [
   [HITS.gather, HITS.markStrike], // the heap rushing up into the mark
   [HITS.asking, HITS.proof], // the question, into the answer's proof
-  [HITS.citeTap, HITS.poster], // the dive into the cover
+  [HITS.opens, HITS.poster], // the mark opening into the poster
 ];
 
 /**
  * Harmony, [from frame, chord], the house vocabulary (C major, the film's
  * voicings): the hook and the fall hang on the minor (the loss), the turn
  * lifts through V to I on the strike, the reading and the graph rest on IV,
- * the bridge and the question lift to V and the proof lands home; the dive
- * leaves on IV, which falls back to vi at the top of the loop.
+ * the bridge and the question lift to V and the proof lands home, under the
+ * sign-off too; the mark opens on V and the poster leaves on IV, which falls
+ * back to vi at the top of the loop.
  */
 export const CHORDS = [
   [0, 'Am7'],
@@ -159,6 +171,6 @@ export const CHORDS = [
   [HITS.done, 'Fmaj7'],
   [HITS.knows, 'G6'],
   [HITS.proof, 'Cmaj7'],
-  [HITS.citeTap, 'G6'],
+  [HITS.opens, 'G6'],
   [HITS.poster, 'Fmaj7'],
 ];

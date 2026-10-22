@@ -144,6 +144,7 @@ def find_script():
             "tts": " ".join((c.get("tts") or c.get("say") or c["text"]).split()),
             "max_pause": c.get("maxPause"),
             "tempo": c.get("tempo"),
+            "run_gap": c.get("runGap"),
             "pace": c.get("pace"),
         }
         for c in data["captions"]
@@ -175,6 +176,7 @@ def savethis_script():
             "tts": " ".join((c.get("tts") or c.get("say") or c["text"]).split()),
             "max_pause": c.get("maxPause"),
             "tempo": c.get("tempo"),
+            "run_gap": c.get("runGap"),
             "pace": c.get("pace"),
         }
         for c in data["captions"]
@@ -249,7 +251,7 @@ def word_timing(text, runs):
     return out
 
 
-def word_timing_voiced(text, samples, sr):
+def word_timing_voiced(text, samples, sr, gap=0.09):
     """Word start times for a Gemini TTS line. Gemini pauses between words,
     not only at punctuation, and breathes at the edges of a line, so
     `word_timing` (built for Kokoro) matched phrases to the wrong runs. Here:
@@ -261,7 +263,10 @@ def word_timing_voiced(text, samples, sr):
 
     import numpy as np
 
-    runs = speech_runs(samples, sr)
+    words = text.split()
+    # `gap`: the shortest pause that splits runs; a line whose phrase break is
+    # quicker (SAVE THIS "…anything, and…", 60ms) sets its own (`runGap`)
+    runs = speech_runs(samples, sr, gap=gap)
     hop = int(sr * 0.01)
     peak = lambda r: float(np.abs(samples[int(r[0] * sr):int(r[1] * sr) + hop]).max(initial=0))
     top = max(peak(r) for r in runs)
@@ -274,7 +279,6 @@ def word_timing_voiced(text, samples, sr):
         runs = runs[:-1]
     while len(runs) > 1 and breath(runs[0], runs[1][0] - runs[0][1]):
         runs = runs[1:]
-    words = text.split()
     phrases, cur = [], []
     for w in words:
         cur.append(w)
@@ -291,16 +295,33 @@ def word_timing_voiced(text, samples, sr):
         acc_v += b_ - a_
         voiced_at.append(acc_v)
     letters = sum(len(w) + 1 for w in words)
-    cuts, done = [], 0
+    # (2026-10-22) the breaks are chosen together, in order, for the best
+    # total fit: one at a time, a long pause later in the line could take an
+    # earlier break and push the rest past it ("So, ask it anything, and get
+    # the answer, with the proof." squeezed its third phrase into 0.1s)
+    wants, done = [], 0
     for ph in phrases[:-1]:
         done += sum(len(w) + 1 for w in ph)
-        want = acc_v * done / letters
-        lo = cuts[-1] + 1 if cuts else 0
-        cand = [i for i in range(lo, len(runs) - 1)]
-        if not cand:
-            break
-        score = lambda i: (runs[i + 1][0] - runs[i][1]) - 0.6 * abs(voiced_at[i] - want)
-        cuts.append(max(cand, key=score))
+        wants.append(acc_v * done / letters)
+    score = lambda i, want: (runs[i + 1][0] - runs[i][1]) - 0.6 * abs(voiced_at[i] - want)
+    n_c = len(runs) - 1
+    cuts = []
+    if wants and n_c >= len(wants):
+        # best[j][i]: the best total for the first j+1 breaks, the last at run i
+        best = [[None] * n_c for _ in wants]
+        back = [[None] * n_c for _ in wants]
+        for i in range(n_c):
+            best[0][i] = score(i, wants[0])
+        for j in range(1, len(wants)):
+            for i in range(j, n_c):
+                prev = max((best[j - 1][h], h) for h in range(j - 1, i) if best[j - 1][h] is not None)
+                best[j][i] = prev[0] + score(i, wants[j])
+                back[j][i] = prev[1]
+        i = max((best[-1][i], i) for i in range(n_c) if best[-1][i] is not None)[1]
+        for j in range(len(wants) - 1, -1, -1):
+            cuts.append(i)
+            i = back[j][i]
+        cuts.reverse()
     groups, start = [], 0
     for c in cuts + [len(runs) - 1]:
         groups.append(runs[start:c + 1])
@@ -388,7 +409,7 @@ def main():
             timing.append({
                 "frame": line.get("frame"),
                 "text": line["text"],
-                "words": word_timing_voiced(line["text"], samples, sr) if engine == "gemini" else word_timing(line["text"], speech_runs(samples, sr)),
+                "words": word_timing_voiced(line["text"], samples, sr, gap=line.get("run_gap") or 0.09) if engine == "gemini" else word_timing(line["text"], speech_runs(samples, sr)),
             })
         print(f"{'ok ' if fits else 'LONG'} {spoken:5.2f}s / {line['window']:4.2f}s  {line['text']}")
 
