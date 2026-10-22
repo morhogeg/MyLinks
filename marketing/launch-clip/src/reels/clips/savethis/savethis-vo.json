@@ -91,21 +91,19 @@
  },
  {
   "frame": 436,
-  "text": "Now it knows your saves better than you do.",
+  "text": "Now every save is one question away.",
   "words": [
    0.03,
-   0.205,
-   0.337,
-   0.6,
-   0.82,
-   1.083,
-   1.39,
-   1.609,
-   1.785
+   0.271,
+   0.793,
+   1.094,
+   1.275,
+   1.516,
+   2.058
   ]
  },
  {
-  "frame": 502,
+  "frame": 516,
   "text": "So ask it anything, and get the answer, with the proof.",
   "words": [
    0.01,
@@ -122,7 +120,7 @@
   ]
  },
  {
-  "frame": 588,
+  "frame": 602,
   "text": "Makeena. Everything you save, finally useful.",
   "words": [
    0.03,
@@ -134,7 +132,7 @@
   ]
  },
  {
-  "frame": 718,
+  "frame": 732,
   "text": "This time, you\u2019ll watch it again.",
   "words": [
    0.04,

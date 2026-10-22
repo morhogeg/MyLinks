@@ -7,8 +7,8 @@
  * save this video and never watch it again (the hook, readable on frame 0);
  * the save falls down a shaft onto every other save; "unless you save it to
  * Machina" floods them with colour and gathers them into the mark; the REAL
- * app reads it and maps it among the saves before it (its graph): now it
- * knows them better than you do, so it can answer from them: Ask, a real question answered from the saves,
+ * app reads it and maps it among the saves before it (its graph): now
+ * every save is one question away, so it can answer from them: Ask, a real question answered from the saves,
  * every source cited (the proof), this reel among them. The problem is said
  * once, at the top; everything after "Unless" is the answer to it (owner,
  * round 9). Its citation opens its card, whose cover is this reel's first
@@ -55,21 +55,21 @@ export const HITS = {
   done: beat(22), // …and the card, read
   graph: beat(26), // "…by topic,": CUT to the graph, the saves mapped by topic
   connect: beat(28), // "…connects it to": the thumb on its dot; its ties light on "what you've saved before"
-  // (round 10) the bridge: what all that reading adds up to, over Ask's
-  // own opening screen, its suggestions questions about the saves
-  knows: beat(31), // "Now it knows your saves…": CUT from the graph to Ask
+  // (rounds 10, 11) the bridge: what all that reading adds up to, over
+  // Ask's own opening screen, its suggestions questions about the saves
+  knows: beat(31), // "Now every save…": CUT from the graph to Ask
   // (round 9) Ask, the solution's last word, each part on its own word
-  askTap: beat(36), // "So ask…": CUT to Ask's composer, on the beat, as…
-  asking: beat(36), // …the question bursts in on "ask it anything"
-  send: 528, // "and get the answer": sent, the answer streams
-  proof: 560, // "with the proof": the saves it came from, cited
-  tagline: beat(42), // "Machina. Everything you save, finally useful."
-  citeTap: beat(50), // the thumb opens this reel's citation: its card…
-  poster: beat(52), // …and the dive into its cover lands ON frame 0
+  askTap: beat(37), // "So ask…": CUT to Ask's composer, on the beat, as…
+  asking: beat(37), // …the question bursts in on "ask it anything"
+  send: 542, // "and get the answer": sent, the answer streams
+  proof: 574, // "with the proof": the saves it came from, cited
+  tagline: beat(43), // "Machina. Everything you save, finally useful."
+  citeTap: beat(51), // the thumb opens this reel's citation: its card…
+  poster: beat(53), // …and the dive into its cover lands ON frame 0
 };
 
 /** a whole beat, so the score's pulse runs straight through the loop */
-export const TOTAL_FRAMES = beat(56);
+export const TOTAL_FRAMES = beat(57);
 export const TOTAL_SEC = TOTAL_FRAMES / FPS;
 
 /** The cut. One beat of story per scene. */
@@ -113,8 +113,10 @@ export const CAPTIONS = [
   { at: 372, to: 432, text: 'and connects it to\nwhat you’ve saved before.', style: 'Clear and genuinely pleased, flowing on from the line before; a little lift on "connects", landing warmly on "saved before".', pace: PACE },
   // (owner, round 10: "So ask it anything" came too abruptly) the bridge,
   // what the reading adds up to, said as the solution, not the problem
-  // again (round 9); over Ask's own opening screen
-  { at: HITS.knows + 2, to: HITS.askTap - 6, text: 'Now it knows your saves\nbetter than you do.', style: 'Warm and a little wry, a knowing smile; quick and light, flowing on from the line before, a small grin on "better than you do".', pace: PACE },
+  // again (round 9); (owner, round 11: "better than you do" read as
+  // argumentative; the owner's pick of three) over Ask's own opening
+  // screen, its suggestions one-tap questions about the saves
+  { at: HITS.knows + 2, to: HITS.askTap - 6, text: 'Now every save is\none question away.', style: 'Warm and easy, a small smile, flowing on from the line before; light and quick, no drawn-out words.', pace: PACE },
   // (owner, round 9: problem, solution, then the problem again made no
   // sense) Ask is the solution's last word, its consequence: because it has
   // read, understood and connected every save, ask it anything; the

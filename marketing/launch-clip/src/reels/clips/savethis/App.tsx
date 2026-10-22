@@ -21,7 +21,7 @@ import VO from './savethis-vo.json';
  *          new one already among them, its layout settling; the thumb taps
  *          its dot and its ties to two older saves light up on "what you've
  *          saved before", as the app's camera glides in on them
- *  knows   (round 10) "Now it knows your saves better than you do": CUT
+ *  knows   (rounds 10, 11) "Now every save is one question away": CUT
  *          to Ask opening, its own words ("What do you want to recall?
  *          Answers come only from your 23 saves, with sources you can
  *          open.") over the questions it suggests about the saves
@@ -133,11 +133,11 @@ export const SUMS_AT = wordAt(2); // "sums"
 export const FILES_AT = wordAt(5); // "files"
 /** (round 10) the first question Ask suggests is about this very reel
  *  ("What's the gist of "You're going to save this video"?"): it lifts on
- *  "saves" (its box measured on the take's held frame, 4px a point) */
+ *  "save" (its box measured on the take's held frame, 4px a point) */
 const SUGGESTION: [number, number, number, number] = [29, 374, 335, 56];
-const BRIDGE = CAPTIONS.find((c) => c.text.startsWith('Now it knows'))!;
+const BRIDGE = CAPTIONS.find((c) => c.text.startsWith('Now every save'))!;
 const BRIDGE_T = VO.find((v) => v.frame === BRIDGE.at);
-const SAVES_AT = BRIDGE.at + Math.round((BRIDGE_T?.words[4] ?? 0) * FPS); // "saves"
+const SAVES_AT = BRIDGE.at + Math.round((BRIDGE_T?.words[2] ?? 0) * FPS); // "save"
 
 /**
  * (round 4) The graph's camera. The app draws its graph to one canvas, so the
@@ -292,7 +292,7 @@ export const App: React.FC<{ f: number }> = ({ f }) => {
   // to the topic, which stays up into the cut to the topics' map
   const upSum = f >= SUMS_AT - 2 && f < S.graph ? lift(f, SUMS_AT - 2, S.graph - SUMS_AT + 2) : 0;
   const upTopic = f >= FILES_AT - 2 && f < S.graph ? prog(f, FILES_AT - 2, FILES_AT + 10, EASE_MODAL) : 0;
-  // (round 10) the suggestion about this reel, up on "saves" into the cut
+  // (round 10) the suggestion about this reel, up on "save" into the cut
   const upAsk = f >= SAVES_AT - 2 && f < S.askTap ? prog(f, SAVES_AT - 2, SAVES_AT + 10, EASE_MODAL) : 0;
   return (
     <AbsoluteFill>
@@ -304,7 +304,7 @@ export const App: React.FC<{ f: number }> = ({ f }) => {
         {f >= FILES_AT - 4 && f < S.graph && (
           <Lift take={T} i={i} rect={TOPIC} radius={8} lift={Math.max(upTopic, 0.002)} rise={1.5} grow={0.05} ring={0.7 * upTopic} />
         )}
-        {/* (round 10) "your saves": the suggestion about this very reel */}
+        {/* (round 10) "every save": the suggestion about this very reel */}
         {f >= SAVES_AT - 4 && f < S.askTap && (
           <Lift take={T} i={i} rect={SUGGESTION} radius={14} lift={Math.max(upAsk, 0.002)} rise={1.5} grow={0.02} ring={0.6 * upAsk} />
         )}
