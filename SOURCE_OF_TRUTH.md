@@ -2669,8 +2669,12 @@ exact-match, capped.
   `shoot.mjs`. **Verified:** gates (brand bans on 341 strings, windows,
   safe area, every line 10 to 24dB over the music in the speech band,
   −14.02 LUFS, −1.25 dBTP, the loop's audio seam); stills at every beat;
-  frame 839 against frame 0. **Not verified:** listened to on speakers; the
-  owner has not seen it. Nothing merges to `main` until the owner reviews.
+  the encode (840 frames, 28.000s, H.264 High yuv420p BT.709, AAC 48kHz
+  320k, 20.9MB), every frame pair scanned (no one-frame flash), frame 839
+  against frame 0 at 35.3dB PSNR. Rendering note: one browser composites on
+  one core, so the README renders six frame ranges in parallel browsers
+  and joins them. **Not verified:** listened to on speakers; the owner has
+  not seen it. Nothing merges to `main` until the owner reviews.
 - **2026-10-22 (round 14) — SAVE THIS: one graph shot, the whole Ask mark,
   one Ask shot, "with your saves from countless apps" (owner: "graph: show
   just the 2nd one, a bit longer; the jump from the first graph to the

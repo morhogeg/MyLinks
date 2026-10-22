@@ -877,7 +877,21 @@ python3 scripts/needle-cards-sm.py      # the field's half-size cards (a speed c
 python3 audio/synth-vo.py needle && python3 audio/vo-to-44k.py out/vo/needle && python3 audio/vo-deess.py out/vo/needle
 node audio/needle-score.mjs && node audio/mix-vo.mjs needle
 node audio/needle-verify.mjs           # bans, windows, safe area, voice over music, −14 LUFS, the loop
-npx remotion render src/index.ts MachinaNeedle out/needle/master.mp4 --crf=14 --audio-bitrate=320k
+# render in parallel frame ranges: one browser composites on ONE core (its
+# GPU process), so four ranges in four browsers finish ~3× sooner; the
+# tunnel (480–559) is the heavy stretch, split it finer
+for r in a:0-299 b:300-479 c1:480-499 c2:500-529 c3:530-559 d:560-839; do
+  npx remotion render src/index.ts MachinaNeedle out/needle/seg-${r%%:*}.mp4 --frames=${r#*:} --concurrency=1 --muted --crf=14 &
+done; wait
+printf "file 'seg-%s.mp4'\n" a b c1 c2 c3 d > out/needle/concat.txt
+ffmpeg -f concat -safe 0 -i out/needle/concat.txt -c copy out/needle/joined.mp4
+# the posting file: Remotion's JPEG frames are full-range BT.601; the feeds
+# expect limited-range BT.709 yuv420p, with AAC 48kHz
+ffmpeg -i out/needle/joined.mp4 -i public/clips/needle/score-vo.wav -map 0:v -map 1:a \
+  -vf "scale=in_range=full:out_range=tv:in_color_matrix=bt601:out_color_matrix=bt709,format=yuv420p" \
+  -c:v libx264 -preset slow -crf 15 -profile:v high -level 4.1 \
+  -color_primaries bt709 -color_trc bt709 -colorspace bt709 -color_range tv \
+  -c:a aac -b:a 320k -ar 48000 -ac 2 -shortest -movflags +faststart out/needle/final_reel.mp4
 node scripts/needle-stills.mjs         # review stills → out/needle-stills/
 ```
 
@@ -944,7 +958,10 @@ safe area, every line 10 to 24dB over the music in the speech band, −14.02
 LUFS, −1.25 dBTP, the loop's audio seam inside the score's own steps. The
 score's energy curve, per beat: the stop on "Give up?" at −29 to −36dB, the
 strike −12dB, the build into the drop −30 → −20dB, the drop −8dB, the needle
-−10dB. Nobody has listened to it on speakers.
+−10dB. The encode: 840 frames, 28.000s, H.264 High yuv420p BT.709, AAC-LC
+48kHz 320k, 20.9MB; every frame pair scanned (no one-frame flash; the six
+range seams move like their neighbours); frame 839 against frame 0 under the
+type: 35.3dB PSNR. Nobody has listened to it on speakers.
 
 ## Motion language
 
