@@ -2637,6 +2637,27 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-22 (round 15) — SAVE THIS: "with a million saves you never
+  opened", Ask opening held still (owner: "'with your saves from countless
+  apps' is not clear enough; something along the lines of with the other
+  million saves you never opened again"; "the Machina logo and the Ask word
+  in the Ask frames are jittery and clunky").** Branch
+  `claude/reel-save-this`. The heap line is "Right down there, with a
+  million saves you never opened." (the timeline's read, one breath, 6%
+  quicker; "a million" on the frame the save hits the heap; "Unless" a frame
+  later; no cut moved; 81 words, verify's ceiling one higher for it). The
+  jitter was the reel's: round 14 played Ask's opening frames, which
+  cross-fade Home's header into Ask's and launch the mark mid-way, and
+  stepped the camera with the take's 12pt layout shift (the composer losing
+  and regaining a line as the question is typed), which held the screen's
+  middle still but jumped its header ~30px twice. Ask opening now holds the
+  take's last frame before the send (the screen settled, mark whole) under
+  the slow push; measured frame to frame, the header moves at most 0.15px
+  and the mark 0.03px. **Verified:** gates (bans, windows, every line 12.9
+  to 18.4dB over the music, −14.05 LUFS, −1.25 dBTP, audio seam step 0.014
+  against the score's own 0.105); the heap and Ask shots frame by frame;
+  every frame pair scanned for one-frame flashes (none); the encode (854
+  frames, 28.47s, −14.0 LUFS, −1.3 dBTP). **Not verified:** listened to.
 - **2026-10-22 (round 14) — SAVE THIS: one graph shot, the whole Ask mark,
   one Ask shot, "with your saves from countless apps" (owner: "graph: show
   just the 2nd one, a bit longer; the jump from the first graph to the
