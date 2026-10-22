@@ -2724,8 +2724,18 @@ exact-match, capped.
   Yearly/Monthly"; forced-update text drops "or TestFlight"; Hide My Email
   check accepts `private.icloud.com`; share sheets show the server's 422
   reason (`shareRefusalMessage`). **C (Terms/Privacy to 18+ for Gemini's
-  under-18 term) NOT done: owner does not want 18+;** Vertex AI's terms carry
-  the same clause, so switching Google products doesn't avoid it. Verified:
+  under-18 term) NOT done.** Apple's age-rating help page requires the
+  rating to be overridden up to any EULA minimum age ("you must override to
+  a rating that adheres to the requirements"), so Terms 18+ with a 4+ rating
+  isn't allowed, and neither is today's Terms 13+ with 4+. **Owner decision
+  (relayed by the launch session): keep Terms and Privacy at 13+, and set
+  App Store Connect → App Information → Age Ratings → Override to Higher Age
+  Rating → 13+** after answering the questionnaire honestly (it computes 4+).
+  Click path in `docs/APP_STORE.md` §2. **Accepted, known exposure for
+  launch:** the Gemini API terms bar apps "likely to be accessed by" under-18s.
+  The suggested post-launch follow-up, checking whether Vertex AI removes the
+  clause, is already answered: Vertex's Service Specific Terms §20(d) have the
+  same clause, so only an 18+ rating or a non-Google model would remove it. Verified:
   tsc, eslint (touched files), web unit tests 84/84, `next build`, `swiftc
   -parse`, py_compile, pytest 1,960 passed (18 new in
   `tests/test_share_moderation.py`). Not verified: the check against live
