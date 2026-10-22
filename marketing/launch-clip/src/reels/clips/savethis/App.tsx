@@ -1,7 +1,7 @@
 import React from 'react';
 import { AbsoluteFill } from 'remotion';
-import { CAPTIONS, FPS, HITS, TYPE_FRAMES } from '../../../../clips/savethis-timeline.mjs';
-import { AppShot, Lift, Tap } from '../../kit/AppShot';
+import { CAPTIONS, CITE_PINGS, FPS, HITS, TYPE_FRAMES } from '../../../../clips/savethis-timeline.mjs';
+import { AppShot, Lift, Ping, Tap } from '../../kit/AppShot';
 import { camAt, camVelocity, type Cam, type Key } from '../../kit/camera';
 import { EASE_IN_OUT, EASE_MODAL, mix, prog } from '../../kit/curves';
 import { addTakes, at, center, rectOf, takeOf } from '../../kit/takes';
@@ -29,7 +29,9 @@ import VO from './savethis-vo.json';
  *          "ask" to its composer, a real question bursting in (round 12:
  *          about the three saves the graph just tied together); "and get
  *          the answer": sent, the answer streams from them; "with the
- *          proof": the three land under it, cited, lifting one by one
+ *          proof": the three land under it, cited, and (round 13) each is
+ *          pinged in turn: it pops forward under a sonar ring, on a ping in
+ *          the score
  *  out     (round 12) on the sign-off the app dissolves into the paper and
  *          the brand card takes the frame (EndCard.tsx)
  *
@@ -215,9 +217,6 @@ export const MARK_TO = {
   size: MARK[2] * OPEN_CAM.z,
 };
 
-/** the frame is the poster again from here (EndCard.tsx) */
-export const HANDOVER = S.poster;
-
 export const appKeys: Key[] = [
   { f: S.iris, ...OPEN_CAM },
   // held while the mark lands on the card's own mark…
@@ -249,6 +248,9 @@ export const appKeys: Key[] = [
   { f: S.tagline + 4, z: ASK_CAM.proof.z * 1.02, ease: linear },
 ];
 
+/** a citation's pop on its ping, by frames since it: up in 3, gone by ~18 */
+const pop = (df: number) => (df <= 0 ? 0 : (df / 3) * Math.exp(1 - df / 3));
+
 /** the reel's emphasis on the next beat after an arrival, eased away */
 const lift = (f: number, landed: number, len = 64) =>
   prog(f, landed, landed + 12, EASE_MODAL) * (1 - prog(f, landed + len - 24, landed + len, EASE_IN_OUT));
@@ -269,8 +271,13 @@ export const App: React.FC<{ f: number }> = ({ f }) => {
   const bare = f >= S.askTap && f < S.send;
   const iris = r < 0.999 ? { x: center(MARK).x, y: center(MARK).y, r: 6 + r * 790 } : null;
   // (round 6) the proof: each citation lifts as it lands, one by one, and
-  // stays up into the sign-off
-  const upCite = (k: number) => (f >= S.proof ? prog(f, S.proof + 2 + 4 * k, S.proof + 14 + 4 * k, EASE_MODAL) : 0);
+  // stays up into the sign-off; (owner, round 13) on its ping it pops
+  // forward, its ring flaring, and settles (CITE_PINGS, an 8th apart)
+  const citeLift = (k: number) => {
+    const up = prog(f, CITE_PINGS[k] - 1, CITE_PINGS[k] + 11, EASE_MODAL);
+    const p = pop(f - CITE_PINGS[k]);
+    return { lift: Math.max(up, 0.002), rise: 1.5 + 1.5 * p, grow: 0.02 + 0.03 * p, ring: 0.6 * up + 0.35 * p };
+  };
   // (round 12) the app dissolves into the paper just ahead of the sign-off,
   // gone as the mark starts to draw
   const gone = prog(f, S.tagline - 14, S.tagline - 6, EASE_IN_OUT);
@@ -295,11 +302,20 @@ export const App: React.FC<{ f: number }> = ({ f }) => {
         )}
         {/* (round 6) the question, sent */}
         {f >= S.send - 9 && f < S.send + 6 && <Tap x={center(SEND).x} y={center(SEND).y} t={prog(f, S.send - 9, S.send + 6, linear)} />}
-        {/* the proof: the citations, lifted one by one (kept mounted: their own raster) */}
+        {/* (round 13) the pings: two rings off each citation, behind the three */}
         {f >= S.proof &&
-          CITES.map((r, k) => (
-            <Lift key={k} take={T} i={i} rect={r} radius={12} lift={Math.max(upCite(k), 0.002)} rise={1.5} grow={0.02} ring={0.6 * upCite(k)} />
-          ))}
+          CITE_PINGS.map((p, k) => {
+            const c = citeLift(k);
+            const on = { rect: CITES[k], radius: 12, dy: -c.lift * c.rise, scale: 1 + c.lift * c.grow };
+            return (
+              <React.Fragment key={k}>
+                <Ping {...on} t={prog(f, p, p + 16, linear)} reach={16} width={2.2} alpha={0.55} />
+                <Ping {...on} t={prog(f, p + 4, p + 26, linear)} reach={28} width={1.5} alpha={0.3} />
+              </React.Fragment>
+            );
+          })}
+        {/* the proof: the citations, lifted one by one (kept mounted: their own raster) */}
+        {f >= S.proof && CITES.map((r, k) => <Lift key={k} take={T} i={i} rect={r} radius={12} {...citeLift(k)} />)}
       </AppShot>
     </AbsoluteFill>
   );

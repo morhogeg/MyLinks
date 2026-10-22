@@ -384,6 +384,35 @@ export function createSynth({ seconds, beat }) {
     );
   };
 
+  /**
+   * Ping — a citation found: a pure tone struck bright, settling from a few
+   * cents sharp like struck glass, a glassy inharmonic partial gone in a
+   * blink, and the delay bus's dotted-8th echo for a sonar trail. `gainAt`
+   * (seconds into the ping → a multiplier) shapes it against the mix.
+   */
+  const ping = (startSec, midi, level = 0.1, panPos = 0, decay = 0.9, gainAt = null) => {
+    const f = mtof(midi);
+    render(
+      startSec,
+      decay + 0.4,
+      (t) => {
+        const e = Math.exp(-t * (4.6 / decay)) * Math.min(1, t / 0.0015);
+        if (e < 1e-4) return 0;
+        const ph = 2 * Math.PI * f * (t + (0.008 * (1 - Math.exp(-t * 40))) / 40);
+        return (
+          (Math.sin(ph) +
+            0.3 * Math.sin(2.76 * ph) * Math.exp(-t * 16) +
+            0.16 * Math.sin(2 * ph) * Math.exp(-t * 7) +
+            0.2 * Math.sin(5.4 * ph) * Math.exp(-t * 70)) *
+          e *
+          level *
+          (gainAt ? gainAt(t) : 1)
+        );
+      },
+      { pan: panPos, send: 0.42, delay: 0.2 },
+    );
+  };
+
   /** Shimmer — a rising cluster of quiet bells, for citations resolving. */
   const shimmer = (startSec, midis, level = 0.075) => {
     midis.forEach((m, i) => bell(startSec + i * 0.075, m, level, i % 2 ? 0.3 : -0.3, 1.9));
@@ -527,7 +556,7 @@ export function createSynth({ seconds, beat }) {
   return {
     N, L, R, SEND, DELAY_SEND,
     mtof, clamp01, secToIdx, rnd, adsr, render, lp, hp,
-    pad, sub, pluck, pulse, keys, bell, kick, hat, rim, shaker, clap, riser, whoosh, impact, tick, shimmer,
+    pad, sub, pluck, pulse, keys, bell, kick, hat, rim, shaker, clap, riser, whoosh, impact, tick, shimmer, ping,
     master, writeWav,
   };
 }

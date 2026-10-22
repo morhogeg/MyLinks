@@ -298,6 +298,46 @@ export const Lift: React.FC<{
  * kept deliberately neutral: ink at low alpha, the app's own tap shape.
  */
 /** `tone: 'light'` for a tap on a dark control (the filled Save button) */
+/**
+ * A sonar ping off an element (screen points, an AppShot child): a ring that
+ * leaves its edge and grows outward as it fades, `t` 0–1 over its life.
+ * Drawn before the element's Lift, it passes behind it and its neighbours.
+ */
+export const Ping: React.FC<{
+  rect: Rect;
+  t: number;
+  radius?: number;
+  /** points it travels out from the edge */
+  reach?: number;
+  /** ring width at the edge, points */
+  width?: number;
+  alpha?: number;
+  /** the element's own Lift transform (its rise, its grow), so the ring
+   *  leaves the element where it is drawn */
+  dy?: number;
+  scale?: number;
+}> = ({ rect, t, radius = 12, reach = 14, width = 1.6, alpha = 0.5, dy = 0, scale = 1 }) => {
+  if (t <= 0 || t >= 1) return null;
+  const [x, y, w, h] = rect;
+  const out = 1 - Math.pow(1 - t, 3);
+  const d = reach * out;
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        left: x - d,
+        top: y - d,
+        width: w + 2 * d,
+        height: h + 2 * d,
+        borderRadius: radius + d,
+        transform: `translate(0px, ${dy}px) scale(${scale})`,
+        transformOrigin: 'center center',
+        boxShadow: `0 0 0 ${(width * (1 - 0.45 * out)).toFixed(3)}px rgba(20,20,27,${(alpha * Math.pow(1 - t, 1.6)).toFixed(4)})`,
+      }}
+    />
+  );
+};
+
 export const Tap: React.FC<{ x: number; y: number; t: number; size?: number; tone?: 'dark' | 'light' }> = ({ x, y, t, size = 34, tone = 'dark' }) => {
   if (t <= 0 || t >= 1) return null;
   const rgb = tone === 'light' ? '255,255,255' : '20,20,27';

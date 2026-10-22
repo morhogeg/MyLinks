@@ -727,10 +727,9 @@ is said once, at the top, and everything after "Unless" answers it (owner,
 round 9: restating the problem after the solution made the order read
 problem, solution, problem). The sign-off is the app's own mark drawing
 in on paper (round 12: not over the Ask chat), the wordmark on the spoken
-name, the tagline under it; then the point goes, the mark settles on the
-hook's line and its brackets part across it ("[ You're going to save this
-video. ]") and off the frame, which is frame 0: the reel loops into its
-own hook ("This time, you'll watch it again.").
+name, the tagline under it on one line; the logo holds to the last frame
+under "This time, you'll watch it again." (round 13: the logo, not the
+poster), and the loop cuts from it, on the beat, back to the hook.
 
 ```bash
 # today's app (a video branch's own web/ can be weeks old: capture main's)
@@ -761,14 +760,14 @@ npx remotion render src/index.ts MachinaSaveThis out/savethis/master.mp4 --crf=1
 | 0:10.3 | "Saved to Machina"; the card: its cover is this reel's frame 0; its summary lifts on "sums it up", its topic chip on "files it by topic" | understands it, sums it up, / files it by topic, | "understands it, sums it up, files it by topic," | bell |
 | 0:12.1 | Cut on "topic": the app's graph, the saves mapped by topic (ATTENTION, MEANING, DESIGN…), its layout settling, the new save one of its dots | and connects it to / what you've saved before. | "and connects it to what you've saved before." | a tick |
 | 0:13.1 | The thumb taps its dot, and a cut on the tap to the three, lit (its ties to two older saves, Four Thousand Weeks and the procrastination talk), the rest receded, as the app's own camera glides in on them (round 12: the cut skips the moment the app raises its selection sheet over the dot) | | | a tick; two linked notes |
-| 0:14.9 | Cut on the beat (round 12: the graph a beat longer) to Ask opening: its mark, "What do you want to recall? Answers come only from your 23 saves, with sources you can open.", and the one-tap questions it suggests about the saves | Now every save is / one question away. | "Now every save is one question away." | a click, a light note; the drums out |
-| 0:17.7 | "So," over Ask opening, then a cut on "ask" to its composer: "What connects my 3 saves about procrastination?" bursts in | So, ask it anything, / and get the answer, / with the proof. | "So, ask it anything, and get the answer, with the proof." | a click; soft keys |
-| 0:18.9 | On "get the answer": sent, the answer streams ("All three agree: …"), drawn from the three | | | tick, low note |
-| 0:20.3 | On "proof": the saves it came from, cited (Tim Urban's talk, Four Thousand Weeks, this reel), each lifting as it lands; the paper rises over the question | | | the band lands, full; three notes |
-| 0:21.2 | The app dissolves into the paper; the app's own launch mark draws in (corner ticks, brackets closing, the point striking on "Machina"), the wordmark wipes in, then the tagline word by word | MACHINA / Everything you save, / finally useful. | "Machina. Everything you save, finally useful." | the brand's impact, lighter; shimmer |
-| 0:25.2 | The type and the point go; the mark settles on the hook's line and its brackets part across it, the poster between their arms, then off the frame | [ You're going to / save this video. ] | | a breath of air |
-| 0:26.5 | The poster: frame 0 again (from 0:26.6) | This time, you'll / watch it again. | "This time, you'll watch it again." | thud, bell |
-| 0:28.5 | Loops into 0:00 without a cut | | | |
+| 0:14.7 | Cut (round 13: half a beat sooner than round 12) to Ask opening: its mark, "What do you want to recall? Answers come only from your 23 saves, with sources you can open.", and the one-tap questions it suggests about the saves, gliding down toward the composer | Now every save is / one question away. | "Now every save is one question away." | a click, a light note; the drums out |
+| 0:17.4 | "So," over Ask opening, then a cut on "ask" to its composer: "What connects my 3 saves about procrastination?" bursts in | So, ask it anything, / and get the answer, / with the proof. | "So, ask it anything, and get the answer, with the proof." | a click; soft keys |
+| 0:18.6 | On "get the answer": sent, the answer streams ("All three agree: …"), drawn from the three | | | tick, low note |
+| 0:20.1 | On "proof": the camera settles on the answer and the saves it came from, cited (Tim Urban's talk, Four Thousand Weeks, this reel); the paper rises over the question | | | the band lands, full |
+| 0:20.5 | (Round 13) On the next beat each citation is highlighted in turn, an 8th apart: it pops forward and two ink rings leave its edge like a sonar ping; then held, half a second longer than round 12 | | | a rising ping on each |
+| 0:21.9 | The app dissolves into the paper; the app's own launch mark draws in (corner ticks, brackets closing, the point striking on "Machina"), the wordmark wipes in, then the tagline word by word, on one line (round 13) | MACHINA / Everything you save, finally useful. | "Machina. Everything you save, finally useful." | the brand's impact, lighter; shimmer |
+| 0:26.1 | The lockup holds to the last frame on a slow push (round 13: the last frame is the logo) | This time, you'll / watch it again. | "This time, you'll watch it again." | the drums out, the pad up to the hook's register; a bell rings over the loop |
+| 0:28.5 | The loop cuts on the beat from the logo to the hook (0:00) | | | |
 
 **What is real and what is not.** Every app pixel is the shipped app on
 `main` (2026-10-21), captured by `capture/shoot.mjs savethisClip`: the
@@ -795,9 +794,10 @@ recorded anywhere). The iOS share sheet and Instagram's UI are not
 captured, so they are not shown. No recipe cards in this account (owner,
 2026-10-02).
 
-**Two deliberate breaks from the house rules.** The reel ends on the
-loop, not on the tagline: the tagline is said once, on the brand card at
-76%, and the last frame is frame 0. And the
+**Two deliberate breaks from the house rules.** The last word is the
+loop's, not the tagline's: the tagline is said once, on the brand card at
+79%, and the last line answers the hook over the logo (round 13: the last
+frame is the logo; until round 12 it was frame 0). And the
 opening (the trapdoor, the well, the heap) is the reel's own motion,
 bigger than the kit's restraint allows, in the same ink-on-paper grade.
 (Round 4: colour enters with Machina, the app's own category colours
@@ -808,9 +808,10 @@ house's darker set tone, since the app fills the frame here rather than
 sitting in a world; the vignette is a breath; the well stays grey.)
 
 **The loop.** The set's drift is periodic over the reel
-(`paperDriftAt`), every layer but the poster is gone by the last frame,
-and the score is rendered twice in a row with the second copy kept, so
-its reverb and delay tails ring on into the start.
+(`paperDriftAt`); the picture cuts on the beat from the logo to the hook
+(round 13), and the score is rendered twice in a row with the second copy
+kept, so its reverb and delay tails (the last bell's among them) ring on
+into the start.
 
 **Finish (rounds 11 and 12, frame-by-frame passes over the render).**
 Under the graph, paper over the frame's foot (Instagram's caption zone),
@@ -820,7 +821,12 @@ over the tapped dot's spot while its camera lifts the three clear, and
 the reel's every-sixth-frame review had stepped over those frames since
 round 4. On the composer shot the screen has no studio shadow or
 glass edge (`AppShot`'s `edge`), so its foot, mid-frame there, melts into
-paper of its own tone instead of a grey band.
+paper of its own tone instead of a grey band. (Round 13) The citations'
+highlight: each pops forward on its ping and two ink rings leave its edge
+(the kit's `Ping`, riding the card's own lift so the rings stay
+concentric with it). The pings sit on the beat after "proof" is said, and
+the score strikes them back up through the mix's duck under the voice (it
+mirrors `mix-vo.mjs`'s envelope), so the three land alike.
 
 **Voice.** Gemini TTS, Sulafat, per-line direction (the timeline is the
 script). Two lines were re-voiced quicker (run 2: the shaft line read

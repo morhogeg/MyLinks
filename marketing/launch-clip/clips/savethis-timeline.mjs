@@ -13,9 +13,9 @@
  * them, every source cited (the proof), this reel among them. The problem is
  * said once, at the top; everything after "Unless" is the answer to it
  * (owner, round 9). The sign-off is the app's own mark drawing in on paper
- * (round 12); then the mark opens, its brackets parting across the reel's
- * own hook, and the frame is frame 0 ("This time, you'll watch it again."):
- * the reel loops into its own hook without a cut.
+ * (round 12), "This time, you'll watch it again." over it, and the logo holds
+ * to the loop, which cuts back to the hook (owner, round 13: the last frame
+ * is the logo).
  *
  * Written in OUTPUT frames on a 128.57 BPM grid, 14 frames a beat (the
  * REVISIT quick cut's pace: an organic Reel, not a feature explainer). Every
@@ -59,22 +59,31 @@ export const HITS = {
   connect: beat(28), // "…connects it to": the thumb on its dot; its ties light on "what you've saved before"
   // (rounds 10, 11) the bridge: what all that reading adds up to, over
   // Ask's own opening screen, its suggestions questions about the saves
-  // (owner, round 12: the graph a half second longer) a beat more of it
-  knows: beat(32), // "Now every save…": CUT from the graph to Ask
+  // (owner, round 12: the graph a half second longer; round 13: a bit
+  // less) half a beat more of it than round 11
+  knows: beat(31.5), // "Now every save…": CUT from the graph to Ask
   // (round 9) Ask, the solution's last word, each part on its own word;
   // (round 12) "So," said over Ask opening, the cut on "ask"
-  askTap: beat(38.5), // "…ask": CUT to Ask's composer, on the half beat, as…
-  asking: beat(38.5), // …the question bursts in on "ask it anything"
-  send: 566, // "and get the answer": sent, the answer streams
-  proof: 610, // "with the proof": the saves it came from, cited
-  // (owner, round 12: not the Ask chat under the tagline) the brand card
-  tagline: beat(46.5), // "Machina. Everything you save, finally useful.": the app's own mark draws in
-  opens: beat(54), // the mark settles on the hook's line and its brackets part across it…
-  poster: beat(57), // …off the frame: it is frame 0
+  askTap: beat(38), // "…ask": CUT to Ask's composer, on the beat, as…
+  asking: beat(38), // …the question bursts in on "ask it anything"
+  send: 559, // "and get the answer": sent, the answer streams
+  proof: 603, // "with the proof": the saves it came from, cited, then each pinged in turn
+  // (owner, round 12: not the Ask chat under the tagline) the brand card;
+  // (owner, round 13) the proof held half a second longer before it, after
+  // its pings
+  tagline: beat(48), // "Machina. Everything you save, finally useful.": the app's own mark draws in
+  // (owner, round 13: the last frame is the logo, not the poster) the
+  // promise over the logo, which holds to the loop
+  watch: beat(56), // "This time, you'll watch it again."
 };
 
 /** a whole beat, so the score's pulse runs straight through the loop */
 export const TOTAL_FRAMES = beat(61);
+
+/** (owner, round 13) the three citations' highlights, an 8th apart from the
+ *  beat after "proof" is said: as the camera settles on them, clear of the
+ *  voice and of the music's duck under it (the score pings each) */
+export const CITE_PINGS = [0, 1, 2].map((k) => beat(44) + 7 * k);
 
 /** (round 12) the sign-off's mark: the app's launch, a touch quicker than its
  *  39 frames, from just before the name; its point strikes at 0.56 of it */
@@ -88,9 +97,7 @@ export const SCENES = [
   { id: 'shaft', from: HITS.drop, dur: HITS.gather - HITS.drop }, // where saves go
   { id: 'turn', from: HITS.gather, dur: HITS.iris - HITS.gather }, // gathered into the mark
   { id: 'app', from: HITS.iris, dur: HITS.tagline - HITS.iris }, // read, mapped, asked
-  { id: 'card', from: HITS.tagline, dur: HITS.opens - HITS.tagline }, // the mark, the name, the line
-  { id: 'opens', from: HITS.opens, dur: HITS.poster - HITS.opens }, // the mark opens on the hook
-  { id: 'poster', from: HITS.poster, dur: TOTAL_FRAMES - HITS.poster }, // frame 0 again
+  { id: 'card', from: HITS.tagline, dur: TOTAL_FRAMES - HITS.tagline }, // the mark, the name, the line; the promise
 ];
 
 /**
@@ -137,12 +144,11 @@ export const CAPTIONS = [
   // the name and the tagline, said once (owner, round 2: the name in the
   // voice); (owner, round 12) on paper, the app's own mark drawing in, the
   // drawn wordmark wiping in on "Machina"
-  { at: HITS.tagline, to: HITS.tagline + 100, place: 'scene', text: 'Machina.\nEverything you save,\nfinally useful.', duck: 0.4, style: 'A confident, warm sign-off; the name with a smile, then the tagline sincere but brisk, no drawn-out words.', pace: PACE },
-  // the mark's brackets part across the hook and the frame is frame 0 as
-  // the reel starts again under this line. (owner, round 4: "See? You're
-  // watching it again." read as a riddle) The hook's "never watch it
-  // again", answered as a promise
-  { at: HITS.poster - 4, to: HITS.poster + 50, text: 'This time, you’ll\nwatch it again.', duck: 0.4, style: 'Warm and sure, a small smile in the voice: a promise, not a punchline. Light and quick, a short breath after "This time", landing softly on "again".', pace: PACE },
+  { at: HITS.tagline, to: HITS.tagline + 100, place: 'scene', text: 'Machina.\nEverything you save, finally useful.', duck: 0.4, style: 'A confident, warm sign-off; the name with a smile, then the tagline sincere but brisk, no drawn-out words.', pace: PACE },
+  // over the logo, which holds to the loop (owner, round 13). (owner, round
+  // 4: "See? You're watching it again." read as a riddle) The hook's "never
+  // watch it again", answered as a promise
+  { at: HITS.watch, to: TOTAL_FRAMES + 6, text: 'This time, you’ll\nwatch it again.', duck: 0.4, style: 'Warm and sure, a small smile in the voice: a promise, not a punchline. Light and quick, a short breath after "This time", landing softly on "again".', pace: PACE },
 ];
 
 /** a small letterspaced label above the line, with it (the kit's Kicker) */
@@ -152,7 +158,6 @@ export const KICKERS = [];
 export const RISERS = [
   [HITS.gather, HITS.markStrike], // the heap rushing up into the mark
   [HITS.asking, HITS.proof], // the question, into the answer's proof
-  [HITS.opens, HITS.poster], // the mark opening into the poster
 ];
 
 /**
@@ -160,8 +165,8 @@ export const RISERS = [
  * voicings): the hook and the fall hang on the minor (the loss), the turn
  * lifts through V to I on the strike, the reading and the graph rest on IV,
  * the bridge and the question lift to V and the proof lands home, under the
- * sign-off too; the mark opens on V and the poster leaves on IV, which falls
- * back to vi at the top of the loop.
+ * sign-off too; the promise leaves on IV, which falls back to vi at the top
+ * of the loop.
  */
 export const CHORDS = [
   [0, 'Am7'],
@@ -171,6 +176,5 @@ export const CHORDS = [
   [HITS.done, 'Fmaj7'],
   [HITS.knows, 'G6'],
   [HITS.proof, 'Cmaj7'],
-  [HITS.opens, 'G6'],
-  [HITS.poster, 'Fmaj7'],
+  [HITS.watch, 'Fmaj7'],
 ];

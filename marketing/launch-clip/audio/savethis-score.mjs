@@ -8,10 +8,11 @@
  * thud on the heap; the heap rushes up a riser into the brand's impact on
  * "Machina"; the band comes in under the reading (a tick on each phase, a
  * bell on "Saved to Machina") and the graph, holds its breath for the
- * question, and lands, full, on the Ask answer's proof and stays full under
- * the sign-off (the brand's impact again, lighter, as the app's mark strikes);
- * the mark opens on a breath of air into the poster, and the poster is as
- * bare as the hook, because it IS the hook: the reel loops.
+ * question, and lands, full, on the Ask answer's proof (round 13: a ping on
+ * each citation as it is highlighted) and stays full under the sign-off (the
+ * brand's impact again, lighter, as the app's mark strikes); under the last
+ * line the drums go and the pad rises to the hook's register, a bell rings
+ * over the loop's cut, and the hook is as bare as ever.
  *
  * THE LOOP: the arrangement is rendered twice in a row and the second copy
  * kept, so the reverb and delay tails of the end ring on into the start,
@@ -24,7 +25,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BAR_FRAMES, BEAT, BEAT_FRAMES, CAPTIONS, CHORDS, FPS, HITS, MARK_STRIKE, RISERS, TOTAL_FRAMES, TOTAL_SEC, TYPE_FRAMES } from '../clips/savethis-timeline.mjs';
+import { BAR_FRAMES, BEAT, BEAT_FRAMES, CAPTIONS, CHORDS, CITE_PINGS, FPS, HITS, MARK_STRIKE, RISERS, TOTAL_FRAMES, TOTAL_SEC, TYPE_FRAMES } from '../clips/savethis-timeline.mjs';
 import { SR, createSynth } from './synth.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -32,7 +33,7 @@ const root = path.join(here, '..');
 
 // two copies of the reel, end to end; the second one is the score
 const S = createSynth({ seconds: TOTAL_SEC * 2, beat: BEAT });
-const { pad, sub, pulse, keys, bell, kick, hat, rim, shaker, clap, riser, whoosh, impact, tick, shimmer, pluck } = S;
+const { pad, sub, pulse, keys, bell, kick, hat, rim, shaker, clap, riser, whoosh, impact, tick, shimmer, pluck, ping } = S;
 
 const H = HITS;
 // the take's runs, so the typing ticks follow the picture
@@ -54,6 +55,23 @@ const clearOfVoice = (from, len) => {
   return f;
 };
 
+// (round 13) the mix ducks the music under each line (audio/mix-vo.mjs: to
+// the line's `duck`, 0.55 by default, across its file, ramped over 120ms
+// either side); a ping belongs to the picture, not the music, so it is
+// struck back up through the duck and the three land alike
+const duckAt = (sec) => {
+  let g = 1;
+  for (const m of MANIFEST) {
+    const D = CAPTIONS.find((c) => c.at === m.frame)?.duck ?? 0.55;
+    const a = m.start;
+    const b = m.start + m.sec;
+    if (sec >= a && sec <= b) g = Math.min(g, D);
+    else if (sec > a - 0.12 && sec < a) g = Math.min(g, 1 - ((1 - D) * (sec - a + 0.12)) / 0.12);
+    else if (sec > b && sec < b + 0.12) g = Math.min(g, D + ((1 - D) * (sec - b)) / 0.12);
+  }
+  return g;
+};
+
 const VOICINGS = {
   Am7: { bass: 45, upper: [55, 60, 64, 67] },
   Fmaj7: { bass: 41, upper: [57, 60, 64, 69] },
@@ -64,25 +82,25 @@ const chordAt = (frame) => VOICINGS[CHORDS.filter(([f]) => f <= frame).at(-1)[1]
 
 /** the band's density along the story: bare hook, the fall, the turn, the
  *  reading and the graph, the asking held, the proof and the sign-off full,
- *  the mark opening, the bare poster */
+ *  the promise thinning into the loop */
 const density = (f) =>
-  f < H.drop ? 0.18 : f < H.land ? 0.3 : f < H.gather ? 0.36 : f < H.markStrike ? 0.5 : f < H.phase0 ? 0.42 : f < H.knows ? 0.85 : f < H.proof ? 0.6 : f < H.opens ? 1 : f < H.poster ? 0.7 : 0.2;
+  f < H.drop ? 0.18 : f < H.land ? 0.3 : f < H.gather ? 0.36 : f < H.markStrike ? 0.5 : f < H.phase0 ? 0.42 : f < H.knows ? 0.85 : f < H.proof ? 0.6 : f < H.watch ? 1 : 0.4;
 const DRUMS = [
   [H.phase0, H.knows],
-  [H.proof, H.opens],
+  [H.proof, H.watch],
 ];
 const drumsAt = (f) => DRUMS.some(([a, b]) => f >= a && f < b);
 
 const arrange = (o) => {
   const t = (frame) => (frame + o) / FPS;
 
-  // ── pad: one voicing per chord span, the hook and the poster high and open
+  // ── pad: one voicing per chord span, the hook and the promise high and open
   CHORDS.forEach(([from, name], k) => {
     const to = k + 1 < CHORDS.length ? CHORDS[k + 1][0] : TOTAL_FRAMES;
     const ch = VOICINGS[name];
     const d = density(from);
     const level = 0.08 + 0.08 * d;
-    const lift = from < H.drop || from >= H.poster ? 12 : 0;
+    const lift = from < H.drop || from >= H.watch ? 12 : 0;
     ch.upper.forEach((m, i) => pad(t(from), (to - from) / FPS + 0.05, m + lift, level * (i === 0 ? 1 : 0.85), ((i / 3) * 2 - 1) * 0.55));
     pad(t(from), (to - from) / FPS + 0.05, ch.bass + 12, level * 0.55, 0);
   });
@@ -91,19 +109,19 @@ const arrange = (o) => {
   for (let f0 = 0; f0 < TOTAL_FRAMES; f0 += BAR_FRAMES) {
     const d = density(f0);
     const ch = chordAt(f0);
-    if (f0 >= H.markStrike && f0 < H.poster) sub(t(f0), ch.bass, 0.3 + 0.25 * d, d >= 0.8 ? 0.5 : 1.4);
+    if (f0 >= H.markStrike) sub(t(f0), ch.bass, 0.3 + 0.25 * d, d >= 0.8 ? 0.5 : 1.4);
     if (d >= 0.8) {
       sub(t(f0 + 1.5 * BEAT_FRAMES), ch.bass + 7, 0.18 + 0.1 * d, 0.32);
       sub(t(f0 + 2.5 * BEAT_FRAMES), ch.bass + 12, 0.16 + 0.1 * d, 0.3);
     }
-    if (f0 >= H.phase0 - BAR_FRAMES && f0 < H.poster) {
+    if (f0 >= H.phase0 - BAR_FRAMES) {
       const SCALE = [0, 2, 4, 5, 7, 9, 11];
       const shape = [0, 2, 3, 4, 6, 4, 3, 2];
       [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5].forEach((on, k) => {
         const fr = f0 + on * BEAT_FRAMES;
-        if (fr < H.phase0 - 4 || fr >= H.poster) return;
-        // the bridge and the asking breathe: half the figure
-        if (fr >= H.knows && fr < H.proof && k % 2) return;
+        if (fr < H.phase0 - 4 || fr >= TOTAL_FRAMES) return;
+        // the bridge and the asking breathe, and the promise: half the figure
+        if (((fr >= H.knows && fr < H.proof) || fr >= H.watch) && k % 2) return;
         const c = chordAt(fr);
         const step = shape[(k + f0 / BAR_FRAMES) % shape.length];
         const m = c.upper[0] + SCALE[step % 7] + Math.floor(step / 7) * 12 + (on >= 2.5 ? 12 : 0);
@@ -180,19 +198,22 @@ const arrange = (o) => {
   tick(t(H.send), 0.11, 1.2);
   sub(t(H.send), 45, 0.2, 0.3);
 
-  // ── the proof: the band lands, the citations lift one by one
+  // ── the proof: the band lands; (owner, round 13) a ping on each citation
+  // as it is highlighted, rising up the chord, left to right
   sub(t(H.proof), 36, 0.42, 0.6);
-  [0, 4, 8].forEach((d, k) => pluck(t(H.proof + 2 + d), [76, 79, 83][k], 0.06, (k - 1) * 0.3, 0.4));
-  shimmer(t(clearOfVoice(H.proof, 10)), [76, 83, 88], 0.045);
+  CITE_PINGS.forEach((p, k) => {
+    ping(t(p), [88, 91, 95][k], 0.1, (k - 1) * 0.35, 0.9, (s) => 1 / duckAt(p / FPS + s));
+    tick(t(p), 0.05, 1.6 + 0.15 * k);
+  });
 
   // ── (round 12) the sign-off: the app's mark draws in on paper, its point
   // striking as the name is said (the brand's impact, lighter than the
-  // opening's), then the mark opens across the hook into the poster
+  // opening's); (round 13) the promise over the logo, and a bell after it
+  // that rings on over the loop's cut into the hook
   impact(t(MARK_STRIKE), 0.22);
   shimmer(t(MARK_STRIKE) + 0.06, [79, 84, 88, 91], 0.04);
-  whoosh(t(H.opens + 10), 0.8, 0.045, 0);
-  sub(t(H.poster), 33, 0.3, 0.7);
-  bell(t(clearOfVoice(H.poster + 2, 4)), 81, 0.06, -0.1, 2.6);
+  sub(t(H.watch), 41, 0.26, 0.9);
+  bell(t(clearOfVoice(H.watch + 2, 4)), 81, 0.06, -0.1, 2.6);
 
   // ── risers, each ENDING on its reveal (out of the voice's way)
   for (const [from, to] of RISERS) {

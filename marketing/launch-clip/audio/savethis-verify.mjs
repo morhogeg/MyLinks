@@ -8,6 +8,7 @@
  *    band captions on screen at once;
  *  - every line at least 3dB over the music in the speech band;
  *  - the mix at the feeds' −14 LUFS (±0.5), true peak ≤ −1 dBTP;
+ *  - the last line still up on the last frame (the loop cuts from it);
  *  - the loop: the step across the seam no bigger than the score's own.
  */
 import fs from 'node:fs';
@@ -56,8 +57,10 @@ for (const c of CAPTIONS) {
 }
 const band = CAPTIONS.filter((c) => c.place !== 'scene' && c.place !== 'lockup');
 for (let i = 1; i < band.length; i++) if (band[i].at < band[i - 1].to) fail(`captions overlap: "${band[i - 1].text}" / "${band[i].text}"`);
-if (CAPTIONS.at(-1).to > TOTAL_FRAMES - 4) fail('the last line is still up at the loop point');
-ok(`timing: ${CAPTIONS.length} lines inside their windows; the band is clear ${TOTAL_FRAMES - CAPTIONS.at(-1).to} frames before the loop`);
+// (owner, round 13) the last frame is the logo under the last line: it is
+// still fully up there (a line rolls out over the 5 frames before its `to`)
+if (CAPTIONS.at(-1).to - 5 < TOTAL_FRAMES) fail('the last line leaves before the last frame');
+ok(`timing: ${CAPTIONS.length} lines inside their windows; the last one up on the last frame`);
 const totalWords = CAPTIONS.reduce((n, c) => n + c.text.split(/\s+/).length, 0);
 // the brief's "under about 75"; (owner, rounds 5 to 8, and round 10's
 // bridge into Ask) the ceiling is 80

@@ -8,22 +8,22 @@ import { CLOCK } from '../../kit/camera';
 import { EASE_IN_OUT, prog } from '../../kit/curves';
 import { Lens, Paper } from '../../kit/Paper';
 import { GRADE } from './grade';
-import { App, HANDOVER, MARK_TO, PROOF_LINE } from './App';
+import { App, MARK_TO, PROOF_LINE } from './App';
 import { EndCard } from './EndCard';
 import { Opening } from './Opening';
 import { POSTER } from './Poster';
 import VO from './savethis-vo.json';
 
 /**
- * SAVE THIS: the organic Reel. 28.5s, 1080 x 1920, the house look (Paper,
+ * SAVE THIS: the organic Reel. 28s, 1080 x 1920, the house look (Paper,
  * Lens, the kit's captions and camera) on its own clock
  * (clips/savethis-timeline.mjs). Every frame of app UI is the real app
- * (capture/shoot.mjs `savethisClip`); the opening and the dive are the
- * reel's own (Opening.tsx, Dive.tsx).
+ * (capture/shoot.mjs `savethisClip`); the opening and the end card are the
+ * reel's own (Opening.tsx, EndCard.tsx).
  *
- * It loops: the last frame is the poster, frame 0, so the set's drift is
- * periodic over the reel and every layer that is not the poster is gone by
- * the end.
+ * It loops: (owner, round 13) the last frame is the logo under "This time,
+ * you'll watch it again.", and the loop cuts from it to the hook on the
+ * beat; the set's drift is periodic over the reel.
  */
 export const paperDriftAt = (f: number) => Math.sin((2 * Math.PI * f) / TOTAL_FRAMES) * 0.5;
 
@@ -37,9 +37,8 @@ export const SaveThis: React.FC<{
   CLOCK.perFrame = 1;
   const drift = paperDriftAt(f);
   // type never sits on UI or on the well: the paper rises behind the band
-  // while either is up, and lets go as the cover opens into the poster
-  const scrim =
-    prog(f, HITS.drop + 2, HITS.drop + 12, EASE_IN_OUT) * (1 - prog(f, HANDOVER - 16, HANDOVER - 2, EASE_IN_OUT));
+  // while either is up (to the end: under the last line it is paper on paper)
+  const scrim = prog(f, HITS.drop + 2, HITS.drop + 12, EASE_IN_OUT);
   return (
     <AbsoluteFill style={{ fontFamily: sans }}>
       {withAudio && <Audio src={staticFile(audioFile)} />}
@@ -85,9 +84,9 @@ export const SaveThis: React.FC<{
           }}
         />
       )}
-      {/* (round 12) the sign-off: the app's mark, the name, the line, and
-          the mark opening into the poster */}
-      <EndCard f={f} paperDrift={drift} show={withCaptions} />
+      {/* (round 12) the sign-off: the app's mark, the name, the line, held
+          to the loop (round 13) */}
+      <EndCard f={f} show={withCaptions} />
       <Captions
         frame={f}
         fps={FPS}
