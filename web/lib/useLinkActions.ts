@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { CaptureState, CardShareMode, Link, LinkStatus, UserNote } from '@/lib/types';
 import { updateLinkStatus, updateLinkTags, updateLinkCategory, updateLinkTitle, updateLinkSummary, updateNoteText, updateLinkNotes, updateLinkReadStatus, retryFailedLink, generateCardSummary, enrichNoteCard } from '@/lib/storage';
-import { newShareId, publishCard, removeLinkFromCollection, unpublishCard } from '@/lib/collections';
+import { newShareId, publishCard, removeLinkFromCollection, shareRefusalMessage, unpublishCard } from '@/lib/collections';
 import { shareLink, shareUrlFor } from '@/lib/share';
 import { useToast } from '@/components/Toast';
 import { announceWaitingSave } from '@/lib/entitlement';
@@ -232,9 +232,10 @@ export function useLinkActions(
             } catch (err) {
                 // The server refuses an update for a share stopped elsewhere,
                 // and says so; anything else is the generic failure.
-                const msg = err instanceof Error && /stopped/i.test(err.message)
-                    ? 'This link was stopped. Share the card again to make a new one.'
-                    : "Couldn't update the share link. Please try again.";
+                const msg = shareRefusalMessage(err)
+                    ?? (err instanceof Error && /stopped/i.test(err.message)
+                        ? 'This link was stopped. Share the card again to make a new one.'
+                        : "Couldn't update the share link. Please try again.");
                 toast.error(msg);
             }
             return;
@@ -250,8 +251,8 @@ export function useLinkActions(
         if (!link.shareId) {
             try {
                 await publishPromise;
-            } catch {
-                toast.error("Couldn't create a share link. Please try again.");
+            } catch (err) {
+                toast.error(shareRefusalMessage(err) ?? "Couldn't create a share link. Please try again.");
                 return;
             }
         }
@@ -268,14 +269,14 @@ export function useLinkActions(
             try {
                 await publishPromise;
                 toast.success('Share link copied to clipboard');
-            } catch {
-                toast.error("Couldn't create a share link. Please try again.");
+            } catch (err) {
+                toast.error(shareRefusalMessage(err) ?? "Couldn't create a share link. Please try again.");
             }
         } else if (outcome === 'shared') {
             // On a re-share the republish ran behind the sheet; warn only if it
             // failed (on a first share it already landed, so this is a no-op).
-            publishPromise.catch(() =>
-                toast.error("The share link may not work. Please try sharing again.")
+            publishPromise.catch((err) =>
+                toast.error(shareRefusalMessage(err) ?? "The share link may not work. Please try sharing again.")
             );
         } else {
             // 'failed' (couldn't even copy) or 'cancelled': swallow the publish

@@ -146,6 +146,9 @@ def test_trial_nudge_copy_is_plain_and_dash_free():
     # No usage counts: this month's metered saves read as the library size.
     assert "12" not in body and "free plan" in body
     assert "—" not in title + body
+    # A status notice, not an upsell (App Review 4.5.4: people opted into
+    # reminders and digests, not marketing).
+    assert "Machina Pro" not in body and "unlimited" not in body.lower()
     title, _ = ent.trial_nudge_copy(now + DAY, 1, 0, "UTC", now)
     assert title == "Your Pro trial ends tomorrow"
     title, body = ent.trial_nudge_copy(now + 3600 * 1000, 1, 2, "UTC", now)

@@ -336,10 +336,18 @@ the double "reads" in paragraph two became "reads … and pulls the text from"
 "connections" is also the word the See-also bullet already uses); and the
 UNDERSTAND bullet gained the serial comma the rest of the document uses.
 
-**Age rating questionnaire:** answer **None/No to everything** (no violence,
-no sexual content, no profanity, no horror, no gambling/contests, no drugs, no
-unrestricted web access — Machina renders extracted article text, not a general
-browser, and no user-to-user interaction). Result: **4+**.
+**Age rating questionnaire (revised 2026-10-22 for Apple's 2025 questionnaire
+and the Sept 2026 social-media question):** content questions (violence,
+sexual content, profanity, horror, gambling/contests, drugs, medical) **None /
+No**. Capabilities: unrestricted web access **No** (Machina renders extracted
+article text and opens links in Safari), messaging/chat **No**, advertising
+**No**, user-generated content **Yes** (anyone can publish a card, collection or
+Ask answer as a public web page, which is why those pages carry a Report link
+and a pre-publish check), social-media capability **No** (no feed or discovery
+of other people's content). Accept the calculated rating; the owner decided
+2026-10-22 not to rate the app 18+. Open question, owner's call: Google's
+Gemini terms (both the Developer API and Vertex AI) bar apps "likely to be
+accessed by individuals under the age of 18", while Terms §2 says 13+.
 
 ## 3. App Review notes (paste into "Notes" on the version page)
 
@@ -370,8 +378,8 @@ browser, and no user-to-user interaction). Result: **4+**.
 > saved content and questions are processed by Google Gemini. This is also
 > covered in our privacy policy (https://mymachina.app/privacy).
 >
-> • To test capture, use the share sheet: open any page in Safari → Share →
-> Machina → the card appears in the feed within ~15 seconds.
+> • To test capture, use the share sheet: open any page in Safari → ••• →
+> Share → Machina → the card appears in the feed within ~15 seconds.
 >
 > • Account deletion is available in-app: Settings → the account row at the
 > top (your name or email) → Delete account.
@@ -382,6 +390,13 @@ browser, and no user-to-user interaction). Result: **4+**.
 > are unlocked. To test the subscription: Settings → Pro trial → Keep Pro.
 > Restore Purchases, the renewal terms and the Terms / Privacy links are on
 > the same sheet.
+>
+> • Public share pages: a user can publish a card, collection or Ask answer
+> as a read-only web page at mymachina.app (it opens in Safari, not in the
+> app). There is no in-app feed or profile, so nobody sees another user's
+> content inside the app. Every page has a Report link; content is checked
+> before it is published; reports are reviewed within 24 hours, and we can
+> remove a page and block an account from publishing.
 >
 > • No ads, no tracking."
 

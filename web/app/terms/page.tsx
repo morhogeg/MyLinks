@@ -20,7 +20,7 @@ export default function TermsPage() {
       <h1 className="mt-6 text-3xl font-semibold tracking-tight text-text">
         Terms of Service
       </h1>
-      <p className="mt-2 text-sm text-text-muted">Last updated: September 16, 2026</p>
+      <p className="mt-2 text-sm text-text-muted">Last updated: October 22, 2026</p>
 
       <p className="mt-6 leading-relaxed text-text-secondary">
         These terms govern your use of Machina (&ldquo;Machina&rdquo;, the
@@ -51,8 +51,8 @@ export default function TermsPage() {
         Everything you save remains yours; Machina claims no ownership of your content. You grant
         us only the limited license needed to operate the Service: to store your content, process it
         with the AI providers named in the Privacy Policy, and display it back to you. If you choose
-        to publish a card or collection as a public share page, you also grant us the right to serve
-        that snapshot publicly until you unpublish or delete it. You are responsible for what you
+        to publish a card, a collection, or an answer from Ask Machina as a public share page, you also
+        grant us the right to serve that snapshot publicly until you unpublish or delete it. You are responsible for what you
         save and share, including having the right to do so.
       </p>
 
@@ -64,8 +64,22 @@ export default function TermsPage() {
         <li>probe, overload, or disrupt the Service, or attempt to access another person&rsquo;s
           workspace or non-public parts of the system;</li>
         <li>circumvent usage limits, automate bulk access, or resell the Service;</li>
-        <li>misuse the AI features to generate or distribute abusive content.</li>
+        <li>misuse the AI features to generate or distribute abusive content;</li>
+        <li>publish a public page with sexually explicit material, hate speech, harassment or
+          threats against a real person, graphic violence, or content that promotes self-harm,
+          terrorism, or serious harm to others.</li>
       </ul>
+      <h2 className="mt-10 text-xl font-semibold text-text">4a. Public pages and reporting</h2>
+      <p className="mt-4 leading-relaxed text-text-secondary">
+        Public share pages are checked automatically before they go live, and a page that looks like
+        it breaks the rules above is not published. Anyone can report a public page with the
+        &ldquo;Report this page&rdquo; link at its foot, or by writing to{" "}
+        <a href="mailto:support@mymachina.app" className="text-accent hover:underline">
+          support@mymachina.app
+        </a>
+        . We review every report within 24 hours. We remove pages that break these terms, and we
+        may stop the account that published them from publishing again or suspend it under section 9.
+      </p>
 
       <h2 className="mt-10 text-xl font-semibold text-text">5. AI output</h2>
       <p className="mt-4 leading-relaxed text-text-secondary">
@@ -90,7 +104,10 @@ export default function TermsPage() {
         renews automatically at the same price unless you cancel at least 24 hours before the end of
         the current period. You can manage or cancel it at any time in your Apple ID subscription
         settings; cancelling stops future renewals and keeps Pro active until the period you already
-        paid for ends. Refunds are handled by Apple under its own policies. A free trial, where
+        paid for ends. Refunds are handled by Apple under its own policies. &ldquo;Unlimited&rdquo;
+        saves and questions on Machina Pro are subject to a fair-use limit of 1,000 saves and 1,000
+        questions a month per account, which protects the Service from automated abuse; normal
+        personal use stays well below it. A free trial, where
         offered, ends on the date shown in Settings and does not convert to a paid plan unless
         you subscribe. Subscription status is checked through
         RevenueCat, described in the Privacy Policy.

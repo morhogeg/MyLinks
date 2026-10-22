@@ -2694,6 +2694,46 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-22 — APP STORE GUIDELINE AUDIT + FIX ROUND (owner: "do a
+  complete check… i dont want any rejections"; go on rounds A+B, not C).**
+  Audited 1.0 against Apple's live App Review Guidelines (last updated
+  2026-10-16) and the linked subscription / privacy / deletion / age-rating
+  pages; report with every clause's verdict and the owner's click paths:
+  https://claude.ai/artifact/GtvqwBX1NkToDuA5BqrGfu. The one LIKELY rejection
+  was guideline 1.2 (rewritten 10-16 to name "AI content creation apps"):
+  public `/s` `/c` `/a` pages had no filter, report, contact or ban.
+  **A (server/web, no build):** every share page footer has "Report this
+  page" (mailto support@ carrying the page URL) + the address as text
+  (`share_service._report_footer`); every publish runs `share_moderation.
+  check_share_content` (Gemini judges the page text and up to 4 shown images
+  through `scraper.safe_get`; refuses only a clear "not allowed" or a
+  Gemini input block; fails OPEN on outage/no key/bad reply;
+  `SHARE_MODERATION=off` kill switch) and `share_service.share_banned`
+  (`share_bans/{uid}`, matches no rule so Admin-only) → `ShareRefused` →
+  HTTP 422 from `publish_share_http`. Operator tool
+  `functions/tools/takedown_share.py <shareId> [--ban|--unban] [--apply]`
+  (dry run by default; takes down via `_unpublish_share_logic` as the owner).
+  Terms: shared answers in §3, prohibited public content in §4, new §4a
+  (reports reviewed within 24h), Pro fair-use 1,000/month in §6a. Privacy:
+  Gemini list gains the publish check, §6 "equal protection" sentence
+  (5.1.1(i)), §8 covers answers + reporting. Trial-ending push is a status
+  notice, no sales line (4.5.4). **B (app):** Settings → About → "Contact
+  support"; `capacitor-native-settings` removed (31 private `App-prefs:` URLs
+  in the binary, 2.5.1) for `ShareConfigPlugin.openAppSettings` (public
+  `openSettingsURLString`); paywall fine print names "Machina Pro
+  Yearly/Monthly"; forced-update text drops "or TestFlight"; Hide My Email
+  check accepts `private.icloud.com`; share sheets show the server's 422
+  reason (`shareRefusalMessage`). **C (Terms/Privacy to 18+ for Gemini's
+  under-18 term) NOT done: owner does not want 18+;** Vertex AI's terms carry
+  the same clause, so switching Google products doesn't avoid it. Verified:
+  tsc, eslint (touched files), web unit tests 84/84, `next build`, `swiftc
+  -parse`, py_compile, pytest 1,960 passed (18 new in
+  `tests/test_share_moderation.py`). Not verified: the check against live
+  Gemini, the Swift change compiled (CI will), anything on a device.
+  `docs/APP_STORE.md` §2 age-rating answers and §3 review notes updated (owner
+  pastes the new notes bullet). Owner console list (subscriptions attached to
+  1.0, age questions, description Pro paragraph, screenshots 1+5 faces) is in
+  the report.
 - **2026-10-22 — REVIEWER ACCOUNT PREPPED FOR SUBMISSION (`as-prep`, owner's
   go).** `machinareviewer` (`users/cJSmZgLyC7bMmPZq1IVZFSpPW9x2`): entitlement
   set to a fresh 14-day Pro trial ending **2026-11-05 08:02 UTC** (plan pro,

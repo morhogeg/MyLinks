@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 import Capacitor
 import WebKit
 
@@ -22,7 +23,8 @@ public class ShareConfigPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "clear", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "clearWebsiteData", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "consumePendingShare", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "consumePendingPaywall", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "consumePendingPaywall", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "openAppSettings", returnType: CAPPluginReturnPromise)
     ]
 
     /// Must match the App Group enabled on BOTH the app and the extension,
@@ -158,5 +160,22 @@ public class ShareConfigPlugin: CAPPlugin, CAPBridgedPlugin {
         }
         let ageMs = max(0, (Date().timeIntervalSince1970 - at) * 1000.0)
         call.resolve(["pending": true, "kind": kind, "ageMs": ageMs])
+    }
+
+    /// Open Machina's own page in the Settings app (where its notification
+    /// switches live). Uses only the public `openSettingsURLString`; this
+    /// replaced the capacitor-native-settings plugin, whose binary carried
+    /// dozens of private `App-prefs:` URLs (App Review 2.5.1) for pages the
+    /// app never opened.
+    @objc func openAppSettings(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            guard let url = URL(string: UIApplication.openSettingsURLString) else {
+                call.resolve(["opened": false])
+                return
+            }
+            UIApplication.shared.open(url, options: [:]) { opened in
+                call.resolve(["opened": opened])
+            }
+        }
     }
 }

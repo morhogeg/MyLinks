@@ -274,9 +274,28 @@ export async function callShareApi(path: string, body: Record<string, unknown>):
     if (!res.ok) {
         let msg = `Request failed (HTTP ${res.status})`;
         try { const j = await res.json(); if (j?.error) msg = j.error; } catch { /* non-JSON error body */ }
-        throw new Error(msg);
+        throw new ShareApiError(msg, res.status);
     }
     return res.json().catch(() => ({}));
+}
+
+/** A share endpoint's error, with the HTTP status it answered. */
+export class ShareApiError extends Error {
+    constructor(message: string, readonly status: number) {
+        super(message);
+        this.name = 'ShareApiError';
+    }
+}
+
+/**
+ * The server's own words when it refused to publish (HTTP 422): the page
+ * failed the content check, or the account may not publish (functions
+ * share_moderation / share_bans). Those sentences are written for the user,
+ * so they're shown as is; every other failure keeps the caller's generic
+ * "try again" toast. Null when this wasn't a refusal.
+ */
+export function shareRefusalMessage(err: unknown): string | null {
+    return err instanceof ShareApiError && err.status === 422 && err.message ? err.message : null;
 }
 
 /** Generate an unguessable share id. */

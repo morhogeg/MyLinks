@@ -11,7 +11,7 @@ import {
 /** Apple's "Hide My Email" relay — a random address nobody recognises as
     their own, so it must never be the headline of an identity. */
 export function isPrivateRelay(email: string | null | undefined): boolean {
-    return typeof email === 'string' && /@privaterelay\.appleid\.com$/i.test(email.trim());
+    return typeof email === 'string' && /@(privaterelay\.appleid\.com|private\.icloud\.com)$/i.test(email.trim());
 }
 
 /** The name to headline an account with: the person's name, else a real

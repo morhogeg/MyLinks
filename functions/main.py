@@ -104,7 +104,7 @@ from share_service import (
     _publish_share_logic, _unpublish_share_logic, _delete_collection_logic,
     _unpublish_all_card_shares_logic,
     _render_shared_card, _render_shared_collection, _render_shared_answer,
-    _share_not_found_html, _valid_share_id,
+    _share_not_found_html, _valid_share_id, ShareRefused,
 )
 
 # Configure logging
@@ -5569,6 +5569,8 @@ def publish_share_http(req: https_fn.Request) -> https_fn.Response:
             update_only=data.get("mode") == "update",
         )
         return https_fn.Response(json.dumps(result), status=200, headers=headers, mimetype='application/json')
+    except ShareRefused as e:
+        return _error_response(str(e), 422, headers)
     except PermissionError as e:
         return _error_response(str(e), 403, headers)
     except LookupError as e:

@@ -5,7 +5,7 @@ import {
     X, Globe, Share2, Copy, Check, ExternalLink, Lock, ShieldCheck, TriangleAlert,
 } from 'lucide-react';
 import { ChatSource, Link } from '@/lib/types';
-import { newShareId } from '@/lib/collections';
+import { newShareId, shareRefusalMessage } from '@/lib/collections';
 import { publishAnswer, unpublishAnswer, resolveShareableSources, PublicAnswerSource } from '@/lib/answerShare';
 import { shareLink, shareUrlFor, openExternal, copyToClipboard } from '@/lib/share';
 import { useToast } from '@/components/Toast';
@@ -142,8 +142,8 @@ export default function ShareAnswerSheet({
             });
             onShareIdChange(id);
             toast.success(shareId ? 'Public page updated' : 'Your answer is live');
-        } catch {
-            toast.error("Couldn't publish this answer. Please try again.");
+        } catch (err) {
+            toast.error(shareRefusalMessage(err) ?? "Couldn't publish this answer. Please try again.");
         } finally {
             setBusy(null);
         }

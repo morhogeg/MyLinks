@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { RotateCcw } from 'lucide-react';
-import { Bell, Sun, Moon, Monitor, Clock, Compass, Lock, BarChart3, Heart, Crown, Puzzle, Upload } from 'lucide-react';
+import { Bell, Sun, Moon, Monitor, Clock, Compass, Lock, BarChart3, Heart, Crown, Puzzle, Upload, Mail, ExternalLink } from 'lucide-react';
 import { policyUrl, openExternal } from '@/lib/share';
 import { isNativeApp } from '@/lib/api';
 import { browserKind, chromeWebStoreUrl, extensionInAStore, macAppStoreUrl } from '@/lib/extension';
@@ -22,6 +22,8 @@ import {
     SectionHeader, Footnote, List, RowShell, RowText, Chevron,
     NavRow, ExternalRow, Toggle, Segmented,
 } from './primitives';
+
+const SUPPORT_EMAIL = 'support@mymachina.app';
 
 export function MainView({
     authUid, accountEmail, displayName, photoURL, providerLabel, providerName, settings, theme, setTheme,
@@ -276,6 +278,13 @@ export function MainView({
             <SectionHeader>About</SectionHeader>
             <List>
                 <NavRow tile={<Heart className="w-[16px] h-[16px]" />} title="The story behind Machina" onClick={() => go('story')} />
+                {/* App Review 1.5: an easy way to reach us from inside the app.
+                    The address is on the row too, for anyone whose phone has
+                    no mail app set up (the mailto then does nothing). */}
+                <RowShell tile={<Mail className="w-[16px] h-[16px]" />} onClick={() => openExternal(`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('Machina support')}`)}>
+                    <RowText title="Contact support" sub={SUPPORT_EMAIL} />
+                    <ExternalLink className="ml-auto w-[15px] h-[15px] text-text-muted/60 shrink-0" />
+                </RowShell>
             </List>
         </>
     );

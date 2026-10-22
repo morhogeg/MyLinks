@@ -16,6 +16,7 @@ interface ShareConfigPlugin {
     clearWebsiteData(): Promise<void>;
     consumePendingShare(): Promise<{ pending: boolean; kind?: string; ageMs?: number; progress?: number; startedAt?: number }>;
     consumePendingPaywall(): Promise<{ pending: boolean; kind?: string; ageMs?: number }>;
+    openAppSettings(): Promise<{ opened: boolean }>;
 }
 
 const ShareConfigNative = registerPlugin<ShareConfigPlugin>('ShareConfig');
@@ -347,4 +348,14 @@ if (typeof document !== 'undefined') {
         if (lastSuccessKey === syncKey(lastArgs.uid, lastArgs.docToken)) return;
         void syncShareConfigToNative(lastArgs.uid, lastArgs.docToken);
     });
+}
+
+/** Open Machina's page in the iOS Settings app. False off iOS or on failure. */
+export async function openAppSettings(): Promise<boolean> {
+    if (!isNativeIos()) return false;
+    try {
+        return (await ShareConfigNative.openAppSettings())?.opened === true;
+    } catch {
+        return false;
+    }
 }

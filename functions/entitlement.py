@@ -832,10 +832,12 @@ def trial_nudge_copy(ends_ms: int, saves: int, asks: int, tz_name: Optional[str]
     title = f"Your Pro trial ends {when}"
     # The counts used to be this month's metered usage, which read as the
     # library size and was wrong for anyone past their first month. The body
-    # now says what changes and that nothing is lost.
+    # says what changes and that nothing is lost, and nothing else: people
+    # opted into push for reminders and digests (PushNudge), so a sales line
+    # here would be the promotional push App Review 4.5.4 forbids without a
+    # separate opt-in. The tap opens Settings, where the plan is.
     del saves, asks
-    body = ("After that you keep everything you saved on the free plan. "
-            "Keep unlimited saves, Ask and your weekly synthesis with Machina Pro.")
+    body = "After that you're on the free plan, and everything you saved stays."
     return title, body
 
 

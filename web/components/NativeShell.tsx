@@ -131,7 +131,7 @@ export default function NativeShell() {
                     </button>
                 ) : (
                     <p className="mt-6 text-[13px] text-text-muted">
-                        Install the latest version from the App Store or TestFlight.
+                        Install the latest version from the App Store.
                     </p>
                 )}
             </div>
