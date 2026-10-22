@@ -72,6 +72,11 @@ const PAGE_HELPERS = () => {
         if (!s) continue;
         const el = n.parentElement;
         if (!el || !el.checkVisibility({ opacityProperty: true, visibilityProperty: true })) continue;
+        // screen-reader-only text (a live status region: Tailwind's sr-only
+        // is a 1px clipped box) is in the DOM for assistive tech, never on
+        // screen; its text nodes still measure their full, unclipped width
+        const eb = el.getBoundingClientRect();
+        if (eb.width <= 1 && eb.height <= 1) continue;
         const r = document.createRange();
         r.selectNodeContents(n);
         const b = r.getBoundingClientRect();

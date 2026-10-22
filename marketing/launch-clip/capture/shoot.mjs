@@ -821,8 +821,9 @@ const takes = {
       askTab: R.askTab,
       composer: R.composer,
       send: R.send,
-      bubble: ['div', S.ask.question],
-      answer: ['div', 'You saved it three weeks ago'],
+      // the question's bubble and the answer (their message rows' content)
+      bubble: ['[data-msg-idx="0"] > div'],
+      answer: ['[data-msg-idx="1"] > div'],
       chip: [`button[title="${S.title}"]`],
       graphChip: ['button', 'Graph'],
     };
@@ -852,7 +853,7 @@ const takes = {
     await t.freeze();
     t.mark('answer');
     for (let done = false; !done; ) {
-      done = server.advanceChat(6);
+      done = server.advanceChat(4);
       await page.waitForTimeout(90); // the chunk crosses the (real) network
       await t.advance(1000 / 60);
       await t.snap({ rects: ASKR });
