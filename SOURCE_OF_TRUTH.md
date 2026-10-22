@@ -1856,14 +1856,17 @@ The multi-user auth work described below **was** fully written but not live:
       replaced the 2026-08-06 setup (Cloudflare **Email Routing**, three
       `route{1,2,3}.mx.cloudflare.net` records, forward-only to the personal
       Gmail). **Do not re-add the Cloudflare MX records** — running both
-      providers splits delivery. Open owner steps, seen in live DNS 2026-10-22:
-      (a) the SPF TXT still reads `include:_spf.mx.cloudflare.net
-      include:_spf.google.com` — drop the Cloudflare include once Email
-      Routing is off; (b) **no DKIM** (`google._domainkey` is empty) — generate
-      it in Admin console → Apps → Gmail → Authenticate email and add the TXT,
-      or mail sent as `support@` is likely to land in spam; (c) **no DMARC**
-      (`_dmarc` is empty) — add `v=DMARC1; p=none; rua=mailto:support@mymachina.app`
-      after DKIM is in place (Cloudflare's dashboard also recommends this).
+      providers splits delivery. **Sender authentication DONE 2026-10-22**
+      (owner; all three verified in live DNS from Cloudflare's nameserver and
+      1.1.1.1): **DKIM** TXT at `google._domainkey` (2048-bit, selector
+      `google`, Admin console → Apps → Gmail → Authenticate email shows
+      "Authenticating email with DKIM"; owner's test mail showed DKIM PASS for
+      mymachina.app); **SPF** is the single record `v=spf1
+      include:_spf.google.com ~all` (the stale Cloudflare include is gone);
+      **DMARC** at `_dmarc` is `v=DMARC1; p=none;
+      rua=mailto:support@mymachina.app` — report-only, so daily XML aggregate
+      reports land in `support@`. Next, optional: after ~2 weeks of reports
+      showing only Google-sent mail passing, tighten to `p=quarantine`.
     - **[x] App Store URLs — updated in `docs/APP_STORE.md`** to the new domain,
       plus a `support@mymachina.app` row. ⚠️ Both the Support and Marketing URLs
       point at the app root, which is now the **public landing page** — task 25
@@ -2707,8 +2710,9 @@ exact-match, capped.
   list it as a Machina host, `vercel.json` allows it in `frame-ancestors`, and
   it is the fallback if the brand domain's DNS breaks. The owner also confirmed
   that the MX records moved to Google Workspace on purpose; §4 task 22's Mail bullet
-  is rewritten and 25d is marked superseded. New owner steps there: drop the
-  stale Cloudflare SPF include, add DKIM, add DMARC.
+  is rewritten and 25d is marked superseded. The owner then finished sender
+  authentication the same session: DKIM (test mail PASS), SPF cut to the Google
+  include only, and DMARC `p=none` reporting to `support@`. All three were verified in DNS.
 
 - **2026-10-21 (later) — SCALE CHECK: SEARCH CAP 10 → 50, ERROR ALERTS LIVE
   (owner: "if I launch today, is the backend ready?").** Answer: yes to
