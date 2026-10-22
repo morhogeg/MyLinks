@@ -2637,6 +2637,28 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-22 (round 11, final) — SAVE THIS: "Now every save is one
+  question away.", the tagline unstuck, and a finish pass (owner: "'better
+  than you do' is argumentative"; "under the tagline the video is stuck on
+  the Ask chat"; then B of three, "no more rounds, Apple grade").** Branch
+  `claude/reel-save-this`. The bridge is the owner's pick of three (each
+  voiced in context first, run 12), over Ask's opening screen; the
+  suggestion about this reel lifts on "save". Under the tagline the camera
+  now glides from the answer onto its three sources, this reel's last,
+  landing as the thumb opens it; the answer dissolves under the paper as
+  it goes. A frame-by-frame pass over the render and its mix then fixed: a
+  hot "s" in two takes (`audio/vo-deess.py`, two bands; the other lines
+  come back bit for bit), the app's tab bar and focus panel at the graph's
+  foot (paper there), a grey band under the composer (no shadow or glass
+  edge on that shot: `AppShot`'s new `edge`, default 1), and the card's
+  letterbox outlining the frame at the dive's end (a paper margin on the
+  replica, outside the frame at the hand-over). 26.6s, 78 words.
+  **Verified:** gates (bans on 253 strings including every captured frame,
+  windows, every line 11.1 to 18.5dB over the music, −14.04 LUFS, −1.25
+  dBTP, seam step 0.006 against the score's own 0.112); every 6th frame
+  of the render and both sides of every fix; the encode (798 frames, 26.6s,
+  −13.9 LUFS, −1.3 dBTP), its last frame against frame 0 at 51.7dB PSNR
+  (the hook's own first step: 45.4dB). **Not verified:** listened to.
 - **2026-10-22 (round 10) — SAVE THIS: a bridge into Ask (owner: "we need
   some wording transition before 'So ask it anything' so it sounds more
   natural").** Branch `claude/reel-save-this`. New line, "Now it knows your
