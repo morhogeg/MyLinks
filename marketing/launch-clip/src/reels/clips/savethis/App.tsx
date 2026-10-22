@@ -107,6 +107,13 @@ const PROOF = (() => {
   const cy = (ANSWER[1] + CITES[2][1] + CITES[2][3]) / 2;
   return { z, cy, fy: PROOF_LINE + 10 + (cy - ANSWER[1]) * z };
 })();
+/** (round 11) the three citations as one column (left-aligned on the
+ *  screen, so centred on themselves, not on it) */
+const CITED = (() => {
+  const x0 = Math.min(...CITES.map((r) => r[0]));
+  const x1 = Math.max(...CITES.map((r) => r[0] + r[2]));
+  return { cx: (x0 + x1) / 2, cy: (CITES[0][1] + CITES[2][1] + CITES[2][3]) / 2 };
+})();
 /** the opened card's cover: the poster, whole (object-contain, measured) */
 export const COVER = rectOf(T, at(T, 'open', 59), 'poster');
 /** (round 3) the parts of the read the narrator names: its summary, its topic */
@@ -195,7 +202,7 @@ const dotAt = (i: number) => center(rectOf(T, i, 'node0'));
  * the camera goes down onto the answer and its citations, and the paper
  * (SaveThis.tsx PROOF_SCRIM) rises over the bubble.
  */
-const ASK_CAM: Record<'screen' | 'typing' | 'answer' | 'proof' | 'card', Cam> = {
+const ASK_CAM: Record<'screen' | 'typing' | 'answer' | 'proof' | 'cited' | 'card', Cam> = {
   // (round 10) Ask opening: its mark, "What do you want to recall?", its
   // promise and the questions it suggests about the saves (y 210 to 570 on
   // the take), clear under the band; at least the frame's width (393pt at
@@ -205,6 +212,9 @@ const ASK_CAM: Record<'screen' | 'typing' | 'answer' | 'proof' | 'card', Cam> = 
   typing: { cx: 196.5, cy: center(COMPOSER).y, z: 3.0, fx: 540, fy: 1150, rx: 0, ry: 0, rz: 0 },
   answer: { cx: 196.5, cy: BUBBLE[1] + 140, z: 2.5, fx: 540, fy: 720 + 140 * 2.5, rx: 0, ry: 0, rz: 0 },
   proof: { cx: 196.5, cy: PROOF.cy, z: PROOF.z, fx: 540, fy: PROOF.fy, rx: 0, ry: 0, rz: 0 },
+  // (round 11) the three up close, the frame's middle: the answer and its
+  // Copy/Save/Share row (to y 355 on the take) all under the paper
+  cited: { cx: CITED.cx, cy: CITED.cy, z: 3.0, fx: 540, fy: 985, rx: 0, ry: 0, rz: 0 },
   card: { cx: center(COVER).x, cy: center(COVER).y + 40, z: 2.75, fx: 540, fy: 1060, rx: 0, ry: 0, rz: 0 },
 };
 
@@ -250,7 +260,10 @@ export const appKeys: Key[] = [
   { f: S.proof - 1, z: ASK_CAM.answer.z * 1.02, ease: linear },
   // the proof: down onto the three citations as they land
   { f: S.proof + 14, ...ASK_CAM.proof, ease: EASE_IN_OUT },
-  { f: S.citeTap, z: ASK_CAM.proof.z * 1.02, ease: linear },
+  // (owner, round 11: under the tagline the chat sat still, "stuck") a slow
+  // glide in on the three, this reel's last, into the thumb opening it
+  { f: S.citeTap - 2, ...ASK_CAM.cited, ease: EASE_IN_OUT },
+  { f: S.citeTap, z: ASK_CAM.cited.z * 1.004, ease: linear },
   // the thumb opens this reel's citation; its card rises, and the dive
   // into its cover lands on the poster
   { f: S.citeTap + 6, ...ASK_CAM.card, ease: EASE_MODAL },

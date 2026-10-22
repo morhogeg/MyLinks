@@ -67,13 +67,16 @@ export const SaveThis: React.FC<{
       )}
       {/* (round 7) on the proof, the paper rises over the question bubble
           (the camera is down on the answer and its citations): above the
-          answer's first line nothing but the tagline */}
-      {f >= HITS.proof && f < HITS.citeTap + 2 && (
+          answer's first line nothing but the tagline. (round 11) As the
+          camera glides in on the citations under the tagline, its edge
+          softens, so the answer dissolves under it instead of being
+          sliced; it lets go once the card has faded in over the chat */}
+      {f >= HITS.proof && f < HITS.citeTap + 8 && (
         <AbsoluteFill
           style={{
             pointerEvents: 'none',
-            opacity: prog(f, HITS.proof + 2, HITS.proof + 14, EASE_IN_OUT) * (1 - prog(f, HITS.citeTap - 4, HITS.citeTap + 2, EASE_IN_OUT)),
-            background: `linear-gradient(180deg, ${GRADE.tone} 0px, ${GRADE.tone} ${PROOF_LINE}px, ${clearOf(GRADE.tone)} ${PROOF_LINE + 10}px)`,
+            opacity: prog(f, HITS.proof + 2, HITS.proof + 14, EASE_IN_OUT) * (1 - prog(f, HITS.citeTap + 2, HITS.citeTap + 8, EASE_IN_OUT)),
+            background: `linear-gradient(180deg, ${GRADE.tone} 0px, ${GRADE.tone} ${PROOF_LINE}px, ${clearOf(GRADE.tone)} ${PROOF_LINE + 10 + 80 * prog(f, HITS.proof + 14, HITS.proof + 40, EASE_IN_OUT)}px)`,
           }}
         />
       )}
