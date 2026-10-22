@@ -711,15 +711,17 @@ tick sounds; the narrator sits 8.1–17.0dB over the music in the speech band
 
 ## SAVE THIS (the organic Reel)
 
-`MachinaSaveThis` is a 23.8s vertical Reel built for Instagram, not a
+`MachinaSaveThis` is a 26.1s vertical Reel built for Instagram, not a
 feature explainer. **The idea: the reel saves itself.** It opens by
 predicting that the viewer will save this video and never watch it again.
 The save falls into a well of every other save, all grey. "Unless you
 save it to Machina" floods them with the app's category colours and
 gathers them into the mark, and the real app reads the reel, sums it up,
 files it by topic, and shows it on its graph tied to two earlier saves.
-And because it has read and connected them all: "So ask it anything, and
-get the answer, with the proof.": a real question ("What do my saves say
+"Now it knows your saves better than you do." (round 10, the bridge, over
+Ask's opening screen, whose first suggestion is a question about this
+reel), "So ask it anything, and get the answer, with the proof.": a real
+question ("What do my saves say
 about putting things off?") answered from the saves, every source cited,
 this reel among them. The problem is said once, at the top, and
 everything after "Unless" answers it (owner, round 9: restating the
@@ -758,13 +760,14 @@ npx remotion render src/index.ts MachinaSaveThis out/savethis/master.mp4 --crf=1
 | 0:10.3 | "Saved to Machina"; the card: its cover is this reel's frame 0; its summary lifts on "sums it up", its topic chip on "files it by topic" | understands it, sums it up, / files it by topic, | "understands it, sums it up, files it by topic," | bell |
 | 0:12.1 | Cut on "topic": the app's graph, the saves mapped by topic (ATTENTION, MEANING, DESIGN…), its layout settling, the new save one of its dots | and connects it to / what you've saved before. | "and connects it to what you've saved before." | a tick |
 | 0:13.1 | The thumb taps its dot: on "what you've saved before" its ties to two older saves (Four Thousand Weeks, the procrastination talk) light up, the rest recedes, and the app's own camera glides in on the three | | | a tick; two linked notes |
-| 0:14.5 | Cut on the beat, straight from the graph to Ask's composer: "What do my saves say about putting things off?" bursts in on "ask" | So ask it anything, / and get the answer, / with the proof. | "So ask it anything, and get the answer, with the proof." | a click, a light note; the drums out; soft keys |
-| 0:15.4 | On "get the answer": sent, the answer streams, drawn from three saves | | | tick, low note |
-| 0:16.5 | On "proof": the saves it came from, cited (Tim Urban's talk, Four Thousand Weeks, this reel), each lifting as it lands; the paper rises over the question | | | the band lands, full; three notes |
-| 0:17.3 | The wordmark wipes in on the spoken name, then the tagline, over the answer and its proof | MACHINA / Everything you save, / finally useful. | "Machina. Everything you save, finally useful." | |
-| 0:21.0 | The thumb opens this reel's citation: its card, its cover the poster whole; the camera dives into it until it IS the frame | | | whoosh |
-| 0:21.6 | The poster: frame 0 again (from 0:21.9) | This time, you'll / watch it again. | "This time, you'll watch it again." | thud, bell |
-| 0:23.8 | Loops into 0:00 without a cut | | | |
+| 0:14.5 | Cut on the beat to Ask opening: its mark, "What do you want to recall? Answers come only from your 23 saves, with sources you can open.", and the questions it suggests about the saves; on "saves" the first, about this very reel ("What's the gist of 'You're going to save this video'?"), lifts | Now it knows your saves / better than you do. | "Now it knows your saves better than you do." | a click, a light note; the drums out |
+| 0:16.8 | Cut on the beat to its composer: "What do my saves say about putting things off?" bursts in on "ask" | So ask it anything, / and get the answer, / with the proof. | "So ask it anything, and get the answer, with the proof." | a click; soft keys |
+| 0:17.6 | On "get the answer": sent, the answer streams, drawn from three saves | | | tick, low note |
+| 0:18.7 | On "proof": the saves it came from, cited (Tim Urban's talk, Four Thousand Weeks, this reel), each lifting as it lands; the paper rises over the question | | | the band lands, full; three notes |
+| 0:19.6 | The wordmark wipes in on the spoken name, then the tagline, over the answer and its proof | MACHINA / Everything you save, / finally useful. | "Machina. Everything you save, finally useful." | |
+| 0:23.3 | The thumb opens this reel's citation: its card, its cover the poster whole; the camera dives into it until it IS the frame | | | whoosh |
+| 0:23.9 | The poster: frame 0 again (from 0:24.3) | This time, you'll / watch it again. | "This time, you'll watch it again." | thud, bell |
+| 0:26.1 | Loops into 0:00 without a cut | | | |
 
 **What is real and what is not.** Every app pixel is the shipped app on
 `main` (2026-10-21), captured by `capture/shoot.mjs savethisClip`: the
@@ -792,7 +795,7 @@ captured, so they are not shown. No recipe cards in this account (owner,
 
 **Two deliberate breaks from the house rules.** The reel ends on the
 loop, not on the tagline: the tagline is said once, over the Ask
-answer and its proof at 73%, and the last frame is frame 0. And the
+answer and its proof at 75%, and the last frame is frame 0. And the
 opening (the trapdoor, the well, the heap) is the reel's own motion,
 bigger than the kit's restraint allows, in the same ink-on-paper grade.
 (Round 4: colour enters with Machina, the app's own category colours

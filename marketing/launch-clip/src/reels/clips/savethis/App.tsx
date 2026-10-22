@@ -21,8 +21,12 @@ import VO from './savethis-vo.json';
  *          new one already among them, its layout settling; the thumb taps
  *          its dot and its ties to two older saves light up on "what you've
  *          saved before", as the app's camera glides in on them
- *  ask     (round 9) "So ask it anything": CUT from the graph to Ask's
- *          composer, a real question bursting in; "and get the answer":
+ *  knows   (round 10) "Now it knows your saves better than you do": CUT
+ *          to Ask opening, its own words ("What do you want to recall?
+ *          Answers come only from your 23 saves, with sources you can
+ *          open.") over the questions it suggests about the saves
+ *  ask     (round 9) "So ask it anything": CUT to Ask's composer, a real
+ *          question bursting in; "and get the answer":
  *          sent, the answer streams from the saves; "with the proof": the
  *          three it came from land under it, cited, lifting one by one; the
  *          tagline sits above them
@@ -40,8 +44,13 @@ export const T = 'clips/savethis/app';
 const S = HITS;
 const linear = (t: number) => t;
 
-/** the take's runs, from its marks: (round 6) the question's characters,
- *  the answer's streamed chunks (60fps captures, one a chunk) */
+/** the take's runs, from its marks: (round 6) the Ask screen's opening,
+ *  the question's characters, the answer's streamed chunks (60fps
+ *  captures, one a chunk) */
+const ASK_OPEN = takeOf(T).marks.asking - takeOf(T).marks.ask;
+/** the cut lands on the Ask screen most of the way faded in, not on the
+ *  blank frame its opening starts from */
+const ASK_JOIN = 8;
 const CHARS = takeOf(T).marks.answer - takeOf(T).marks.asking;
 const STREAM = takeOf(T).marks.sources - takeOf(T).marks.answer;
 /** (round 4) the take opens the graph this many 60fps frames before the
@@ -65,8 +74,10 @@ export const frameAt = (f: number) => {
   // (round 4) CUT to the graph as its layout settles…
   if (f < S.connect) return at(T, 'graph', GRAPH_JOIN + (f - S.graph));
   // …the tap: its ties light and the app's camera glides in on them
-  if (f < S.askTap) return at(T, 'graphTap', Math.min(119, f - S.connect));
-  // (round 9) CUT to Ask's composer; on "ask" the question bursts in, a
+  if (f < S.knows) return at(T, 'graphTap', Math.min(119, f - S.connect));
+  // (round 10) CUT to Ask, its screen opening at real speed, then held…
+  if (f < S.askTap) return at(T, 'ask', Math.min(ASK_OPEN - 1, ASK_JOIN + (f - S.knows) * 2));
+  // (round 9) …CUT to its composer; on "ask" the question bursts in, a
   // character every TYPE_FRAMES…
   if (f < S.send) return at(T, 'asking', Math.min(CHARS - 1, Math.max(0, f - S.asking) / TYPE_FRAMES));
   // …sent: the answer streams, a chunk a frame…
@@ -113,6 +124,13 @@ const LIST_T = VO.find((v) => v.frame === LIST.at);
 const wordAt = (k: number) => LIST.at + Math.round((LIST_T?.words[k] ?? 0) * FPS);
 export const SUMS_AT = wordAt(2); // "sums"
 export const FILES_AT = wordAt(5); // "files"
+/** (round 10) the first question Ask suggests is about this very reel
+ *  ("What's the gist of "You're going to save this video"?"): it lifts on
+ *  "saves" (its box measured on the take's held frame, 4px a point) */
+const SUGGESTION: [number, number, number, number] = [29, 374, 335, 56];
+const BRIDGE = CAPTIONS.find((c) => c.text.startsWith('Now it knows'))!;
+const BRIDGE_T = VO.find((v) => v.frame === BRIDGE.at);
+const SAVES_AT = BRIDGE.at + Math.round((BRIDGE_T?.words[4] ?? 0) * FPS); // "saves"
 
 /**
  * (round 4) The graph's camera. The app draws its graph to one canvas, so the
@@ -148,7 +166,7 @@ export const graphCam = (f: number): Cam => {
   const zIsland = mix(GRAPH.zIsland[0], GRAPH.zIsland[1], prog(f, S.graph, S.connect, EASE_IN_OUT));
   // as wide as the titles need, never closer than the island's framing
   const zTies = Math.min(zIsland, (1080 - 2 * GRAPH.margin) / ties.w);
-  const z = mix(zIsland, zTies, w) * (1 + 0.04 * prog(f, S.graph, S.askTap, linear));
+  const z = mix(zIsland, zTies, w) * (1 + 0.04 * prog(f, S.graph, S.knows, linear));
   // the titles are up from the frame after the tap: none of them leaves the
   // frame while the camera travels to them
   let cx = mix(isl.x - 4, ties.x, w);
@@ -177,7 +195,12 @@ const dotAt = (i: number) => center(rectOf(T, i, 'node0'));
  * the camera goes down onto the answer and its citations, and the paper
  * (SaveThis.tsx PROOF_SCRIM) rises over the bubble.
  */
-const ASK_CAM: Record<'typing' | 'answer' | 'proof' | 'card', Cam> = {
+const ASK_CAM: Record<'screen' | 'typing' | 'answer' | 'proof' | 'card', Cam> = {
+  // (round 10) Ask opening: its mark, "What do you want to recall?", its
+  // promise and the questions it suggests about the saves (y 210 to 570 on
+  // the take), clear under the band; at least the frame's width (393pt at
+  // 2.75), so the screen's edges never show
+  screen: { cx: 196.5, cy: 395, z: 2.8, fx: 540, fy: 1090, rx: 0, ry: 0, rz: 0 },
   // the composer the width of the frame: the question, big, on clean paper
   typing: { cx: 196.5, cy: center(COMPOSER).y, z: 3.0, fx: 540, fy: 1150, rx: 0, ry: 0, rz: 0 },
   answer: { cx: 196.5, cy: BUBBLE[1] + 140, z: 2.5, fx: 540, fy: 720 + 140 * 2.5, rx: 0, ry: 0, rz: 0 },
@@ -213,9 +236,12 @@ export const appKeys: Key[] = [
   { f: S.done + 16, cx: 196.5, cy: 352, z: 2.4, fx: 540, fy: 1190, ease: EASE_IN_OUT },
   // a slow push on the topic, into the cut
   { f: S.graph - 1, z: 2.5, ease: linear },
-  // (round 4) S.graph to S.askTap: the graph, on its own camera (graphCam)
-  { f: S.askTap - 1, ...ASK_CAM.typing },
-  // (round 9) CUT to Ask's composer on "So ask it anything": the question
+  // (round 4) S.graph to S.knows: the graph, on its own camera (graphCam)
+  { f: S.knows - 1, ...ASK_CAM.screen },
+  // (round 10) CUT to Ask opening on "Now it knows your saves", a slow push…
+  { f: S.knows, ...ASK_CAM.screen },
+  { f: S.askTap - 1, z: ASK_CAM.screen.z * 1.04, ease: linear },
+  // (round 9) …CUT to its composer on "So ask it anything": the question
   // bursts in
   { f: S.askTap, ...ASK_CAM.typing },
   { f: S.send - 1, z: ASK_CAM.typing.z * 1.03, ease: linear },
@@ -240,7 +266,7 @@ export const App: React.FC<{ f: number }> = ({ f }) => {
   const i = frameAt(f);
   // the graph's camera rides the app's, so what it shows stays put: no
   // smear from its own travel
-  const inGraph = f >= S.graph && f < S.askTap;
+  const inGraph = f >= S.graph && f < S.knows;
   const cam = inGraph ? graphCam(f) : camAt(appKeys, f);
   const v = inGraph ? { x: 0, y: 0 } : camVelocity(appKeys, f, 1);
   // the iris: a circle from the card's mark, open by the time it lands
@@ -253,6 +279,8 @@ export const App: React.FC<{ f: number }> = ({ f }) => {
   // to the topic, which stays up into the cut to the topics' map
   const upSum = f >= SUMS_AT - 2 && f < S.graph ? lift(f, SUMS_AT - 2, S.graph - SUMS_AT + 2) : 0;
   const upTopic = f >= FILES_AT - 2 && f < S.graph ? prog(f, FILES_AT - 2, FILES_AT + 10, EASE_MODAL) : 0;
+  // (round 10) the suggestion about this reel, up on "saves" into the cut
+  const upAsk = f >= SAVES_AT - 2 && f < S.askTap ? prog(f, SAVES_AT - 2, SAVES_AT + 10, EASE_MODAL) : 0;
   return (
     <AbsoluteFill>
       <AppShot take={T} i={i} cam={cam} motion={{ x: v.x, y: v.y }} iris={iris} shadow={r}>
@@ -262,6 +290,10 @@ export const App: React.FC<{ f: number }> = ({ f }) => {
         )}
         {f >= FILES_AT - 4 && f < S.graph && (
           <Lift take={T} i={i} rect={TOPIC} radius={8} lift={Math.max(upTopic, 0.002)} rise={1.5} grow={0.05} ring={0.7 * upTopic} />
+        )}
+        {/* (round 10) "your saves": the suggestion about this very reel */}
+        {f >= SAVES_AT - 4 && f < S.askTap && (
+          <Lift take={T} i={i} rect={SUGGESTION} radius={14} lift={Math.max(upAsk, 0.002)} rise={1.5} grow={0.02} ring={0.6 * upAsk} />
         )}
         {/* (round 4) the thumb on the new save's dot */}
         {f >= S.connect - 9 && f < S.connect + 12 && (

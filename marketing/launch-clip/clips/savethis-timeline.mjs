@@ -59,10 +59,10 @@ export const HITS = {
   // own opening screen, its suggestions questions about the saves
   knows: beat(31), // "Now it knows your saves…": CUT from the graph to Ask
   // (round 9) Ask, the solution's last word, each part on its own word
-  askTap: beat(36), // "So…": CUT to Ask's composer, on the beat…
-  asking: 507, // …"ask it anything": the question bursts in
-  send: 532, // "and get the answer": sent, the answer streams
-  proof: 564, // "with the proof": the saves it came from, cited
+  askTap: beat(36), // "So ask…": CUT to Ask's composer, on the beat, as…
+  asking: beat(36), // …the question bursts in on "ask it anything"
+  send: 528, // "and get the answer": sent, the answer streams
+  proof: 560, // "with the proof": the saves it came from, cited
   tagline: beat(42), // "Machina. Everything you save, finally useful."
   citeTap: beat(50), // the thumb opens this reel's citation: its card…
   poster: beat(52), // …and the dive into its cover lands ON frame 0
@@ -114,13 +114,13 @@ export const CAPTIONS = [
   // (owner, round 10: "So ask it anything" came too abruptly) the bridge,
   // what the reading adds up to, said as the solution, not the problem
   // again (round 9); over Ask's own opening screen
-  { at: HITS.knows + 2, to: HITS.askTap - 2, text: 'Now it knows your saves\nbetter than you do.', style: 'Warm and a little wry, a knowing smile; quick and light, flowing on from the line before, a small grin on "better than you do".', pace: PACE },
+  { at: HITS.knows + 2, to: HITS.askTap - 6, text: 'Now it knows your saves\nbetter than you do.', style: 'Warm and a little wry, a knowing smile; quick and light, flowing on from the line before, a small grin on "better than you do".', pace: PACE },
   // (owner, round 9: problem, solution, then the problem again made no
   // sense) Ask is the solution's last word, its consequence: because it has
   // read, understood and connected every save, ask it anything; the
   // question types on "ask it anything", the answer streams on "get the
   // answer", the saves it came from land on "proof"
-  { at: HITS.askTap + 2, to: HITS.tagline - 6, text: 'So ask it anything,\nand get the answer,\nwith the proof.', style: 'Confident and simple, one easy sentence in three quick beats; light and brisk, landing softly on "proof".', pace: PACE },
+  { at: HITS.askTap - 2, to: HITS.tagline - 6, text: 'So ask it anything,\nand get the answer,\nwith the proof.', style: 'Confident and simple, one easy sentence in three quick beats; light and brisk, landing softly on "proof".', pace: PACE },
   // the name and the tagline, said once, over the answer and its proof
   // (owner, round 2: the name in the voice); the drawn wordmark wipes in on
   // "Machina"
@@ -146,8 +146,8 @@ export const RISERS = [
  * Harmony, [from frame, chord], the house vocabulary (C major, the film's
  * voicings): the hook and the fall hang on the minor (the loss), the turn
  * lifts through V to I on the strike, the reading and the graph rest on IV,
- * the question lifts to V and the proof lands home; the dive leaves on IV,
- * which falls back to vi at the top of the loop.
+ * the bridge and the question lift to V and the proof lands home; the dive
+ * leaves on IV, which falls back to vi at the top of the loop.
  */
 export const CHORDS = [
   [0, 'Am7'],
@@ -155,7 +155,7 @@ export const CHORDS = [
   [HITS.gather, 'G6'],
   [HITS.markStrike, 'Cmaj7'],
   [HITS.done, 'Fmaj7'],
-  [HITS.askTap, 'G6'],
+  [HITS.knows, 'G6'],
   [HITS.proof, 'Cmaj7'],
   [HITS.citeTap, 'G6'],
   [HITS.poster, 'Fmaj7'],
