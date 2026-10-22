@@ -56,14 +56,15 @@ export const HITS = {
   bury: beat(33), // newer saves land on top of it, from "buried"
   fieldTap: beat(37), // "type what you remember": the search field
   type: beat(37.5), // "never watch it again"
-  found: beat(41), // this video's card, alone
-  tagline: beat(41) + 4, // "Machina. Everything you save, finally useful."
-  cardTap: beat(49), // the thumb taps its cover…
-  poster: beat(51), // …the dive lands ON frame 0
+  found: beat(41), // this video's card, alone ("There it is,…")
+  // (round 5) four beats later than before, for the payoff line
+  tagline: beat(45) + 4, // "Machina. Everything you save, finally useful."
+  cardTap: beat(53), // the thumb taps its cover…
+  poster: beat(55), // …the dive lands ON frame 0
 };
 
 /** a whole beat, so the score's pulse runs straight through the loop */
-export const TOTAL_FRAMES = beat(55);
+export const TOTAL_FRAMES = beat(59);
 export const TOTAL_SEC = TOTAL_FRAMES / FPS;
 
 /** The cut. One beat of story per scene. */
@@ -106,19 +107,19 @@ export const CAPTIONS = [
   // graph: the thumb taps the new save's dot and its ties to older saves light
   { at: 372, to: 432, text: 'and connects it to\nwhat you’ve saved before.', style: 'Clear and genuinely pleased, flowing on from the line before; a little lift on "connects", landing warmly on "saved before".', pace: PACE },
   { at: 434, to: 514, text: 'Weeks later, buried\nunder everything else,', style: 'Storytelling, quick and a touch dramatic; trailing on into the next line.', pace: PACE },
-  { at: 518, to: 564, text: 'type what you remember.', style: 'Easy and casual, like the simplest thing in the world.', pace: PACE },
+  { at: 518, to: 554, text: 'type what you remember.', style: 'Easy and casual, like the simplest thing in the world.', pace: PACE },
   // (owner, round 5: the search showed the result but nobody said it) the
   // payoff, on the card coming back: found, from a half-memory, not its title
-  { at: 556, to: 626, text: 'There it is,\nexactly the one you meant.', style: 'The payoff, warm and quietly delighted: a small reveal on "There it is", then quick and sure, a light lift on "exactly"; no drawn-out words.', pace: PACE },
+  { at: 556, to: 624, text: 'There it is,\nexactly the one you meant.', style: 'The payoff, warm and quietly delighted: a small reveal on "There it is", then quick and sure, a light lift on "exactly"; no drawn-out words.', pace: PACE },
   // the find: the name and the tagline, said once, over the save it just
   // brought back (owner, round 2: the name in the voice); the drawn wordmark
   // wipes in on "Machina"
-  { at: HITS.tagline, to: 678, place: 'scene', text: 'Machina.\nEverything you save,\nfinally useful.', duck: 0.4, style: 'A confident, warm sign-off; the name with a smile, then the tagline sincere but brisk, no drawn-out words.', pace: PACE },
+  { at: HITS.tagline, to: HITS.tagline + 100, place: 'scene', text: 'Machina.\nEverything you save,\nfinally useful.', duck: 0.4, style: 'A confident, warm sign-off; the name with a smile, then the tagline sincere but brisk, no drawn-out words.', pace: PACE },
   // the thumb taps the found card's cover and the camera dives into it,
   // landing on frame 0 as the reel starts again under this line. (owner,
   // round 4: "See? You're watching it again." read as a riddle) The hook's
   // "never watch it again", answered as a promise
-  { at: 704, to: 764, text: 'This time, you’ll\nwatch it again.', duck: 0.4, style: 'Warm and sure, a small smile in the voice: a promise, not a punchline. Light and quick, a short breath after "This time", landing softly on "again".', pace: PACE },
+  { at: HITS.poster - 10, to: HITS.poster + 50, text: 'This time, you’ll\nwatch it again.', duck: 0.4, style: 'Warm and sure, a small smile in the voice: a promise, not a punchline. Light and quick, a short breath after "This time", landing softly on "again".', pace: PACE },
 ];
 
 /** a small letterspaced label above the line, with it (the kit's Kicker) */

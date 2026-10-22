@@ -711,7 +711,7 @@ tick sounds; the narrator sits 8.1–17.0dB over the music in the speech band
 
 ## SAVE THIS (the organic Reel)
 
-`MachinaSaveThis` is a 25.7s vertical Reel built for Instagram, not a
+`MachinaSaveThis` is a 27.5s vertical Reel built for Instagram, not a
 feature explainer. **The idea: the reel saves itself.** It opens by
 predicting that the viewer will save this video and never watch it again.
 The save falls into a well of every other save, all grey. "Unless you
@@ -719,7 +719,8 @@ save it to Machina" floods them with the app's category colours and
 gathers them into the mark, and the real app reads the reel, sums it up,
 files it by topic, shows it on its graph tied to two earlier saves,
 buries it under three weeks of newer saves, and finds it again from
-"never watch it again". The found card's cover is the reel's first
+"never watch it again" ("There it is, exactly the one you meant."). The
+found card's cover is the reel's first
 frame, so the camera dives into it and lands ON frame 0: the reel loops
 into its own hook ("This time, you'll watch it again.").
 
@@ -754,10 +755,11 @@ npx remotion render src/index.ts MachinaSaveThis out/savethis/master.mp4 --crf=1
 | 0:13.1 | The thumb taps its dot: on "what you've saved before" its ties to two older saves (Four Thousand Weeks, the procrastination talk) light up, the rest recedes, and the app's own camera glides in on the three | | | a tick; two linked notes |
 | 0:14.5 | Cut: the whole feed; seven newer saves land on the card, one an 8th, and bury it | THREE WEEKS LATER / Weeks later, buried / under everything else, | "Weeks later, buried under everything else," | the band drops; a thud per save |
 | 0:17.3 | Search your saves, tapped; "never watch it again" types; the feed narrows to one card | type what you remember. | "type what you remember." | a click a character |
-| 0:19.1 | The card lifts: this reel, found; the wordmark wipes in on the spoken name | MACHINA / Everything you save, / finally useful. | "Machina. Everything you save, finally useful." | the band lands, full |
-| 0:22.9 | The thumb taps the cover; the camera dives; the cover opens to the frame | | | whoosh |
-| 0:23.5 | The poster: frame 0 again (from 0:23.8) | This time, you'll / watch it again. | "This time, you'll watch it again." | thud, bell |
-| 0:25.7 | Loops into 0:00 without a cut | | | |
+| 0:18.5 | The one card left lifts on its beat (0:19.1): this reel, found from a half-memory, not its title | There it is, / exactly the one you meant. | "There it is, exactly the one you meant." | the band lands, full |
+| 0:21.1 | The wordmark wipes in on the spoken name, then the tagline, over the found card | MACHINA / Everything you save, / finally useful. | "Machina. Everything you save, finally useful." | |
+| 0:24.7 | The thumb taps the cover; the camera dives; the cover opens to the frame | | | whoosh |
+| 0:25.3 | The poster: frame 0 again (from 0:25.7) | This time, you'll / watch it again. | "This time, you'll watch it again." | thud, bell |
+| 0:27.5 | Loops into 0:00 without a cut | | | |
 
 **What is real and what is not.** Every app pixel is the shipped app on
 `main` (2026-10-21), captured by `capture/shoot.mjs savethisClip`: the

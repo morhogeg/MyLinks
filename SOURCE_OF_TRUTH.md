@@ -2637,6 +2637,17 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-22 (round 5) — SAVE THIS says the payoff (owner: "it shows the
+  result, but the narration should speak out about the payoff"; "summed up"
+  was not strong enough).** Branch `claude/reel-save-this`. After "type what
+  you remember.", a new line on the one card left: "There it is, exactly the
+  one you meant." (the reveal, then the search-by-meaning point: the query is
+  a half-memory, not the title; 2.2s take). The sign-off, the dive and the
+  loop move four beats later: 27.5s, 78 words (the brief's "about 75"; the
+  word gate now allows 78). **Verified:** gates (bans, windows, every line
+  11.7 to 17.7dB over the music, −14.02 LUFS, −1.20 dBTP, seam step 0.016
+  against the score's own 0.115); stills from the search to the loop;
+  the encode's last frame against frame 0 at 46.4dB PSNR (consecutive frames: 42.5dB). **Not verified:** listened to.
 - **2026-10-22 (round 4) — SAVE THIS: the real graph, colour, and a clearer
   last line (owner: "show our beautiful graph instead of just the related
   cards"; "it's a bit black and white"; "not sure about 'See? You're

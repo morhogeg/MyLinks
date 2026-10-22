@@ -112,7 +112,21 @@
   ]
  },
  {
-  "frame": 578,
+  "frame": 556,
+  "text": "There it is, exactly the one you meant.",
+  "words": [
+   0.0,
+   0.305,
+   0.457,
+   0.99,
+   1.354,
+   1.537,
+   1.719,
+   1.901
+  ]
+ },
+ {
+  "frame": 634,
   "text": "Makeena. Everything you save, finally useful.",
   "words": [
    0.03,
@@ -124,7 +138,7 @@
   ]
  },
  {
-  "frame": 704,
+  "frame": 760,
   "text": "This time, you\u2019ll watch it again.",
   "words": [
    0.04,
