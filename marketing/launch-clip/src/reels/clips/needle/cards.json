@@ -1,0 +1,1012 @@
+{
+ "dpr": 4,
+ "cards": [
+  {
+   "id": "tailend",
+   "title": "The Tail End",
+   "category": "Family",
+   "sourceType": "web",
+   "w": 361,
+   "h": 302.5,
+   "margin": 20,
+   "img": [
+    1572,
+    1368
+   ],
+   "box": [
+    64,
+    80,
+    1444,
+    1212
+   ]
+  },
+  {
+   "id": "piranesi",
+   "title": "Read Piranesi, and go in blind",
+   "category": "Books",
+   "sourceType": "image",
+   "w": 361,
+   "h": 307.5,
+   "margin": 20,
+   "img": [
+    1572,
+    1388
+   ],
+   "box": [
+    64,
+    82,
+    1444,
+    1232
+   ]
+  },
+  {
+   "id": "goloritze",
+   "title": "Cala Goloritz\u00e9, Sardinia",
+   "category": "Travel",
+   "sourceType": "web",
+   "w": 361,
+   "h": 302.5,
+   "margin": 20,
+   "img": [
+    1572,
+    1368
+   ],
+   "box": [
+    64,
+    82,
+    1444,
+    1212
+   ]
+  },
+  {
+   "id": "procrastinator",
+   "title": "Inside the mind of a master procrastinator",
+   "category": "Psychology",
+   "sourceType": "youtube",
+   "w": 361,
+   "h": 302.5,
+   "margin": 20,
+   "img": [
+    1572,
+    1368
+   ],
+   "box": [
+    64,
+    80,
+    1444,
+    1212
+   ]
+  },
+  {
+   "id": "yoga",
+   "title": "Yoga For Complete Beginners, 20 Minute Home Yoga Workout",
+   "category": "Wellness",
+   "sourceType": "youtube",
+   "w": 361,
+   "h": 295,
+   "margin": 20,
+   "img": [
+    1572,
+    1340
+   ],
+   "box": [
+    64,
+    80,
+    1444,
+    1180
+   ]
+  },
+  {
+   "id": "naval",
+   "title": "How to Get Rich (without getting lucky)",
+   "category": "Career",
+   "sourceType": "web",
+   "w": 361,
+   "h": 302.5,
+   "margin": 20,
+   "img": [
+    1572,
+    1368
+   ],
+   "box": [
+    64,
+    82,
+    1444,
+    1212
+   ]
+  },
+  {
+   "id": "systems",
+   "title": "You do not rise to the level of your goals",
+   "category": "Habits",
+   "sourceType": "web",
+   "w": 361,
+   "h": 283,
+   "margin": 20,
+   "img": [
+    1572,
+    1292
+   ],
+   "box": [
+    64,
+    82,
+    1444,
+    1132
+   ]
+  },
+  {
+   "id": "optimistic",
+   "title": "Optimistic Nihilism",
+   "category": "Philosophy",
+   "sourceType": "youtube",
+   "w": 361,
+   "h": 302.5,
+   "margin": 20,
+   "img": [
+    1572,
+    1368
+   ],
+   "box": [
+    64,
+    82,
+    1444,
+    1212
+   ]
+  },
+  {
+   "id": "question",
+   "title": "The Most Important Question of Your Life",
+   "category": "Career",
+   "sourceType": "web",
+   "w": 361,
+   "h": 273.5,
+   "margin": 20,
+   "img": [
+    1572,
+    1252
+   ],
+   "box": [
+    64,
+    80,
+    1444,
+    1096
+   ]
+  },
+  {
+   "id": "tinydesk",
+   "title": "Anderson .Paak & The Free Nationals: Tiny Desk Concert",
+   "category": "Music",
+   "sourceType": "youtube",
+   "w": 361,
+   "h": 295,
+   "margin": 20,
+   "img": [
+    1572,
+    1340
+   ],
+   "box": [
+    64,
+    82,
+    1444,
+    1180
+   ]
+  },
+  {
+   "id": "rams",
+   "title": "Dieter Rams: ten principles for good design",
+   "category": "Design",
+   "sourceType": "web",
+   "w": 361,
+   "h": 314.5,
+   "margin": 20,
+   "img": [
+    1572,
+    1416
+   ],
+   "box": [
+    64,
+    82,
+    1444,
+    1260
+   ]
+  },
+  {
+   "id": "bretvictor",
+   "title": "Inventing on Principle",
+   "category": "Design",
+   "sourceType": "web",
+   "w": 361,
+   "h": 302.5,
+   "margin": 20,
+   "img": [
+    1572,
+    1368
+   ],
+   "box": [
+    64,
+    82,
+    1444,
+    1212
+   ]
+  },
+  {
+   "id": "jobs",
+   "title": "Steve Jobs' 2005 Stanford Commencement Address",
+   "category": "Talks",
+   "sourceType": "youtube",
+   "w": 361,
+   "h": 322.5,
+   "margin": 20,
+   "img": [
+    1572,
+    1448
+   ],
+   "box": [
+    64,
+    82,
+    1444,
+    1292
+   ]
+  },
+  {
+   "id": "gift",
+   "title": "Birthday idea for Dana",
+   "category": "Gifts",
+   "sourceType": "note",
+   "w": 361,
+   "h": 283,
+   "margin": 20,
+   "img": [
+    1572,
+    1292
+   ],
+   "box": [
+    64,
+    80,
+    1444,
+    1132
+   ]
+  },
+  {
+   "id": "fourthousand",
+   "title": "Four Thousand Weeks",
+   "category": "Books",
+   "sourceType": "web",
+   "w": 361,
+   "h": 283,
+   "margin": 20,
+   "img": [
+    1572,
+    1292
+   ],
+   "box": [
+    64,
+    82,
+    1444,
+    1132
+   ]
+  },
+  {
+   "id": "perfectdays",
+   "title": "Perfect Days",
+   "category": "Film",
+   "sourceType": "youtube",
+   "w": 361,
+   "h": 283,
+   "margin": 20,
+   "img": [
+    1572,
+    1292
+   ],
+   "box": [
+    64,
+    80,
+    1444,
+    1132
+   ]
+  },
+  {
+   "id": "webb",
+   "title": "Cosmic Cliffs in the Carina Nebula",
+   "category": "Space",
+   "sourceType": "web",
+   "w": 361,
+   "h": 273.5,
+   "margin": 20,
+   "img": [
+    1572,
+    1252
+   ],
+   "box": [
+    64,
+    82,
+    1444,
+    1096
+   ]
+  },
+  {
+   "id": "coffee",
+   "title": "The Ultimate V60 Technique",
+   "category": "Coffee",
+   "sourceType": "youtube",
+   "w": 361,
+   "h": 273.5,
+   "margin": 20,
+   "img": [
+    1572,
+    1252
+   ],
+   "box": [
+    64,
+    80,
+    1444,
+    1096
+   ]
+  },
+  {
+   "id": "money",
+   "title": "The Psychology of Money",
+   "category": "Money",
+   "sourceType": "web",
+   "w": 361,
+   "h": 273.5,
+   "margin": 20,
+   "img": [
+    1572,
+    1252
+   ],
+   "box": [
+    64,
+    80,
+    1444,
+    1096
+   ]
+  },
+  {
+   "id": "lawsofux",
+   "title": "Laws of UX",
+   "category": "Design",
+   "sourceType": "web",
+   "w": 361,
+   "h": 275,
+   "margin": 20,
+   "img": [
+    1572,
+    1260
+   ],
+   "box": [
+    64,
+    82,
+    1444,
+    1100
+   ]
+  },
+  {
+   "id": "tmb",
+   "title": "Tour du Mont Blanc",
+   "category": "Outdoors",
+   "sourceType": "web",
+   "w": 361,
+   "h": 302.5,
+   "margin": 20,
+   "img": [
+    1572,
+    1368
+   ],
+   "box": [
+    64,
+    80,
+    1444,
+    1212
+   ]
+  },
+  {
+   "id": "fushimi",
+   "title": "Fushimi Inari at dawn",
+   "category": "Travel",
+   "sourceType": "web",
+   "w": 361,
+   "h": 283,
+   "margin": 20,
+   "img": [
+    1572,
+    1292
+   ],
+   "box": [
+    64,
+    82,
+    1444,
+    1132
+   ]
+  },
+  {
+   "id": "robinson",
+   "title": "Do schools kill creativity?",
+   "category": "Education",
+   "sourceType": "youtube",
+   "w": 361,
+   "h": 246,
+   "margin": 20,
+   "img": [
+    1572,
+    1144
+   ],
+   "box": [
+    64,
+    80,
+    1444,
+    984
+   ]
+  },
+  {
+   "id": "sinek",
+   "title": "How great leaders inspire action",
+   "category": "Business",
+   "sourceType": "youtube",
+   "w": 361,
+   "h": 254,
+   "margin": 20,
+   "img": [
+    1572,
+    1176
+   ],
+   "box": [
+    64,
+    82,
+    1444,
+    1016
+   ]
+  },
+  {
+   "id": "walker",
+   "title": "Sleep is your superpower",
+   "category": "Health",
+   "sourceType": "youtube",
+   "w": 361,
+   "h": 246,
+   "margin": 20,
+   "img": [
+    1572,
+    1144
+   ],
+   "box": [
+    64,
+    80,
+    1444,
+    984
+   ]
+  },
+  {
+   "id": "egg",
+   "title": "The Egg - A Short Story",
+   "category": "Stories",
+   "sourceType": "youtube",
+   "w": 361,
+   "h": 246,
+   "margin": 20,
+   "img": [
+    1572,
+    1144
+   ],
+   "box": [
+    64,
+    80,
+    1444,
+    984
+   ]
+  },
+  {
+   "id": "entropy",
+   "title": "The Most Misunderstood Concept in Physics",
+   "category": "Science",
+   "sourceType": "youtube",
+   "w": 361,
+   "h": 266,
+   "margin": 20,
+   "img": [
+    1572,
+    1224
+   ],
+   "box": [
+    64,
+    80,
+    1444,
+    1064
+   ]
+  },
+  {
+   "id": "grant",
+   "title": "The surprising habits of original thinkers",
+   "category": "Psychology",
+   "sourceType": "youtube",
+   "w": 361,
+   "h": 246,
+   "margin": 20,
+   "img": [
+    1572,
+    1144
+   ],
+   "box": [
+    64,
+    82,
+    1444,
+    984
+   ]
+  },
+  {
+   "id": "freesolo",
+   "title": "Free Solo",
+   "category": "Film",
+   "sourceType": "youtube",
+   "w": 361,
+   "h": 273.5,
+   "margin": 20,
+   "img": [
+    1572,
+    1252
+   ],
+   "box": [
+    64,
+    82,
+    1444,
+    1096
+   ]
+  },
+  {
+   "id": "kindofblue",
+   "title": "Kind of Blue",
+   "category": "Music",
+   "sourceType": "youtube",
+   "w": 361,
+   "h": 246,
+   "margin": 20,
+   "img": [
+    1572,
+    1144
+   ],
+   "box": [
+    64,
+    80,
+    1444,
+    984
+   ]
+  },
+  {
+   "id": "mulafossur",
+   "title": "M\u00falafossur waterfall, Faroe Islands",
+   "category": "Travel",
+   "sourceType": "web",
+   "w": 361,
+   "h": 254,
+   "margin": 20,
+   "img": [
+    1572,
+    1176
+   ],
+   "box": [
+    64,
+    80,
+    1444,
+    1016
+   ]
+  },
+  {
+   "id": "wtrek",
+   "title": "The W Trek, Torres del Paine",
+   "category": "Outdoors",
+   "sourceType": "web",
+   "w": 361,
+   "h": 273.5,
+   "margin": 20,
+   "img": [
+    1572,
+    1252
+   ],
+   "box": [
+    64,
+    80,
+    1444,
+    1096
+   ]
+  },
+  {
+   "id": "pantheon",
+   "title": "The Pantheon, Rome",
+   "category": "Architecture",
+   "sourceType": "web",
+   "w": 361,
+   "h": 254,
+   "margin": 20,
+   "img": [
+    1572,
+    1176
+   ],
+   "box": [
+    64,
+    82,
+    1444,
+    1016
+   ]
+  },
+  {
+   "id": "lisbon",
+   "title": "Miradouro da Senhora do Monte",
+   "category": "Travel",
+   "sourceType": "web",
+   "w": 361,
+   "h": 254,
+   "margin": 20,
+   "img": [
+    1572,
+    1176
+   ],
+   "box": [
+    64,
+    82,
+    1444,
+    1016
+   ]
+  },
+  {
+   "id": "seljalandsfoss",
+   "title": "Seljalandsfoss, Iceland",
+   "category": "Travel",
+   "sourceType": "web",
+   "w": 361,
+   "h": 273.5,
+   "margin": 20,
+   "img": [
+    1572,
+    1252
+   ],
+   "box": [
+    64,
+    82,
+    1444,
+    1096
+   ]
+  },
+  {
+   "id": "greatwork",
+   "title": "How to Do Great Work",
+   "category": "Work",
+   "sourceType": "web",
+   "w": 361,
+   "h": 246,
+   "margin": 20,
+   "img": [
+    1572,
+    1144
+   ],
+   "box": [
+    64,
+    80,
+    1444,
+    984
+   ]
+  },
+  {
+   "id": "makers",
+   "title": "Maker\u2019s Schedule, Manager\u2019s Schedule",
+   "category": "Work",
+   "sourceType": "web",
+   "w": 361,
+   "h": 226.5,
+   "margin": 20,
+   "img": [
+    1572,
+    1064
+   ],
+   "box": [
+    64,
+    82,
+    1444,
+    908
+   ]
+  },
+  {
+   "id": "sivers",
+   "title": "Hell Yeah or No",
+   "category": "Decisions",
+   "sourceType": "web",
+   "w": 361,
+   "h": 242,
+   "margin": 20,
+   "img": [
+    1572,
+    1128
+   ],
+   "box": [
+    64,
+    82,
+    1444,
+    968
+   ]
+  },
+  {
+   "id": "truefans",
+   "title": "1,000 True Fans",
+   "category": "Creativity",
+   "sourceType": "web",
+   "w": 361,
+   "h": 246,
+   "margin": 20,
+   "img": [
+    1572,
+    1144
+   ],
+   "box": [
+    64,
+    82,
+    1444,
+    984
+   ]
+  },
+  {
+   "id": "twominute",
+   "title": "How to Stop Procrastinating by Using the \u201c2-Minute Rule\u201d",
+   "category": "Habits",
+   "sourceType": "web",
+   "w": 361,
+   "h": 274,
+   "margin": 20,
+   "img": [
+    1572,
+    1256
+   ],
+   "box": [
+    64,
+    80,
+    1444,
+    1096
+   ]
+  },
+  {
+   "id": "hailmary",
+   "title": "Project Hail Mary",
+   "category": "Books",
+   "sourceType": "web",
+   "w": 361,
+   "h": 246,
+   "margin": 20,
+   "img": [
+    1572,
+    1144
+   ],
+   "box": [
+    64,
+    80,
+    1444,
+    984
+   ]
+  },
+  {
+   "id": "kahneman",
+   "title": "Thinking, Fast and Slow",
+   "category": "Books",
+   "sourceType": "web",
+   "w": 361,
+   "h": 246,
+   "margin": 20,
+   "img": [
+    1572,
+    1144
+   ],
+   "box": [
+    64,
+    80,
+    1444,
+    984
+   ]
+  },
+  {
+   "id": "range",
+   "title": "Range: Why Generalists Triumph in a Specialized World",
+   "category": "Books",
+   "sourceType": "web",
+   "w": 361,
+   "h": 266,
+   "margin": 20,
+   "img": [
+    1572,
+    1224
+   ],
+   "box": [
+    64,
+    82,
+    1444,
+    1064
+   ]
+  },
+  {
+   "id": "overstory",
+   "title": "The Overstory",
+   "category": "Books",
+   "sourceType": "web",
+   "w": 361,
+   "h": 246,
+   "margin": 20,
+   "img": [
+    1572,
+    1144
+   ],
+   "box": [
+    64,
+    82,
+    1444,
+    984
+   ]
+  },
+  {
+   "id": "tomorrow",
+   "title": "Tomorrow, and Tomorrow, and Tomorrow",
+   "category": "Books",
+   "sourceType": "web",
+   "w": 361,
+   "h": 246,
+   "margin": 20,
+   "img": [
+    1572,
+    1144
+   ],
+   "box": [
+    64,
+    80,
+    1444,
+    984
+   ]
+  },
+  {
+   "id": "sevenmin",
+   "title": "The Scientific 7-Minute Workout",
+   "category": "Fitness",
+   "sourceType": "web",
+   "w": 361,
+   "h": 226.5,
+   "margin": 20,
+   "img": [
+    1572,
+    1064
+   ],
+   "box": [
+    64,
+    80,
+    1444,
+    908
+   ]
+  },
+  {
+   "id": "c25k",
+   "title": "Couch to 5K",
+   "category": "Fitness",
+   "sourceType": "web",
+   "w": 361,
+   "h": 226.5,
+   "margin": 20,
+   "img": [
+    1572,
+    1064
+   ],
+   "box": [
+    64,
+    80,
+    1444,
+    908
+   ]
+  },
+  {
+   "id": "boxbreath",
+   "title": "Box breathing before big meetings",
+   "category": "Wellness",
+   "sourceType": "note",
+   "w": 361,
+   "h": 234.5,
+   "margin": 20,
+   "img": [
+    1572,
+    1096
+   ],
+   "box": [
+    64,
+    80,
+    1444,
+    940
+   ]
+  },
+  {
+   "id": "refactoringui",
+   "title": "Refactoring UI",
+   "category": "Design",
+   "sourceType": "web",
+   "w": 361,
+   "h": 246,
+   "margin": 20,
+   "img": [
+    1572,
+    1144
+   ],
+   "box": [
+    64,
+    82,
+    1444,
+    984
+   ]
+  },
+  {
+   "id": "butterick",
+   "title": "Butterick\u2019s Practical Typography",
+   "category": "Design",
+   "sourceType": "web",
+   "w": 361,
+   "h": 254,
+   "margin": 20,
+   "img": [
+    1572,
+    1176
+   ],
+   "box": [
+    64,
+    82,
+    1444,
+    1016
+   ]
+  },
+  {
+   "id": "paleblue",
+   "title": "Pale Blue Dot",
+   "category": "Space",
+   "sourceType": "web",
+   "w": 361,
+   "h": 246,
+   "margin": 20,
+   "img": [
+    1572,
+    1144
+   ],
+   "box": [
+    64,
+    82,
+    1444,
+    984
+   ]
+  },
+  {
+   "id": "pomodoro",
+   "title": "The Pomodoro Technique",
+   "category": "Productivity",
+   "sourceType": "web",
+   "w": 361,
+   "h": 254,
+   "margin": 20,
+   "img": [
+    1572,
+    1176
+   ],
+   "box": [
+    64,
+    82,
+    1444,
+    1016
+   ]
+  },
+  {
+   "id": "spirited",
+   "title": "Spirited Away",
+   "category": "Film",
+   "sourceType": "web",
+   "w": 361,
+   "h": 254,
+   "margin": 20,
+   "img": [
+    1572,
+    1176
+   ],
+   "box": [
+    64,
+    80,
+    1444,
+    1016
+   ]
+  }
+ ]
+}

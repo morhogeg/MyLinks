@@ -9,6 +9,8 @@ import { FindClip } from './reels/clips/find/FindClip';
 import * as SAVETHIS from '../clips/savethis-timeline.mjs';
 import { PosterStill } from './reels/clips/savethis/PosterStill';
 import { SaveThis } from './reels/clips/savethis/SaveThis';
+import * as NEEDLE from '../clips/needle-timeline.mjs';
+import { Needle } from './reels/clips/needle/Needle';
 
 /**
  * Compositions:
@@ -169,6 +171,26 @@ export const RemotionRoot: React.FC = () => (
       fps={SAVETHIS.FPS}
       width={SAVETHIS.WIDTH}
       height={SAVETHIS.HEIGHT}
+      defaultProps={{ withAudio: false, withCaptions: true }}
+    />
+    {/* FIND THE BOOK, the needle reel (src/reels/clips/needle,
+        clips/needle-timeline.mjs) */}
+    <Composition
+      id="MachinaNeedle"
+      component={Needle}
+      durationInFrames={NEEDLE.TOTAL_FRAMES}
+      fps={NEEDLE.FPS}
+      width={NEEDLE.WIDTH}
+      height={NEEDLE.HEIGHT}
+      defaultProps={{ withAudio: true, withCaptions: true }}
+    />
+    <Composition
+      id="MachinaNeedleSilent"
+      component={Needle}
+      durationInFrames={NEEDLE.TOTAL_FRAMES}
+      fps={NEEDLE.FPS}
+      width={NEEDLE.WIDTH}
+      height={NEEDLE.HEIGHT}
       defaultProps={{ withAudio: false, withCaptions: true }}
     />
     <Composition

@@ -36,7 +36,7 @@ import { fileURLToPath } from 'node:url';
 import { startServer } from './server.mjs';
 import { openDevice } from './device.mjs';
 import { Take } from './recorder.mjs';
-import { ASK, CAPTURE_USER, CARDS, SAVE, SAVETHIS, SEARCH, SYNTHESIS } from './library.mjs';
+import { ASK, CAPTURE_USER, CARDS, NEEDLE, SAVE, SAVETHIS, SEARCH, SYNTHESIS } from './library.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.join(here, '..', 'public', 'reel', 'app');
@@ -125,6 +125,57 @@ const isoWeekId = (d) => {
   const week = Math.ceil(((t.getTime() - jan1) / 86_400_000 + 1) / 7);
   return `${t.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
 };
+
+/**
+ * FIND THE BOOK's account (library.mjs `NEEDLE`): the 24 saves without the
+ * two recipes (and their collection), Sam's screenshot moved back to June,
+ * and 31 more real saves, written as the seed writes a card (shims/seed.ts),
+ * so the haystack the reel flies through is the app's own feed.
+ */
+async function prepareNeedle() {
+  await page.evaluate(
+    ([uid, n, day]) => {
+      const C = window.__capture;
+      const now = Date.now();
+      for (const id of n.without) C.remove(`users/${uid}/links/${id}`);
+      for (const id of n.withoutCollections) C.remove(`users/${uid}/collections/${id}`);
+      for (const p of C.list(`users/${uid}/links/`)) {
+        const d = C.get(p);
+        if (d?.collectionIds?.some((c) => n.withoutCollections.includes(c))) {
+          C.set(p, { ...d, collectionIds: d.collectionIds.filter((c) => !n.withoutCollections.includes(c)) });
+        }
+      }
+      for (const [id, age] of Object.entries(n.ages)) {
+        const p = `users/${uid}/links/${id}`;
+        const d = C.get(p);
+        if (d) C.set(p, { ...d, createdAt: now - age * day });
+      }
+      for (const c of n.extra) {
+        C.set(`users/${uid}/links/${c.id}`, {
+          url: c.url,
+          title: c.title,
+          summary: c.summary,
+          detailedSummary: c.summary,
+          tags: c.tags,
+          category: c.category,
+          status: 'unread',
+          createdAt: Math.round(now - c.age * day),
+          sourceType: c.sourceType,
+          language: 'en',
+          concepts: c.concepts,
+          relatedLinks: [],
+          collectionIds: [],
+          reminderStatus: 'none',
+          // no third-party imagery (brand rule), as the seed does
+          hideThumbnail: true,
+          metadata: { originalTitle: c.title, estimatedReadTime: c.readTime, ...(c.youtubeChannel ? { youtubeChannel: c.youtubeChannel } : {}) },
+          ...(c.sourceName ? { sourceName: c.sourceName } : {}),
+        });
+      }
+    },
+    [UID, NEEDLE, 86_400_000],
+  );
+}
 
 // Element rects the reel's camera aims at, by take. [selector, text filter?]
 const R = {
@@ -903,6 +954,150 @@ const takes = {
     }
     await t.thaw();
     return t.save({ later: later.map(([p]) => p.split('/').pop()) });
+  },
+
+  // ─────────────────────────────────────────────────── FIND THE BOOK: cards
+  // Every card in the feed, shot one at a time on transparency (its own
+  // rounded corners and shadow, nothing behind it), for the field the reel
+  // flies through. Only what is BEHIND the cards changes: the page's
+  // backgrounds are cleared and its fixed chrome hidden; the cards are the
+  // app's pixels. → public/reel/app/clips/needle/cards/<id>.png and
+  // src/reels/clips/needle/cards.json
+  async needleCards() {
+    await fresh(prepareNeedle);
+    await page.waitForTimeout(1500);
+    const dir = path.join(OUT, 'clips', 'needle', 'cards');
+    fs.rmSync(dir, { recursive: true, force: true });
+    fs.mkdirSync(dir, { recursive: true });
+    await page.evaluate(() => {
+      const css = document.createElement('style');
+      css.textContent = 'html, body { background: transparent !important; background-image: none !important; }';
+      document.head.appendChild(css);
+      for (const el of document.querySelectorAll('body *')) {
+        const p = getComputedStyle(el).position;
+        if (p === 'fixed' || p === 'sticky') el.style.visibility = 'hidden';
+      }
+      for (const card of document.querySelectorAll('main article.surface-card')) {
+        for (let el = card.parentElement; el && el !== document.documentElement; el = el.parentElement) {
+          el.style.background = 'transparent';
+          el.style.backgroundImage = 'none';
+        }
+      }
+    });
+    const all = [...CARDS.filter((c) => !NEEDLE.without.includes(c.id)), ...NEEDLE.extra];
+    const M = 20; // points around the card: room for its shadow
+    const cards = [];
+    for (const c of all) {
+      const find = (title) => {
+        const arts = [...document.querySelectorAll('main article.surface-card')];
+        const art = arts.find((a) => a.querySelector('h3')?.textContent.trim() === title);
+        if (!art) return null;
+        // the card alone: its neighbours' edges (and the search field above
+        // the first) sit inside its shadow margin
+        document.body.style.visibility = 'hidden';
+        for (const a of arts) a.style.visibility = a === art ? 'visible' : 'hidden';
+        art.scrollIntoView({ block: 'center', behavior: 'instant' });
+        return true;
+      };
+      if (!(await page.evaluate(find, c.title))) throw new Error(`needleCards: no card for ${c.id}`);
+      await page.waitForTimeout(150);
+      const b = await page.evaluate((title) => {
+        const art = [...document.querySelectorAll('main article.surface-card')].find((a) => a.querySelector('h3')?.textContent.trim() === title);
+        const r = art.getBoundingClientRect();
+        return { x: r.x, y: r.y, w: r.width, h: r.height, text: art.innerText };
+      }, c.title);
+      // the shadow margin, kept inside the 393pt screen (the card is 16pt
+      // from its sides, so the sides get what fits)
+      const x0 = Math.max(0, b.x - M);
+      const x1 = Math.min(393, b.x + b.w + M);
+      const y0 = b.y - M;
+      const y1 = b.y + b.h + M;
+      await page.screenshot({
+        path: path.join(dir, `${c.id}.png`),
+        clip: { x: x0, y: y0, width: x1 - x0, height: y1 - y0 },
+        omitBackground: true,
+        animations: 'disabled',
+      });
+      // `img`: the PNG's size; `box`: the card's own rect inside it (pixels)
+      const px = (v) => Math.round(v * DPR);
+      cards.push({
+        id: c.id,
+        title: c.title,
+        category: c.category,
+        sourceType: c.sourceType,
+        w: b.w,
+        h: b.h,
+        margin: M,
+        img: [px(x1 - x0), px(y1 - y0)],
+        box: [px(b.x - x0), px(b.y - y0), px(b.w), px(b.h)],
+      });
+    }
+    const dest = path.join(here, '..', 'src', 'reels', 'clips', 'needle', 'cards.json');
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.writeFileSync(dest, JSON.stringify({ dpr: DPR, cards }, null, 1) + '\n');
+    console.log(`wrote ${cards.length} cards → ${path.relative(path.join(here, '..'), dir)}`);
+    return { frames: cards, marks: {} };
+  },
+
+  // ───────────────────────────────────────────────────── FIND THE BOOK: Ask
+  // One continuous use of Ask on the same account: the tab opens (its mark
+  // arriving, which the reel's gathered mark lands on), the half-remembered
+  // question typed a character a 60fps frame, the answer streamed, its one
+  // source: Sam's screenshot. The thinking line ("Searching your …") is on
+  // no frame: the reel is in the field while the app reads.
+  async needleClip() {
+    const N = NEEDLE;
+    await fresh(prepareNeedle);
+    const t = new Take(dev, OUT, 'clips/needle/app');
+    const cite = (id) => `button[title="${[...CARDS, ...N.extra].find((c) => c.id === id).title}"]`;
+    const RN = {
+      askTab: R.askTab,
+      composer: R.composer,
+      send: R.send,
+      mark: ['[aria-label="Machina is ready"]'],
+      heading: ['h2', 'What do you want to recall?'],
+      bubble: ['[data-msg-idx="0"] > div'],
+      answer: ['[data-msg-idx="1"] > div'],
+      cite1: [cite(N.ask.sources[0])],
+    };
+    const roll60 = (n) => t.roll(n, { rects: RN, step: 1000 / 60 });
+    t.mark('home');
+    await t.snap({ rects: RN });
+    await t.freeze();
+    await tab('Ask').click();
+    t.mark('ask');
+    await roll60(90);
+    await t.thaw();
+    await visible(page.locator('textarea')).click();
+    await page.waitForTimeout(200);
+    await t.freeze();
+    t.mark('typing');
+    for (const ch of N.ask.question) {
+      await page.keyboard.type(ch);
+      await t.advance(1000 / 60);
+      await t.snap({ rects: RN });
+    }
+    t.mark('typed');
+    await roll60(20);
+    await t.thaw();
+    await page.keyboard.press('Enter');
+    for (let k = 0; k < 80 && !server.chatOpen(); k++) await page.waitForTimeout(25);
+    server.advanceChat(4);
+    await until(N.ask.answer.split(' ')[0]);
+    await t.freeze();
+    t.mark('answer');
+    for (let done = false; !done; ) {
+      done = server.advanceChat(4);
+      await page.waitForTimeout(90); // the chunk crosses the (real) network
+      await t.advance(1000 / 60);
+      await t.snap({ rects: RN });
+    }
+    server.finishChat();
+    await page.waitForTimeout(400);
+    t.mark('sources');
+    await roll60(90);
+    await t.thaw();
+    return t.save();
   },
 };
 

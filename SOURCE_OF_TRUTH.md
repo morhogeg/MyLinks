@@ -2637,6 +2637,40 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-22 — FIND THE BOOK, a new organic Reel (the needle reel), on
+  branch `claude/reel-find-the-book` (built on `claude/reel-save-this`'s kit;
+  the capture is today's `main`).** Owner brief: one finished, upload-ready
+  Reel, NOT a cut of the launch film, "not another generic video with
+  captions and the app's screens", only the real app, Gemini TTS narration.
+  The idea: the answer was in your saves all along. Frame 0 dares the viewer,
+  "Find the book Sam told you to read.", over a 3D field of the demo
+  account's real saves (every card the shipped app's own rendering, shot
+  alone on transparency: `capture/shoot.mjs needleCards`), with the needle,
+  Sam's screenshot "Read Piranesi, and go in blind", in plain sight among
+  decoy books; the camera searches, stops dead on "Give up?", the field
+  gathers into the mark, which match-cuts to Ask's own mark on the real Ask
+  screen; the question is typed and sent; the field returns as a tunnel at
+  speed and brakes onto the needle (the payoff, 68 to 71%); the dive lands
+  inside the real answer, which cites it; the tagline; then "P.S. It was in
+  the first frame." flies the field back to frame 0 so the loop is seamless
+  and the rewatch is a game. 28.0s, 1080×1920, 30fps, 64 words. Demo account
+  for this take only (`NEEDLE` in `capture/library.mjs`): the 24 saves minus
+  the two recipes (no cooking, owner 2026-10-02) plus 31 more real saves
+  with true summaries; Ask says "your 53 saves". Voice: Gemini TTS
+  `gemini-3.8-flash-tts` (Google's current TTS model), Sulafat, per-line
+  direction, voiced by `narration-tts.yml` (run 57; the container has no
+  `GEMINI_API_KEY`). New files: `clips/needle-timeline.mjs`,
+  `src/reels/clips/needle/` (field, renderer with true perspective, depth of
+  field, fog and sub-frame motion blur; the app shots; the brand pieces),
+  `audio/needle-score.mjs` (120 BPM: a stop on "Give up?", a drop on the
+  send, the needle home on I), `audio/needle-verify.mjs`,
+  `scripts/needle-stills.mjs`, `scripts/needle-cards-sm.py`; one-line
+  entries in `Root.tsx`, `synth-vo.py`, `mix-vo.mjs`, `server.mjs`,
+  `shoot.mjs`. **Verified:** gates (brand bans on 341 strings, windows,
+  safe area, every line 10 to 24dB over the music in the speech band,
+  −14.02 LUFS, −1.25 dBTP, the loop's audio seam); stills at every beat;
+  frame 839 against frame 0. **Not verified:** listened to on speakers; the
+  owner has not seen it. Nothing merges to `main` until the owner reviews.
 - **2026-10-22 (round 14) — SAVE THIS: one graph shot, the whole Ask mark,
   one Ask shot, "with your saves from countless apps" (owner: "graph: show
   just the 2nd one, a bit longer; the jump from the first graph to the

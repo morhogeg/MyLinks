@@ -16,7 +16,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ASK, CAPTURE_USER, CARDS, SAVETHIS, SEARCH } from './library.mjs';
+import { ASK, CAPTURE_USER, CARDS, NEEDLE, SAVETHIS, SEARCH } from './library.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(here, '..', 'out', 'capture', 'app', 'out');
@@ -54,7 +54,7 @@ const json = (res, code, body) => {
 };
 
 const cardSource = (id) => {
-  const c = [...CARDS, SAVETHIS].find((x) => x.id === id);
+  const c = [...CARDS, SAVETHIS, ...NEEDLE.extra].find((x) => x.id === id);
   return { id, title: c.title, category: c.category, sourceName: c.sourceName ?? null, url: c.url || null };
 };
 
@@ -105,7 +105,7 @@ export function startServer(port = 4600) {
         res.flushHeaders?.();
         // the reel's question gets its own answer; anything else, the film's
         const q = String(body.question ?? '').trim();
-        const a = q === SAVETHIS.ask.question ? SAVETHIS.ask : ASK;
+        const a = q === SAVETHIS.ask.question ? SAVETHIS.ask : q === NEEDLE.ask.question ? NEEDLE.ask : ASK;
         chat = { res, sent: 0, text: a.answer, sources: a.sources, sourcesSent: false };
         return;
       }
