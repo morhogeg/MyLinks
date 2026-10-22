@@ -25,7 +25,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BAR_FRAMES, BEAT, BEAT_FRAMES, CAPTIONS, CHORDS, CITE_PINGS, FPS, HITS, MARK_STRIKE, RISERS, TOTAL_FRAMES, TOTAL_SEC, TYPE_FRAMES } from '../clips/savethis-timeline.mjs';
+import { BAR_FRAMES, BEAT, BEAT_FRAMES, CAPTIONS, CHORDS, CITE_PINGS, FPS, HITS, MARK_STRIKE, RISERS, TOTAL_FRAMES, TOTAL_SEC } from '../clips/savethis-timeline.mjs';
 import { SR, createSynth } from './synth.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -36,10 +36,6 @@ const S = createSynth({ seconds: TOTAL_SEC * 2, beat: BEAT });
 const { pad, sub, pulse, keys, bell, kick, hat, rim, shaker, clap, riser, whoosh, impact, tick, shimmer, pluck, ping } = S;
 
 const H = HITS;
-// the take's runs, so the typing ticks follow the picture
-const TAKE = JSON.parse(fs.readFileSync(path.join(root, 'src', 'reels', 'clips', 'savethis', 'takes.json'), 'utf8'))['clips/savethis/app'];
-// (round 6) the question typed into Ask, a character a frame
-const CHARS = TAKE.marks.answer - TAKE.marks.asking;
 
 // ── where the narrator is speaking, in frames (from the voice manifest)
 const MANIFEST = JSON.parse(fs.readFileSync(path.join(root, 'out', 'vo', 'savethis', 'manifest.json'), 'utf8'));
@@ -176,27 +172,23 @@ const arrange = (o) => {
   for (let k = 0; k < 5; k++) tick(t(H.phase0 + k * BEAT_FRAMES), 0.07, 1.2 + k * 0.1);
   bell(t(H.done), 88, 0.1, 0.2, 2.2);
   sub(t(H.done), 48, 0.26, 0.3);
-  // (round 4) the cut to the graph; the thumb on the new save's dot, and its
-  // two ties lighting: two notes, linked, under the word
+  // (round 4) the cut to the graph, the new save's two ties lit; (round 14)
+  // on "connects", two notes, linked, under the word
   tick(t(H.graph), 0.08, 0.95);
   if (!voiced(H.graph + 2, 12)) whoosh(t(H.graph) + 0.02, 0.45, 0.035, 0.15);
-  tick(t(H.connect), 0.11, 1.12);
   pluck(t(H.connect + 2), 76, 0.07, -0.2, 0.45);
   pluck(t(H.connect + 6), 83, 0.06, 0.2, 0.45);
   sub(t(H.connect), 43, 0.22, 0.3);
 
-  // ── (round 6) Ask: the cut in, the question bursting in (a soft click a
-  // frame, two characters each), the send; the answer streams on the band
-  // (round 10) "Now it knows your saves": the cut from the graph to Ask
-  // opening, a light note on it, the drums out; (round 9) "So ask it
-  // anything": the cut to its composer
+  // ── (round 6) Ask: the answer streams on the band. (round 10) "Now every
+  // save is one question away": the cut from the graph to Ask opening, a
+  // light note on it, the drums out; (round 14) "So, ask it anything": the
+  // question sent on "ask", in the same shot
   tick(t(H.knows), 0.09, 1.15);
   pluck(t(H.knows + 1), 79, 0.05, 0, 0.5);
   sub(t(H.knows), 43, 0.2, 0.3);
-  tick(t(H.askTap), 0.07, 1.25);
-  for (let k = 0; k < CHARS; k += 2) tick(t(H.asking + k * TYPE_FRAMES), 0.02, 1.5 + ((k * 7) % 5) * 0.06);
-  tick(t(H.send), 0.11, 1.2);
-  sub(t(H.send), 45, 0.2, 0.3);
+  tick(t(H.asked), 0.11, 1.2);
+  sub(t(H.asked), 45, 0.2, 0.3);
 
   // ── the proof: the band lands; (owner, round 13) a ping on each citation
   // as it is highlighted, rising up the chord, left to right

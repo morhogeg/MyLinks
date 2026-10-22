@@ -50,14 +50,12 @@ export const SaveThis: React.FC<{
         <Tap x={POSTER.bookmark.x} y={POSTER.bookmark.y + 18} t={prog(f, HITS.tapSave - 10, HITS.tapSave + 18, (t) => t)} size={120} />
       </div>
       <BandScrim opacity={scrim} tone={GRADE.tone} />
-      {/* (round 4) once the app's camera glides in on the lit ties, the
-          paper rises further, over the graph's own header and legend */}
-      {f >= HITS.connect && f < HITS.knows && (
+      {/* (round 4) on the lit ties, the paper rises further, over the
+          graph's own header and legend */}
+      {f >= HITS.graph && f < HITS.knows && (
         <AbsoluteFill
           style={{
             pointerEvents: 'none',
-            // (round 12) up from the cut on the tap
-            opacity: f > HITS.connect ? 1 : 0,
             background: `linear-gradient(180deg, ${GRADE.tone} 0px, ${GRADE.tone} 700px, ${clearOf(GRADE.tone)} 930px)`,
           }}
         />

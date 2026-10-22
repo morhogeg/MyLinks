@@ -38,10 +38,6 @@ export const BAR = BAR_FRAMES / FPS; // 1.8667s
 export const beat = (n) => Math.round(n * BEAT_FRAMES);
 export const onBeat = (f) => Math.round(f / BEAT_FRAMES) * BEAT_FRAMES;
 
-/** frames a typed character stays (the capture types one per 60fps frame;
- *  the reel plays two a frame: the question bursts in, then holds) */
-export const TYPE_FRAMES = 0.5;
-
 /**
  * Picture events, in frames, each on the word it answers. Taps, landings and
  * cuts sit on the beat; the fall, the gather and the typing run between.
@@ -55,18 +51,20 @@ export const HITS = {
   iris: beat(16), // the point opens into the app
   phase0: beat(17), // the real pipeline, a phase a beat…
   done: beat(22), // …and the card, read
-  graph: beat(26), // "…by topic,": CUT to the graph, the saves mapped by topic
-  connect: beat(28), // "…connects it to": the thumb on its dot; its ties light on "what you've saved before"
+  // (owner, round 14: the cut from the whole graph to the three was too
+  // much) only the three: the new save and its ties to two older saves, lit
+  graph: beat(26), // "…by topic,": CUT to the graph, the new save's ties lit
+  connect: beat(27), // "…connects it to what you've saved before"
   // (rounds 10, 11) the bridge: what all that reading adds up to, over
   // Ask's own opening screen, its suggestions questions about the saves
   // (owner, round 12: the graph a half second longer; round 13: a bit
   // less) half a beat more of it than round 11
   knows: beat(31.5), // "Now every save…": CUT from the graph to Ask
   // (round 9) Ask, the solution's last word, each part on its own word;
-  // (round 12) "So," said over Ask opening, the cut on "ask"
-  askTap: beat(38), // "…ask": CUT to Ask's composer, on the beat, as…
-  asking: beat(38), // …the question bursts in on "ask it anything"
-  send: 559, // "and get the answer": sent, the answer streams
+  // (round 12) "So," said over Ask opening; (owner, round 14: no cut to the
+  // composer and back) one shot: on "ask" the question is sent and Ask's
+  // chat takes the opening's place, the answer streaming in
+  asked: beat(38), // "…ask": the question, sent; "and get the answer": it streams
   proof: 603, // "with the proof": the saves it came from, cited, then each pinged in turn
   // (owner, round 12: not the Ask chat under the tagline) the brand card;
   // (owner, round 13) the proof held half a second longer before it, after
@@ -119,8 +117,10 @@ export const CAPTIONS = [
   { at: 5, to: 54, place: 'scene', text: 'You’re going to\nsave this video.', duck: 0.4, style: 'A friendly, knowing call-out, half teasing, as if catching a friend in the act. Quick and light, one breath, no pause inside the line.', pace: PACE },
   { at: 54, to: 99, text: 'And never\nwatch it again.', duck: 0.45, style: 'Wry and lightly amused, a little deadpan; landing low and certain on "again".', pace: PACE },
   // (owner, round 14: "with all the others" → "something like with all your
-  // saves from countless apps") the heap is every app's saves
-  { at: 100, to: 162, text: 'Right down there,\nwith your saves from countless apps.', style: 'Amused and quick, a wry aside, as if pointing down into a deep hole; light, no drawn-out words.', pace: PACE },
+  // saves from countless apps") the heap is every app's saves; the quicker
+  // of two reads, a touch quicker still, so the heap's line ends before
+  // "Unless" with no cut moved
+  { at: 99, to: 165, tempo: 1.05, text: 'Right down there,\nwith your saves from countless apps.', style: 'Amused and quick, a wry aside, pointing down into a deep hole, then a knowing nod at the pile; light, one easy breath, no drawn-out words.', pace: PACE },
   // (owner, round 2: no full stop after the name on screen; the voice keeps its take)
   { at: 166, to: 236, text: 'Unless you save it\nto Machina', tts: 'Unless you save it to Machina.', duck: 0.4, style: 'The turn: bright, warm and confident, a little conspiratorial; the name lands with a smile.', pace: PACE },
   { at: 238, to: 302, text: 'It reads every save,\nfrom any app,', style: 'Clear and easy, genuinely pleased; flowing straight on, the sentence is not finished.', pace: PACE },
@@ -136,13 +136,13 @@ export const CAPTIONS = [
   // again (round 9); (owner, round 11: "better than you do" read as
   // argumentative; the owner's pick of three) over Ask's own opening
   // screen, its suggestions one-tap questions about the saves
-  { at: HITS.knows + 2, to: HITS.askTap - 13, text: 'Now every save is\none question away.', style: 'Warm and easy, a small smile, flowing on from the line before; light and quick, no drawn-out words.', pace: PACE },
+  { at: HITS.knows + 2, to: HITS.asked - 13, text: 'Now every save is\none question away.', style: 'Warm and easy, a small smile, flowing on from the line before; light and quick, no drawn-out words.', pace: PACE },
   // (owner, round 9: problem, solution, then the problem again made no
   // sense) Ask is the solution's last word, its consequence: because it has
   // read, understood and connected every save, ask it anything; the
-  // question types on "ask it anything", the answer streams on "get the
-  // answer", the saves it came from land on "proof"
-  { at: HITS.askTap - 9, to: HITS.tagline - 6, runGap: 0.05, text: 'So, ask it anything,\nand get the answer,\nwith the proof.', style: 'Confident and simple: a clear, warm "So," to open, then one easy sentence in three quick beats; light and brisk, landing softly on "proof".', pace: PACE },
+  // question is sent on "ask", the answer streams on "get the answer", the
+  // saves it came from land on "proof"
+  { at: HITS.asked - 9, to: HITS.tagline - 6, runGap: 0.05, text: 'So, ask it anything,\nand get the answer,\nwith the proof.', style: 'Confident and simple: a clear, warm "So," to open, then one easy sentence in three quick beats; light and brisk, landing softly on "proof".', pace: PACE },
   // the name and the tagline, said once (owner, round 2: the name in the
   // voice); (owner, round 12) on paper, the app's own mark drawing in, the
   // drawn wordmark wiping in on "Machina"
@@ -159,7 +159,7 @@ export const KICKERS = [];
 /** Risers END on the reveal they lead into. [from, to] in frames. */
 export const RISERS = [
   [HITS.gather, HITS.markStrike], // the heap rushing up into the mark
-  [HITS.asking, HITS.proof], // the question, into the answer's proof
+  [HITS.asked, HITS.proof], // the question, into the answer's proof
 ];
 
 /**

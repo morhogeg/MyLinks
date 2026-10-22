@@ -22,9 +22,9 @@ const BROWSER = '/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/head
 const H = HITS;
 const REVIEW = [
   0, H.tapSave + 4, H.drop + 6, H.drop + 20, H.land, H.land + 24, H.gather + 16, H.markStrike + 2,
-  H.iris + 6, H.phase0 + 20, H.done + 4, H.done + 30, H.graph + 2, H.connect - 2, H.connect + 12, H.connect + 40,
-  H.knows - 2, H.knows + 4, H.knows + 40, H.askTap, H.asking + 6, H.asking + 20,
-  H.send + 10, H.proof + 3, H.proof + 10, H.proof + 18, H.proof + 30, H.tagline - 4, H.tagline + 14, H.tagline + 40, H.watch - 2, H.watch + 30, TOTAL_FRAMES - 1,
+  H.iris + 6, H.phase0 + 20, H.done + 4, H.done + 30, H.graph + 2, H.graph + 20, H.graph + 45, H.graph + 75,
+  H.knows - 2, H.knows + 4, H.knows + 16, H.knows + 40, H.asked - 1, H.asked + 1, H.asked + 4, H.asked + 30,
+  H.proof + 3, H.proof + 10, H.proof + 18, H.proof + 30, H.tagline - 4, H.tagline + 14, H.tagline + 40, H.watch - 2, H.watch + 30, TOTAL_FRAMES - 1,
 ];
 const frames = process.argv.slice(2).map(Number).filter((n) => !Number.isNaN(n));
 const list = frames.length ? frames : REVIEW;
