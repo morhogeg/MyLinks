@@ -751,7 +751,7 @@ npx remotion render src/index.ts MachinaSaveThis out/savethis/master.mp4 --crf=1
 | 0:00.9 | The thumb fills the bookmark with ink, on "save" | | | click and a low thock |
 | 0:01.9 | The type rolls out; the paper splits under the bookmark and swings down like a trapdoor | And never / watch it again. | "And never watch it again." | whoosh |
 | 0:02.3 | It falls into a well lined with grey, unreadable saves | | | a scale run falling |
-| 0:04.2 | It lands on the heap, in the beat after "there," | Right down there, / with your saves from countless apps. | "Right down there, with your saves from countless apps." (round 14) | thud |
+| 0:04.2 | It lands on the heap, in the beat after "there," | Right down there, / with a million saves / you never opened. | "Right down there, with a million saves you never opened." (round 15; "a million" as it lands) | thud |
 | 0:04.5 | The camera dives at the heap: hundreds of saves | | | whoosh |
 | 0:05.6 | Colour floods the grey heap on "Unless" (the app's own category colours, a wave out from the point); then the heap and the well rush into one point | Unless you save it / to Machina | "Unless you save it to Machina." | riser |
 | 0:07.0 | The brackets close on it: the mark, on "Machina" | | | impact, shimmer |
@@ -759,7 +759,7 @@ npx remotion render src/index.ts MachinaSaveThis out/savethis/master.mp4 --crf=1
 | 0:07.9 | The pill, a phase a beat: Fetching the link, Reading the page, Writing the summary, Searching connections, Organizing & tagging | It reads every save, / from any app, | "It reads every save, from any app," | the band; a tick a phase |
 | 0:10.3 | "Saved to Machina"; the card: its cover is this reel's frame 0; its summary lifts on "sums it up", its topic chip on "files it by topic" | understands it, sums it up, / files it by topic, | "understands it, sums it up, files it by topic," | bell |
 | 0:12.1 | Cut on "topic" to the app's graph (round 14: only the three, no map of every save first): the new save's dot, just tapped, its ties to two older saves lit and titled (Four Thousand Weeks and the procrastination talk), the rest receded, as the app's own camera settles on them | and connects it to / what you've saved before. | "and connects it to what you've saved before." | a tick; two linked notes on "connects" |
-| 0:14.7 | Cut to Ask opening: its mark drawing in, its point striking (round 14: the whole mark, not its brackets alone), "What do you want to recall? Answers come only from your 23 saves, with sources you can open.", and the one-tap questions it suggests about the saves; one slow push from here to the proof | Now every save is / one question away. | "Now every save is one question away." | a click, a light note; the drums out |
+| 0:14.7 | Cut to Ask opening, settled and held still (rounds 14 and 15: its whole mark, its own header), "What do you want to recall? Answers come only from your 23 saves, with sources you can open.", and the one-tap questions it suggests about the saves; one slow push from here to the proof | Now every save is / one question away. | "Now every save is one question away." | a click, a light note; the drums out |
 | 0:17.4 | "So," over Ask opening; on "ask" the question is sent and the chat takes the opening's place in the same shot (round 14: no cut to the composer and back): "What connects my 3 saves about procrastination?" | So, ask it anything, / and get the answer, / with the proof. | "So, ask it anything, and get the answer, with the proof." | a click, a low note |
 | 0:17.8 | The answer streams under the question ("All three agree: …"), drawn from the three | | | |
 | 0:20.1 | On "proof": the camera settles on the answer and the saves it came from, cited (Tim Urban's talk, Four Thousand Weeks, this reel); the paper rises over the question | | | the band lands, full |
@@ -819,10 +819,12 @@ joins the take after the tap (round 12; round 14: twenty 60fps frames
 after, its glide in on the three mostly done), because on a phone the app
 raises its selection sheet over the tapped dot's spot while its camera
 lifts the three clear, and the reel's every-sixth-frame review had
-stepped over those frames since round 4. (Round 14) Ask opening plays
-while the take types the question under the frame, so its mark finishes
-its launch; the app's empty screen steps 12pt down and back as its
-composer sheds and regains a line, and the camera steps with it. (Round 13) The citations'
+stepped over those frames since round 4. (Round 15) Ask opening holds
+the take's last frame before the send: its earlier frames cross-fade
+Home's header into Ask's and launch the mark mid-way (round 12 held one
+of those, brackets only; round 14 played them, and the header and the
+mark jittered), and while the question is typed the empty screen steps
+12pt down and back with the composer. (Round 13) The citations'
 highlight: each pops forward on its ping and two ink rings leave its edge
 (the kit's `Ping`, riding the card's own lift so the rings stay
 concentric with it). The pings sit on the beat after "proof" is said, and
