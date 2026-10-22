@@ -2651,7 +2651,9 @@ exact-match, capped.
   **Verified:** gates (bans on 253 strings including every captured frame,
   windows, every line 11.5 to 18.0dB over the music, −14.03 LUFS, −1.34
   dBTP, seam step 0.094 against the score's own 0.109); stills of the new
-  section and the ending. **Not verified:** listened to.
+  section and the ending; the encode (784 frames, −13.9 LUFS, −1.3 dBTP),
+  its last frame against frame 0 at 52.0dB PSNR (the hook's own first
+  step: 45.4dB). **Not verified:** listened to.
 - **2026-10-22 (round 9) — SAVE THIS: one arc (owner: "you show the
   problem, then the solution, then you say again you'll never watch it:
   problem, solution, problem again doesn't make sense").** Branch
