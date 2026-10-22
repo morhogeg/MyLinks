@@ -2694,6 +2694,17 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-22 — Onboarding "Recall" slide copy (web now, iOS next build).**
+  Owner asked to drop "in English or Hebrew" and make slide 3 clearer while
+  1.0 (build 1382) is in review. `OnboardingTour.tsx` slide 3 body is now:
+  "Ask a question and get an answer built only from your saves, with links to
+  the sources it used. Search works by meaning too: “that video about waking
+  up early” finds it, even if you don’t remember the title." **Web only for
+  now** (Vercel on the main push). The iOS app bundles the static export
+  (`webDir: 'out'`, no `server.url`), so build 1382 keeps the old line; the
+  change rides the next TestFlight build (1.0.1, or a rebuild if 1.0 is
+  rejected). Nothing pushed to `trigger/testflight`. Verified: tsc 0. Not
+  verified: rendered on a device.
 - **2026-10-22 — 1.0 SUBMITTED TO APP REVIEW (owner, 12:48 local; `as-submit`
   ticked).** Submission `2e04d2cd-50a6-457e-bbd2-c596c4fdc9c7`: iOS App 1.0
   **build 1382**, subscription group Machina Pro, Annual and Monthly, all
