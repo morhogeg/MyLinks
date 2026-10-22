@@ -2694,6 +2694,24 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-22 — 1.0 SUBMITTED TO APP REVIEW (owner, 12:48 local; `as-submit`
+  ticked).** Submission `2e04d2cd-50a6-457e-bbd2-c596c4fdc9c7`: iOS App 1.0
+  **build 1382**, subscription group Machina Pro, Annual and Monthly, all
+  "Waiting for Review". The owner did the console steps from the audit report
+  first: age rating answered honestly and overridden to 13+, description gained
+  the Pro paragraph ("…key moments for YouTube videos") and a final "Terms of
+  Use: https://mymachina.app/terms" line (License Agreement stays Apple's
+  standard), review notes gained the share-pages bullet and the
+  Safari → ••• → Share path. **Screenshots unchanged:** a blurred shot 1
+  was made (`1-feed-BLURRED.png` in the Desktop upload folder) but the owner
+  kept the original, so the TED/YouTube faces in shots 1 and 5 remain the one
+  known listing risk. If Apple cites 2.3.9/5.2.1, swap in the blurred file (a
+  metadata-only resubmit, no new build). Note for future sessions: App Store
+  Connect no longer has an IAP section on the version page. Each item gets
+  **Add for Review** into one draft submission (the group, then each
+  subscription, then the version), and the draft's **Submit for Review**
+  sends them together. **During review:** nobody signs into `machinareviewer`;
+  release is manual.
 - **2026-10-22 — APP STORE GUIDELINE AUDIT + FIX ROUND (owner: "do a
   complete check… i dont want any rejections"; go on rounds A+B, not C).**
   Audited 1.0 against Apple's live App Review Guidelines (last updated
