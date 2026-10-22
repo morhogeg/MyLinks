@@ -2637,6 +2637,21 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-22 (round 10) — SAVE THIS: a bridge into Ask (owner: "we need
+  some wording transition before 'So ask it anything' so it sounds more
+  natural").** Branch `claude/reel-save-this`. New line, "Now it knows your
+  saves better than you do.", between the graph and "So ask it anything":
+  what all that reading adds up to, said as the solution (not the problem
+  again, round 9). It plays over Ask's real opening screen ("What do you
+  want to recall? Answers come only from your 23 saves, with sources you
+  can open.") and its suggested questions; on "saves" the first suggestion,
+  about this very reel, lifts. Then the cut to the composer on "So ask it
+  anything". Voiced on GitHub (run 11, two reads; kept the timeline's,
+  which lifts on "knows"). 26.1s, 80 words (the gate's ceiling again).
+  **Verified:** gates (bans on 253 strings including every captured frame,
+  windows, every line 11.5 to 18.0dB over the music, −14.03 LUFS, −1.34
+  dBTP, seam step 0.094 against the score's own 0.109); stills of the new
+  section and the ending. **Not verified:** listened to.
 - **2026-10-22 (round 9) — SAVE THIS: one arc (owner: "you show the
   problem, then the solution, then you say again you'll never watch it:
   problem, solution, problem again doesn't make sense").** Branch
