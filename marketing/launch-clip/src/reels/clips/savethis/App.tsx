@@ -140,8 +140,9 @@ const tiesAt = (i: number) => {
 const GRAPH = { z: 4.0, fy: 1130, margin: 60 };
 export const graphCam = (f: number): Cam => {
   const ties = tiesAt(frameAt(f));
-  // as wide as the titles need, a slow push over the shot
-  const z = Math.min(GRAPH.z, (1080 - 2 * GRAPH.margin) / ties.w) * (1 + 0.04 * prog(f, S.graph, S.knows, linear));
+  // as wide as the titles need, a slow push over the shot (to 30px of the
+  // frame's sides at most)
+  const z = Math.min(GRAPH.z, (1080 - 2 * GRAPH.margin) / ties.w) * (1 + 0.06 * prog(f, S.graph, S.knows, linear));
   // none of the titles leaves the frame
   const half = (540 - 30) / z;
   const cx = Math.min(Math.max(ties.x, ties.x1 - half), ties.x0 + half);
@@ -191,12 +192,14 @@ export const appKeys: Key[] = [
   // a slow push on the topic, into the cut
   { f: S.graph - 1, z: 2.5, ease: linear },
   // (round 4) S.graph to S.knows: the graph, on its own camera (graphCam)
-  { f: S.knows - 1, ...ASK_CAM.chat, z: ASK_CAM.chat.z * 0.98 },
+  { f: S.knows - 1, ...ASK_CAM.chat, z: ASK_CAM.chat.z * 0.96 },
   // (rounds 10–14) CUT to Ask opening on "Now every save", one slow push
-  // through the question sent on "ask" and the answer streaming in (the
-  // status bar stays under the band)…
-  { f: S.knows, ...ASK_CAM.chat, z: ASK_CAM.chat.z * 0.98 },
-  { f: S.proof - 1, z: ASK_CAM.chat.z * 1.03, ease: linear },
+  // (the status bar stays under the band; most of it over the opening,
+  // where the screen is still) through the question sent on "ask" and the
+  // answer streaming in…
+  { f: S.knows, ...ASK_CAM.chat, z: ASK_CAM.chat.z * 0.96 },
+  { f: S.asked, z: ASK_CAM.chat.z * 1.02, ease: linear },
+  { f: S.proof - 1, z: ASK_CAM.chat.z * 1.04, ease: linear },
   // the proof: down onto the three citations as they land
   { f: S.proof + 14, ...ASK_CAM.proof, ease: EASE_IN_OUT },
   // held, a slow push, into the sign-off (round 12: the app gives way to
