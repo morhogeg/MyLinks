@@ -7,11 +7,13 @@
  * save this video and never watch it again (the hook, readable on frame 0);
  * the save falls down a shaft onto every other save; "unless you save it to
  * Machina" floods them with colour and gathers them into the mark; the REAL
- * app reads it, maps it among the saves before it (its graph), buries it
- * under weeks of newer saves, and Ask answers a real question from the
- * saves, citing them (round 6: the proof), this reel among them. Its cover is this reel's first frame: the camera dives into it
- * ("This time, you'll watch it again.") and lands ON frame 0, so the reel
- * loops into its own hook without a cut.
+ * app reads it and maps it among the saves before it (its graph). Then the
+ * problem ("But you'll never rewatch them all.") and Ask as its payoff: a
+ * real question answered from the saves, every source cited (the proof),
+ * this reel among them. Its citation opens its card, whose cover is this
+ * reel's first frame: the camera dives into it ("This time, you'll watch it
+ * again.") and lands ON frame 0, so the reel loops into its own hook
+ * without a cut.
  *
  * Written in OUTPUT frames on a 128.57 BPM grid, 14 frames a beat (the
  * REVISIT quick cut's pace: an organic Reel, not a feature explainer). Every
@@ -34,9 +36,9 @@ export const BAR = BAR_FRAMES / FPS; // 1.8667s
 export const beat = (n) => Math.round(n * BEAT_FRAMES);
 export const onBeat = (f) => Math.round(f / BEAT_FRAMES) * BEAT_FRAMES;
 
-/** frames a typed character stays (the capture types one per 60fps frame,
- *  the reel plays them one a frame: the question types at a brisk 30 a second) */
-export const TYPE_FRAMES = 1;
+/** frames a typed character stays (the capture types one per 60fps frame;
+ *  the reel plays two a frame: the question bursts in, then holds) */
+export const TYPE_FRAMES = 0.5;
 
 /**
  * Picture events, in frames, each on the word it answers. Taps, landings and
@@ -53,20 +55,19 @@ export const HITS = {
   done: beat(22), // …and the card, read
   graph: beat(26), // "…by topic,": CUT to the graph, the saves mapped by topic
   connect: beat(28), // "…connects it to": the thumb on its dot; its ties light on "what you've saved before"
-  skip: beat(31), // three weeks later
-  bury: beat(33), // newer saves land on top of it, from "buried"
-  // (round 6) Ask, not search: a real question, the answer and its proof
-  askTap: beat(37), // "ask your saves anything": the Ask tab
-  asking: beat(38), // the question, typed
-  send: beat(41.5), // sent: the answer streams ("Get the answer,…")
-  proof: beat(45), // the saves it came from, cited ("…and the proof")
-  tagline: beat(46) + 6, // "Machina. Everything you save, finally useful."
-  citeTap: beat(54), // the thumb opens this reel's citation: its card…
-  poster: beat(56), // …and the dive into its cover lands ON frame 0
+  // (round 7) the problem, then Ask as its payoff
+  issue: beat(31), // "But you'll never rewatch them all": the feed, flicked
+  askTap: beat(34.5), // "So ask your saves anything": CUT to Ask
+  asking: beat(35.5), // the question, typed
+  send: beat(37.5), // sent: the answer streams ("Get the answer,…")
+  proof: beat(40.5), // the saves it came from, cited ("…and the proof")
+  tagline: beat(42), // "Machina. Everything you save, finally useful."
+  citeTap: beat(50), // the thumb opens this reel's citation: its card…
+  poster: beat(52), // …and the dive into its cover lands ON frame 0
 };
 
 /** a whole beat, so the score's pulse runs straight through the loop */
-export const TOTAL_FRAMES = beat(60);
+export const TOTAL_FRAMES = beat(56);
 export const TOTAL_SEC = TOTAL_FRAMES / FPS;
 
 /** The cut. One beat of story per scene. */
@@ -110,10 +111,10 @@ export const CAPTIONS = [
   { at: 372, to: 432, text: 'and connects it to\nwhat you’ve saved before.', style: 'Clear and genuinely pleased, flowing on from the line before; a little lift on "connects", landing warmly on "saved before".', pace: PACE },
   // (owner, round 7: no "weeks later"; the problem in one line, then Ask
   // as its payoff) over the feed, flicked past every other save…
-  { at: 434, to: 486, text: 'But you’ll never\nrewatch them all.', style: 'Honest and a little wry, a small shrug in the voice; quick and light, no drawn-out words.', pace: PACE },
+  { at: HITS.issue, to: HITS.askTap, text: 'But you’ll never\nrewatch them all.', style: 'Honest and a little wry, a small shrug in the voice; quick and light, no drawn-out words.', pace: PACE },
   // …so: Ask, on a real question; the answer, and the saves it came from
-  { at: 490, to: 530, text: 'So ask your saves anything.', style: 'Bright and easy, the turn of the story, the answer to the line before; quick and light, a small lift on "anything".', pace: PACE },
-  { at: HITS.send + 15, to: HITS.tagline - 10, text: 'Get the answer,\nand the proof.', style: 'Pleased and sure, two quick beats: "Get the answer," then "and the proof" landing with a small smile; no drawn-out words.', pace: PACE },
+  { at: HITS.askTap + 3, to: HITS.send + 6, text: 'So ask your saves anything.', style: 'Easy and sure, like the obvious fix; quick and light, one breath.', pace: PACE },
+  { at: HITS.send + 7, to: HITS.tagline - 6, text: 'Get the answer,\nand the proof.', style: 'Pleased and sure, two quick beats: "Get the answer," then "and the proof" landing with a small smile; no drawn-out words.', pace: PACE },
   // the name and the tagline, said once, over the answer and its proof
   // (owner, round 2: the name in the voice); the drawn wordmark wipes in on
   // "Machina"
@@ -126,7 +127,7 @@ export const CAPTIONS = [
 ];
 
 /** a small letterspaced label above the line, with it (the kit's Kicker) */
-export const KICKERS = [{ at: 430, to: 514, text: 'Three weeks later' }];
+export const KICKERS = [];
 
 /** Risers END on the reveal they lead into. [from, to] in frames. */
 export const RISERS = [
@@ -148,7 +149,7 @@ export const CHORDS = [
   [HITS.gather, 'G6'],
   [HITS.markStrike, 'Cmaj7'],
   [HITS.done, 'Fmaj7'],
-  [HITS.skip, 'G6'],
+  [HITS.issue, 'G6'],
   [HITS.askTap, 'Am7'],
   [HITS.proof, 'Cmaj7'],
   [HITS.citeTap, 'G6'],

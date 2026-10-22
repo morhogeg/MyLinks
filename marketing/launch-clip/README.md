@@ -711,17 +711,18 @@ tick sounds; the narrator sits 8.1–17.0dB over the music in the speech band
 
 ## SAVE THIS (the organic Reel)
 
-`MachinaSaveThis` is a 28.0s vertical Reel built for Instagram, not a
+`MachinaSaveThis` is a 26.1s vertical Reel built for Instagram, not a
 feature explainer. **The idea: the reel saves itself.** It opens by
 predicting that the viewer will save this video and never watch it again.
 The save falls into a well of every other save, all grey. "Unless you
 save it to Machina" floods them with the app's category colours and
 gathers them into the mark, and the real app reads the reel, sums it up,
-files it by topic, shows it on its graph tied to two earlier saves, and
-buries it under three weeks of newer saves; then Ask answers a real
-question from the saves ("What do my saves say about putting things
-off?"), every source cited, this reel among them ("ask your saves
-anything. Get the answer, and the proof."). Its citation opens its card,
+files it by topic, and shows it on its graph tied to two earlier saves.
+Then the problem, over the feed flicked past every other save ("But
+you'll never rewatch them all."), and Ask as its payoff ("So ask your
+saves anything. Get the answer, and the proof."): a real question ("What
+do my saves say about putting things off?") answered from the saves,
+every source cited, this reel among them. Its citation opens its card,
 whose cover is the reel's first frame, so the camera dives into it and
 lands ON frame 0: the reel loops into its own hook ("This time, you'll
 watch it again.").
@@ -755,14 +756,14 @@ npx remotion render src/index.ts MachinaSaveThis out/savethis/master.mp4 --crf=1
 | 0:10.3 | "Saved to Machina"; the card: its cover is this reel's frame 0; its summary lifts on "sums it up", its topic chip on "files it by topic" | understands it, sums it up, / files it by topic, | "understands it, sums it up, files it by topic," | bell |
 | 0:12.1 | Cut on "topic": the app's graph, the saves mapped by topic (ATTENTION, MEANING, DESIGN…), its layout settling, the new save one of its dots | and connects it to / what you've saved before. | "and connects it to what you've saved before." | a tick |
 | 0:13.1 | The thumb taps its dot: on "what you've saved before" its ties to two older saves (Four Thousand Weeks, the procrastination talk) light up, the rest recedes, and the app's own camera glides in on the three | | | a tick; two linked notes |
-| 0:14.5 | Cut: the whole feed; seven newer saves land on the card, one an 8th, and bury it | THREE WEEKS LATER / Weeks later, buried / under everything else, | "Weeks later, buried under everything else," | the band drops; a thud per save |
-| 0:17.3 | Cut to Ask ("What do you want to recall?"); "What do my saves say about putting things off?" types | ask your saves anything. | "ask your saves anything." | the cut; a click every other character |
-| 0:19.4 | Sent: the answer streams, drawn from three saves | Get the answer, / and the proof. | "Get the answer, and the proof." | tick, low note |
-| 0:21.0 | The proof: the saves it came from, cited (Tim Urban's talk, Four Thousand Weeks, this reel), each lifting as it lands; the camera pulls back to the whole exchange | | | the band lands, full; three notes |
-| 0:21.7 | The wordmark wipes in on the spoken name, then the tagline, over the question, its answer and its proof | MACHINA / Everything you save, / finally useful. | "Machina. Everything you save, finally useful." | |
-| 0:25.2 | The thumb opens this reel's citation: its card, its cover the poster whole; the camera dives into it until it IS the frame | | | whoosh |
-| 0:25.8 | The poster: frame 0 again (from 0:26.1) | This time, you'll / watch it again. | "This time, you'll watch it again." | thud, bell |
-| 0:28.0 | Loops into 0:00 without a cut | | | |
+| 0:14.5 | Cut: the feed, flicked down past every other save (The Tail End, Piranesi, Perfect Days, Naval…) | But you'll never / rewatch them all. | "But you'll never rewatch them all." | the band drops; a whoosh |
+| 0:16.1 | Cut to Ask: "What do my saves say about putting things off?" bursts in | So ask your saves anything. | "So ask your saves anything." | a click; soft keys |
+| 0:17.5 | Sent: the answer streams, drawn from three saves, the question above it | Get the answer, / and the proof. | "Get the answer, and the proof." | tick, low note |
+| 0:18.9 | The proof: the saves it came from, cited (Tim Urban's talk, Four Thousand Weeks, this reel), each lifting as it lands; the paper rises over the question | | | the band lands, full; three notes |
+| 0:19.6 | The wordmark wipes in on the spoken name, then the tagline, over the answer and its proof | MACHINA / Everything you save, / finally useful. | "Machina. Everything you save, finally useful." | |
+| 0:23.3 | The thumb opens this reel's citation: its card, its cover the poster whole; the camera dives into it until it IS the frame | | | whoosh |
+| 0:23.9 | The poster: frame 0 again (from 0:24.3) | This time, you'll / watch it again. | "This time, you'll watch it again." | thud, bell |
+| 0:26.1 | Loops into 0:00 without a cut | | | |
 
 **What is real and what is not.** Every app pixel is the shipped app on
 `main` (2026-10-21), captured by `capture/shoot.mjs savethisClip`: the

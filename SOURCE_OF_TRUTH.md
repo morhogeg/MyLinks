@@ -2637,6 +2637,23 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-22 (round 7) — SAVE THIS: the problem, then Ask as its payoff
+  (owner: "it doesn't need the weeks later, not relevant"; "a sentence before
+  Ask showing the issue, then Ask is the payoff"; "Apple grade").** Branch
+  `claude/reel-save-this`. The burial and its "three weeks later" are gone.
+  After the graph: a cut to the real feed flicked down past every other save
+  under "But you'll never rewatch them all." (the problem; the flick is the
+  feed's own scroll captured in 14-point steps, played on the house fling
+  curve with the cards' own travel as motion blur), then a cut to Ask on "So
+  ask your saves anything." (the question bursts in), "Get the answer, and
+  the proof." over the answer streaming and its three citations landing; on
+  the proof the camera goes down onto the answer and its citations and the
+  paper rises over the question bubble (`PROOF_LINE`), so the tagline sits
+  over the answer and its proof alone. The last line now answers the problem
+  too ("This time, you'll watch it again."). 26.1s, 77 words. Found on the
+  way: the feed's tab bar scrolls away with a flick, so the capture scrolls
+  back up (unrecorded) before tapping Ask. **Verified:** gates (bans on 254 strings including every captured frame, windows, every line 11.2 to 18.3dB over the music, −14.03 LUFS, −1.22 dBTP, seam step 0.002 against the score's own 0.111); stills of every beat; the encode's last frame against frame 0 at 48.2dB PSNR (consecutive frames: 42.3dB).
+  **Not verified:** listened to.
 - **2026-10-22 (round 6) — SAVE THIS shows Ask, not search, and brightens
   (owner: "the search feature is not strong enough, show Ask"; "ask, get the
   answer and the proof (the cited card)"; "finding a card should not be a

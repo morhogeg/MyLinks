@@ -3,7 +3,7 @@ import { AbsoluteFill } from 'remotion';
 import { CAPTIONS, FPS, HITS, TYPE_FRAMES } from '../../../../clips/savethis-timeline.mjs';
 import { AppShot, Lift, Tap } from '../../kit/AppShot';
 import { camAt, camVelocity, type Cam, type Key } from '../../kit/camera';
-import { EASE_IN_OUT, EASE_MODAL, mix, prog } from '../../kit/curves';
+import { EASE_FLING, EASE_IN_OUT, EASE_MODAL, mix, prog } from '../../kit/curves';
 import { addTakes, at, center, rectOf, takeOf } from '../../kit/takes';
 import TAKES from './takes.json';
 import VO from './savethis-vo.json';
@@ -21,12 +21,12 @@ import VO from './savethis-vo.json';
  *          new one already among them, its layout settling; the thumb taps
  *          its dot and its ties to two older saves light up on "what you've
  *          saved before", as the app's camera glides in on them
- *  skip    three weeks later: the card's date goes back, and the saves made
- *          since land on top of it, one an 8th
- *  ask     (round 6) CUT to Ask on "ask your saves anything": a real
- *          question types; sent, the answer streams from the saves, and the
- *          three it came from land under it, cited (the proof), lifting one
- *          by one; the tagline sits above them
+ *  issue   (round 7) "But you'll never rewatch them all": CUT to the feed,
+ *          flicked down past every other save
+ *  ask     CUT to Ask on "So ask your saves anything": a real question
+ *          bursts in; sent, the answer streams from the saves, and the three
+ *          it came from land under it, cited (the proof), lifting one by
+ *          one; the tagline sits above them
  *  tap     the thumb opens this reel's citation: its card, its cover the
  *          poster whole, and the camera dives into it until it IS the frame
  *          (Dive.tsx hands over to the poster itself)
@@ -42,10 +42,18 @@ const S = HITS;
 const linear = (t: number) => t;
 
 /** the take's 8th-note runs, from its marks */
-const BURY = takeOf(T).marks.buried - takeOf(T).marks.bury0; // 7 saves x 14
+/** (round 7) the flick: captured scroll steps (14 points each) after its
+ *  first, resting frame */
+const SCROLL = takeOf(T).marks.scrolled - takeOf(T).marks.scroll - 1;
+/** the flick starts a breath after the cut, and has settled by the next */
+const FLICK = { from: S.issue + 4, to: S.askTap - 2 };
+const flickStep = (f: number) => Math.round(SCROLL * prog(f, FLICK.from, FLICK.to, EASE_FLING));
 /** (round 6) the Ask screen's opening, the question's characters, the
  *  answer's streamed chunks (60fps captures, one a chunk) */
 const ASK_OPEN = takeOf(T).marks.asking - takeOf(T).marks.ask;
+/** the cut lands on the Ask screen most of the way faded in, not on the
+ *  blank frame its opening starts from */
+const ASK_JOIN = 8;
 const CHARS = takeOf(T).marks.answer - takeOf(T).marks.asking;
 const STREAM = takeOf(T).marks.sources - takeOf(T).marks.answer;
 /** (round 4) the take opens the graph this many 60fps frames before the
@@ -55,8 +63,6 @@ const STREAM = takeOf(T).marks.sources - takeOf(T).marks.answer;
 const GRAPH_TAP = takeOf(T).marks.graphTap - takeOf(T).marks.graph;
 const GRAPH_JOIN = GRAPH_TAP - (S.connect - S.graph);
 
-/** the saves since land one an 8th, the first just before "buried" */
-export const BURY_FROM = S.bury - 7;
 /** the question's last character */
 export const ASKED = S.asking + (CHARS - 1) * TYPE_FRAMES;
 
@@ -72,13 +78,11 @@ export const frameAt = (f: number) => {
   if (f < S.connect) return at(T, 'graph', GRAPH_JOIN + (f - S.graph));
   // …the tap: its ties light and the app's camera glides in on them, until
   // three weeks later
-  if (f < S.skip) return at(T, 'graphTap', Math.min(119, f - S.connect));
-  // three weeks later: the date goes back (the take's skip, eased over)
-  if (f < BURY_FROM) return at(T, 'skip', ((f - S.skip) * 14) / (BURY_FROM - S.skip));
-  // the saves since, one an 8th (14 captured frames each, at real speed)
-  if (f < S.askTap) return at(T, 'bury0', Math.min(BURY + 16, (f - BURY_FROM) * 2));
+  if (f < S.issue) return at(T, 'graphTap', Math.min(119, f - S.connect));
+  // (round 7) CUT to the feed, flicked down past every other save
+  if (f < S.askTap) return at(T, 'scroll', flickStep(f));
   // (round 6) CUT to Ask: its screen opening at real speed…
-  if (f < S.asking) return at(T, 'ask', Math.min(ASK_OPEN - 1, (f - S.askTap) * 2));
+  if (f < S.asking) return at(T, 'ask', Math.min(ASK_OPEN - 1, ASK_JOIN + (f - S.askTap) * 2));
   // …the question, a character every TYPE_FRAMES…
   if (f < S.send) return at(T, 'asking', Math.min(CHARS - 1, (f - S.asking) / TYPE_FRAMES));
   // …sent: the answer streams, a chunk a frame…
@@ -99,9 +103,15 @@ const SEND = rectOf(T, at(T, 'asking', CHARS - 1), 'send');
 const CITES = [1, 2, 3].map((k) => rectOf(T, at(T, 'sources', 47), `cite${k}`));
 const ANSWER = rectOf(T, at(T, 'sources', 47), 'answer');
 const BUBBLE = rectOf(T, at(T, 'sources', 47), 'bubble');
-/** the whole exchange, the question down to its proof: the frame it is
- *  held in, its top just under the band, its bottom clear of the feed's UI */
-const EXCHANGE = { top: BUBBLE[1], bottom: CITES[2][1] + CITES[2][3], z: 2.05 };
+/** the proof's framing: the answer and its three citations, the answer's
+ *  first line just under PROOF_LINE (where the paper over the question
+ *  bubble clears), and the bubble's last pixel above it */
+export const PROOF_LINE = 680;
+const PROOF = (() => {
+  const z = 2.4;
+  const cy = (ANSWER[1] + CITES[2][1] + CITES[2][3]) / 2;
+  return { z, cy, fy: PROOF_LINE + 10 + (cy - ANSWER[1]) * z };
+})();
 /** the opened card's cover: the poster, whole (object-contain, measured) */
 export const COVER = rectOf(T, at(T, 'open', 59), 'poster');
 /** (round 3) the parts of the read the narrator names: its summary, its topic */
@@ -154,7 +164,7 @@ export const graphCam = (f: number): Cam => {
   const zIsland = mix(GRAPH.zIsland[0], GRAPH.zIsland[1], prog(f, S.graph, S.connect, EASE_IN_OUT));
   // as wide as the titles need, never closer than the island's framing
   const zTies = Math.min(zIsland, (1080 - 2 * GRAPH.margin) / ties.w);
-  const z = mix(zIsland, zTies, w) * (1 + 0.04 * prog(f, S.graph, S.skip, linear));
+  const z = mix(zIsland, zTies, w) * (1 + 0.04 * prog(f, S.graph, S.issue, linear));
   // the titles are up from the frame after the tap: none of them leaves the
   // frame while the camera travels to them
   let cx = mix(isl.x - 4, ties.x, w);
@@ -177,21 +187,20 @@ export const graphCam = (f: number): Cam => {
  *  as the app glides it up, clear of the panel sliding in below) */
 const dotAt = (i: number) => center(rectOf(T, i, 'node0'));
 
-/** (round 6) the Ask beat's framings (screen points; tuned on the take) */
-const ASK_CAM: Record<'open' | 'typing' | 'answer' | 'proof' | 'card', Cam> = {
-  open: { cx: 196.5, cy: center(COMPOSER).y - 150, z: 2.3, fx: 540, fy: 1220, rx: 0, ry: 0, rz: 0 },
-  typing: { cx: 196.5, cy: center(COMPOSER).y - 70, z: 2.55, fx: 540, fy: 1200, rx: 0, ry: 0, rz: 0 },
-  answer: { cx: 196.5, cy: ANSWER[1] + 60, z: 2.45, fx: 540, fy: 1000, rx: 0, ry: 0, rz: 0 },
-  proof: {
-    cx: 196.5,
-    cy: (EXCHANGE.top + EXCHANGE.bottom) / 2,
-    z: EXCHANGE.z,
-    fx: 540,
-    fy: 700 + ((EXCHANGE.bottom - EXCHANGE.top) / 2) * EXCHANGE.z,
-    rx: 0,
-    ry: 0,
-    rz: 0,
-  },
+/** (round 7) the feed as it is flicked: a column of cards, readable */
+const FEED_CAM: Cam = { cx: 196.5, cy: 430, z: 2.3, fx: 540, fy: 1150, rx: 0, ry: 0, rz: 0 };
+
+/**
+ * (round 6) The Ask beat's framings, in screen points. The question bubble
+ * sits clear under the band while the answer streams below it; on the proof
+ * the camera goes down onto the answer and its citations, and the paper
+ * (SaveThis.tsx PROOF_SCRIM) rises over the bubble.
+ */
+const ASK_CAM: Record<'typing' | 'answer' | 'proof' | 'card', Cam> = {
+  // the composer the width of the frame: the question, big, on clean paper
+  typing: { cx: 196.5, cy: center(COMPOSER).y, z: 3.0, fx: 540, fy: 1150, rx: 0, ry: 0, rz: 0 },
+  answer: { cx: 196.5, cy: BUBBLE[1] + 140, z: 2.5, fx: 540, fy: 720 + 140 * 2.5, rx: 0, ry: 0, rz: 0 },
+  proof: { cx: 196.5, cy: PROOF.cy, z: PROOF.z, fx: 540, fy: PROOF.fy, rx: 0, ry: 0, rz: 0 },
   card: { cx: center(COVER).x, cy: center(COVER).y + 40, z: 2.75, fx: 540, fy: 1060, rx: 0, ry: 0, rz: 0 },
 };
 
@@ -223,19 +232,14 @@ export const appKeys: Key[] = [
   { f: S.done + 16, cx: 196.5, cy: 352, z: 2.4, fx: 540, fy: 1190, ease: EASE_IN_OUT },
   // a slow push on the topic, into the cut
   { f: S.graph - 1, z: 2.5, ease: linear },
-  // (round 4) S.graph to S.skip: the graph, on its own camera (graphCam)
-  { f: S.skip - 1, cx: 196.5, cy: 330, z: 2.3, fx: 540, fy: 1180, ease: linear },
-  // CUT, three weeks later: the card back in the feed, then back to the
-  // whole feed, so the saves since are seen landing on it and pushing it under
-  { f: S.skip, cx: 196.5, cy: 330, z: 2.3, fx: 540, fy: 1180, ease: linear },
-  { f: S.skip + 18, cx: 196.5, cy: 430, z: 1.32, fx: 540, fy: 1210, ease: EASE_IN_OUT },
-  { f: S.askTap - 1, z: 1.26, ease: linear },
-  // (round 6) CUT to Ask: "What do you want to recall?" over its composer
-  { f: S.askTap, ...ASK_CAM.open },
-  { f: S.asking - 1, z: ASK_CAM.open.z * 1.02, ease: linear },
-  // the question types: in on the composer
-  { f: S.asking + 10, ...ASK_CAM.typing, ease: EASE_MODAL },
-  { f: S.send - 1, z: ASK_CAM.typing.z * 1.02, ease: linear },
+  // (round 4) S.graph to S.issue: the graph, on its own camera (graphCam)
+  { f: S.issue - 1, ...FEED_CAM },
+  // (round 7) CUT to the feed: held while it is flicked past
+  { f: S.issue, ...FEED_CAM },
+  { f: S.askTap - 1, z: FEED_CAM.z * 1.03, ease: linear },
+  // CUT to Ask: its composer, the question bursting in, held
+  { f: S.askTap, ...ASK_CAM.typing },
+  { f: S.send - 1, z: ASK_CAM.typing.z * 1.03, ease: linear },
   // CUT on the send: the question up top, the answer streaming under it
   { f: S.send, ...ASK_CAM.answer },
   { f: S.proof - 1, z: ASK_CAM.answer.z * 1.02, ease: linear },
@@ -257,9 +261,15 @@ export const App: React.FC<{ f: number }> = ({ f }) => {
   const i = frameAt(f);
   // the graph's camera rides the app's, so what it shows stays put: no
   // smear from its own travel
-  const inGraph = f >= S.graph && f < S.skip;
+  const inGraph = f >= S.graph && f < S.issue;
   const cam = inGraph ? graphCam(f) : camAt(appKeys, f);
-  const v = inGraph ? { x: 0, y: 0 } : camVelocity(appKeys, f, 1);
+  // the flick: the cards' own travel smears, the camera holds
+  const flicking = f >= FLICK.from && f < S.askTap;
+  const v = inGraph
+    ? { x: 0, y: 0 }
+    : flicking
+      ? { x: 0, y: -(flickStep(f) - flickStep(f - 1)) * 14 * cam.z }
+      : camVelocity(appKeys, f, 1);
   // the iris: a circle from the card's mark, open by the time it lands
   const r = prog(f, S.iris - 1, S.iris + 18, EASE_IN_OUT);
   const iris = r < 0.999 ? { x: center(MARK).x, y: center(MARK).y, r: 6 + r * 790 } : null;

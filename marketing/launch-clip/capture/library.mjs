@@ -612,9 +612,12 @@ export const SAVETHIS = {
   readTime: 1,
   /** served by the capture server from the static export's root */
   cover: '/capture-savethis-cover.jpg',
-  /** days old it is when it is found again ("three weeks later") */
+  /** the saves younger than this many days are held back until after the
+   *  graph (it maps what was saved before it), then join the feed the reel
+   *  flicks past (round 7: "But you'll never rewatch them all.") */
   buriedAge: 20,
-  /** what the viewer remembers of it, typed into Search your saves */
+  /** (rounds 1 to 5) what the viewer remembered of it, typed into Search
+   *  your saves; kept for the capture server's search answer */
   query: 'never watch it again',
   hits: ['savethis'],
   /**

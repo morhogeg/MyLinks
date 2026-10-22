@@ -38,8 +38,6 @@ const H = HITS;
 const TAKE = JSON.parse(fs.readFileSync(path.join(root, 'src', 'reels', 'clips', 'savethis', 'takes.json'), 'utf8'))['clips/savethis/app'];
 // (round 6) the question typed into Ask, a character a frame
 const CHARS = TAKE.marks.answer - TAKE.marks.asking;
-const SAVES_SINCE = (TAKE.marks.buried - TAKE.marks.bury0) / 14;
-const BURY_FROM = H.bury - 7;
 
 // ── where the narrator is speaking, in frames (from the voice manifest)
 const MANIFEST = JSON.parse(fs.readFileSync(path.join(root, 'out', 'vo', 'savethis', 'manifest.json'), 'utf8'));
@@ -67,9 +65,9 @@ const chordAt = (frame) => VOICINGS[CHORDS.filter(([f]) => f <= frame).at(-1)[1]
  *  reading, a breath for the skip, the asking held, the proof full, the dive,
  *  the bare poster */
 const density = (f) =>
-  f < H.drop ? 0.18 : f < H.land ? 0.3 : f < H.gather ? 0.36 : f < H.markStrike ? 0.5 : f < H.phase0 ? 0.42 : f < H.skip ? 0.85 : f < H.askTap ? 0.55 : f < H.proof ? 0.6 : f < H.citeTap ? 1 : f < H.poster ? 0.7 : 0.2;
+  f < H.drop ? 0.18 : f < H.land ? 0.3 : f < H.gather ? 0.36 : f < H.markStrike ? 0.5 : f < H.phase0 ? 0.42 : f < H.issue ? 0.85 : f < H.askTap ? 0.55 : f < H.proof ? 0.6 : f < H.citeTap ? 1 : f < H.poster ? 0.7 : 0.2;
 const DRUMS = [
-  [H.phase0, H.skip],
+  [H.phase0, H.issue],
   [H.proof, H.citeTap + 7],
 ];
 const drumsAt = (f) => DRUMS.some(([a, b]) => f >= a && f < b);
@@ -104,7 +102,7 @@ const arrange = (o) => {
         const fr = f0 + on * BEAT_FRAMES;
         if (fr < H.phase0 - 4 || fr >= H.poster) return;
         // the skip and the typing breathe: half the figure
-        if ((fr >= H.skip && fr < H.askTap) || (fr >= H.askTap && fr < H.proof)) if (k % 2) return;
+        if ((fr >= H.issue && fr < H.askTap) || (fr >= H.askTap && fr < H.proof)) if (k % 2) return;
         const c = chordAt(fr);
         const step = shape[(k + f0 / BAR_FRAMES) % shape.length];
         const m = c.upper[0] + SCALE[step % 7] + Math.floor(step / 7) * 12 + (on >= 2.5 ? 12 : 0);
@@ -168,20 +166,16 @@ const arrange = (o) => {
   pluck(t(H.connect + 6), 83, 0.06, 0.2, 0.45);
   sub(t(H.connect), 43, 0.22, 0.3);
 
-  // ── three weeks later: a breath, then one thud per save landing on top,
-  // each a step higher, an 8th apart
-  if (!voiced(H.skip - 6, 18)) whoosh(t(H.skip) - 0.15, 0.6, 0.05, 0.2);
-  for (let k = 0; k < SAVES_SINCE; k++) {
-    const fr = BURY_FROM + k * 7;
-    sub(t(fr), 40 + k, 0.2 + k * 0.012, 0.18);
-    tick(t(fr), 0.05, 0.8 + k * 0.05);
-  }
+  // ── (round 7) the problem: the cut to the feed, and the flick past every
+  // other save (air under the voice, the band dropping out)
+  tick(t(H.issue), 0.08, 0.9);
+  whoosh(t(H.issue + 4), 0.75, 0.03, 0.15);
+  sub(t(H.issue), 38, 0.24, 0.35);
 
-  // ── (round 6) Ask: the cut in, a click every other character (a typed
-  // character a frame), the send; the answer streams on the band
-  if (!voiced(H.askTap + 2, 12)) whoosh(t(H.askTap) + 0.02, 0.45, 0.035, -0.1);
+  // ── (round 6) Ask: the cut in, the question bursting in (a soft click a
+  // frame, two characters each), the send; the answer streams on the band
   tick(t(H.askTap), 0.09, 1.15);
-  for (let k = 0; k < CHARS; k += 2) tick(t(H.asking + k * TYPE_FRAMES), 0.024, 1.5 + ((k * 7) % 5) * 0.06);
+  for (let k = 0; k < CHARS; k += 2) tick(t(H.asking + k * TYPE_FRAMES), 0.02, 1.5 + ((k * 7) % 5) * 0.06);
   tick(t(H.send), 0.11, 1.2);
   sub(t(H.send), 45, 0.2, 0.3);
 

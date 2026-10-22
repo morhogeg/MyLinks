@@ -23,7 +23,7 @@ const H = HITS;
 const REVIEW = [
   0, H.tapSave + 4, H.drop + 6, H.drop + 20, H.land, H.land + 24, H.gather + 16, H.markStrike + 2,
   H.iris + 6, H.phase0 + 20, H.done + 4, H.done + 30, H.graph + 2, H.connect - 2, H.connect + 12, H.connect + 40,
-  H.skip + 30, H.bury + 20, H.askTap + 6, H.asking + 30,
+  H.issue + 2, H.issue + 20, H.askTap + 6, H.asking + 20,
   H.send + 10, H.proof + 14, H.tagline + 40, H.citeTap + 8, H.citeTap + 18, H.poster - 6, H.poster + 20, TOTAL_FRAMES - 1,
 ];
 const frames = process.argv.slice(2).map(Number).filter((n) => !Number.isNaN(n));

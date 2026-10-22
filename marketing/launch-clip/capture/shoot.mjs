@@ -597,8 +597,7 @@ const takes = {
   //     settles with the new save among its dots; a press on its dot lights
   //     its ties to the two saves before it, and the app's camera glides in
   //     (back to Card after, unrecorded);
-  //  2. three weeks later: it is dated back, and the saves made since land
-  //     on top of it one by one, the way the feed receives them;
+  //  2. (round 7) every other save: the feed, flicked down past them;
   //  3. (round 6) Ask: a real question about putting things off; the
   //     answer streams from three saves, each cited (the proof), this reel
   //     the last, whose citation opens its card on its cover (the poster,
@@ -801,18 +800,30 @@ const takes = {
     await page.waitForTimeout(300);
     await t.freeze();
 
-    // 2. three weeks later: dated back, then the saves made since, oldest
-    // first, each landing on top of the feed as it arrives
-    await page.evaluate(([p, d]) => window.__capture.merge(p, { createdAt: d }), [at, now - S.buriedAge * DAY]);
-    t.mark('skip');
-    await roll60(14);
-    for (let k = 0; k < later.length; k++) {
-      await page.evaluate(([p, d]) => window.__capture.set(p, d), later[k]);
-      t.mark(`bury${k}`);
-      await roll60(14);
-    }
-    t.mark('buried');
-    await roll60(40);
+    // 2. (round 7) the problem: every other save in the feed (the ones
+    // held back join it, unrecorded), flicked down past them, recorded in
+    // fine steps so the reel can play them on a flick's curve
+    await t.thaw();
+    for (const p of later) await page.evaluate(([path, d]) => window.__capture.set(path, d), p);
+    await page.waitForTimeout(900);
+    await page.evaluate(() => document.scrollingElement.scrollTo({ top: 0, behavior: 'instant' }));
+    await page.waitForTimeout(300);
+    await t.freeze();
+    await tagScroller(S.title);
+    t.mark('scroll');
+    await t.snap();
+    const flick = await page.evaluate(() => {
+      const sc = document.querySelector('[data-capture-scroller]');
+      return Math.min(2800, sc.scrollHeight - sc.clientHeight);
+    });
+    await rollScroll(t, flick, 14, {});
+    t.mark('scrolled');
+    // the tab bar scrolls away with the feed: back to the top (unrecorded,
+    // the reel cuts to Ask) so it returns
+    await t.thaw();
+    await page.evaluate(() => document.scrollingElement.scrollTo({ top: 0, behavior: 'instant' }));
+    await page.waitForTimeout(800);
+    await t.freeze();
 
     // 3. (round 6: Ask, not search) the Ask tab; a real question, typed a
     // character a 60fps frame; the answer streamed from three saves, each a

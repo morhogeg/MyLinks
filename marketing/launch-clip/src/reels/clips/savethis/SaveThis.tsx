@@ -10,7 +10,7 @@ import { EASE_IN_OUT, EASE_MODAL, prog } from '../../kit/curves';
 import { Lens, Paper } from '../../kit/Paper';
 import { GRADE } from './grade';
 import { INK } from '../../kit/Type';
-import { App, HANDOVER, MARK_TO } from './App';
+import { App, HANDOVER, MARK_TO, PROOF_LINE } from './App';
 import { Dive } from './Dive';
 import { Opening } from './Opening';
 import { POSTER } from './Poster';
@@ -56,12 +56,24 @@ export const SaveThis: React.FC<{
       <BandScrim opacity={scrim} tone={GRADE.tone} />
       {/* (round 4) once the app's camera glides in on the lit ties, the
           paper rises further, over the graph's own header and legend */}
-      {f >= HITS.connect && f < HITS.skip && (
+      {f >= HITS.connect && f < HITS.issue && (
         <AbsoluteFill
           style={{
             pointerEvents: 'none',
             opacity: prog(f, HITS.connect + 2, HITS.connect + 18, EASE_IN_OUT),
             background: `linear-gradient(180deg, ${GRADE.tone} 0px, ${GRADE.tone} 700px, ${clearOf(GRADE.tone)} 930px)`,
+          }}
+        />
+      )}
+      {/* (round 7) on the proof, the paper rises over the question bubble
+          (the camera is down on the answer and its citations): above the
+          answer's first line nothing but the tagline */}
+      {f >= HITS.proof && f < HITS.citeTap + 2 && (
+        <AbsoluteFill
+          style={{
+            pointerEvents: 'none',
+            opacity: prog(f, HITS.proof + 2, HITS.proof + 14, EASE_IN_OUT) * (1 - prog(f, HITS.citeTap - 4, HITS.citeTap + 2, EASE_IN_OUT)),
+            background: `linear-gradient(180deg, ${GRADE.tone} 0px, ${GRADE.tone} ${PROOF_LINE}px, ${clearOf(GRADE.tone)} ${PROOF_LINE + 10}px)`,
           }}
         />
       )}
