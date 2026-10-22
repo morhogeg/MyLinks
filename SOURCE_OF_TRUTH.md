@@ -2637,6 +2637,18 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-22 (round 3) — SAVE THIS names what the read is (owner: "it only
+  says reads it; say it's analyzed, understood, categorized").** Branch
+  `claude/reel-save-this`. New line between "It reads every save, from any
+  app," and "and connects it to what you've saved before.": "understands it,
+  sums it up, files it by topic," (take `list-b`, 2.1s; the other direction
+  paused between clauses, 2.9s), over the finished card, with the summary
+  lifted (ink ring) on "sums" and the PRODUCTIVITY chip on "files" (rects
+  `category`/`summary1`/`summary2`/`tag1`/`tag2` added to the take). Every
+  beat after the read moves four beats later: 25.7s, 69 words. **Verified:**
+  gates (every line 11 to 18dB over the music, −14.0 LUFS, −1.2 dBTP, seam
+  step 0.03 against the score's own 0.12); stills of the new beat.
+  **Not verified:** listened to.
 - **2026-10-22 (later) — SAVE THIS round 2 (owner: "the video part is
   perfect, keep it").** Branch `claude/reel-save-this`. (1) The sign-off says
   the name: "Machina. Everything you save, finally useful." (the wordmark wipes

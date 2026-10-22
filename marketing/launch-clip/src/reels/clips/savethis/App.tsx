@@ -1,11 +1,12 @@
 import React from 'react';
 import { AbsoluteFill } from 'remotion';
-import { HITS, TYPE_FRAMES } from '../../../../clips/savethis-timeline.mjs';
+import { CAPTIONS, FPS, HITS, TYPE_FRAMES } from '../../../../clips/savethis-timeline.mjs';
 import { AppShot, Lift, Tap } from '../../kit/AppShot';
 import { camAt, camVelocity, type Cam, type Key } from '../../kit/camera';
 import { EASE_GATHER, EASE_IN_OUT, EASE_MODAL, prog } from '../../kit/curves';
 import { addTakes, at, center, rectOf, takeOf } from '../../kit/takes';
 import TAKES from './takes.json';
+import VO from './savethis-vo.json';
 
 /**
  * The app side of SAVE THIS: one continuous use of Home, the real app
@@ -56,7 +57,7 @@ export const frameAt = (f: number) => {
   // five phases, a beat each, at real speed
   if (f < S.done) return at(T, 'phase0', (f - S.phase0) * 2);
   // read, and "Saved to Machina"
-  if (f < S.cardOpen) return at(T, 'done', (f - S.done) * 2);
+  if (f < S.cardOpen) return at(T, 'done', Math.min(39, (f - S.done) * 2));
   // (round 2) the thumb opens it: the app's own sheet, at real speed…
   if (f < SCROLL_FROM) return at(T, 'open', (f - S.cardOpen) * 2);
   // …down to its Related cards (the captured step nearest the eased scroll)…
@@ -86,6 +87,21 @@ export const CARD = rectOf(T, at(T, 'result', 59), 'card');
 export const COVER = rectOf(T, at(T, 'result', 59), 'cover');
 /** the card in the feed when it is opened, and its Related cards once there */
 const OPENED = rectOf(T, at(T, 'done', 39), 'card');
+/** (round 3) the parts of the read the narrator names: its summary, its topic */
+const union = (a: number[], b: number[]): [number, number, number, number] => {
+  const x = Math.min(a[0], b[0]);
+  const y = Math.min(a[1], b[1]);
+  return [x, y, Math.max(a[0] + a[2], b[0] + b[2]) - x, Math.max(a[1] + a[3], b[1] + b[3]) - y];
+};
+const pad = (r: number[], p: number): [number, number, number, number] => [r[0] - p, r[1] - p, r[2] + 2 * p, r[3] + 2 * p];
+const SUMMARY = pad(union(rectOf(T, at(T, 'done', 39), 'summary1'), rectOf(T, at(T, 'done', 39), 'summary2')), 6);
+const TOPIC = pad(rectOf(T, at(T, 'done', 39), 'category'), 2);
+/** the frames the narrator says "sums it up" and "files it by topic" */
+const LIST = CAPTIONS.find((c) => c.text.startsWith('understands'))!;
+const LIST_T = VO.find((v) => v.frame === LIST.at);
+const wordAt = (k: number) => LIST.at + Math.round((LIST_T?.words[k] ?? 0) * FPS);
+export const SUMS_AT = wordAt(2); // "sums"
+export const FILES_AT = wordAt(5); // "files"
 const RELATED = rectOf(T, at(T, 'relatedHold'), 'relatedList');
 
 /** the camera when the app opens: the processing card, its mark in frame */
@@ -110,7 +126,10 @@ export const appKeys: Key[] = [
   // …then down to the pill, as the narrator starts on the reading
   { f: S.phase0 + 16, cx: 196.5, cy: center(PILL).y, z: 2.85, fx: 540, fy: 1190, ease: EASE_IN_OUT },
   { f: S.done - 4, z: 3.0, ease: linear },
-  // "Saved to Machina", and up to the card: its cover, its summary
+  // "Saved to Machina", and up to the card as it is understood: its summary
+  // and its topic are named and lifted (round 3)
+  { f: S.done + 16, cx: 196.5, cy: 352, z: 2.4, fx: 540, fy: 1190, ease: EASE_IN_OUT },
+  { f: S.cardOpen - 10, z: 2.46, ease: linear },
   { f: S.cardOpen, cx: 196.5, cy: 330, z: 2.25, fx: 540, fy: 1180, ease: EASE_IN_OUT },
   // (round 2) it opens; the camera follows the scroll down to the saves it
   // connects to, and holds on them
@@ -149,12 +168,22 @@ export const App: React.FC<{ f: number }> = ({ f }) => {
   const r = prog(f, S.iris - 1, S.iris + 18, EASE_IN_OUT);
   const iris = r < 0.999 ? { x: center(MARK).x, y: center(MARK).y, r: 6 + r * 790 } : null;
   const up = f >= S.found ? lift(f, S.found, S.cardTap - S.found) : 0;
+  // the read's parts, each on the word that names it, gone before the open
+  const upSum = f >= SUMS_AT - 2 && f < S.cardOpen ? lift(f, SUMS_AT - 2, S.cardOpen - SUMS_AT + 2) : 0;
+  const upTopic = f >= FILES_AT - 2 && f < S.cardOpen ? lift(f, FILES_AT - 2, S.cardOpen - FILES_AT + 2) : 0;
   // the saves it connects to, emphasised on the beat after they land
   const upRelated = f >= S.related && f < S.skip ? lift(f, S.related + 6, S.skip - S.related - 6) : 0;
   const tapCover = { x: center(COVER).x, y: center(COVER).y };
   return (
     <AbsoluteFill>
       <AppShot take={T} i={i} cam={cam} motion={{ x: v.x, y: v.y }} iris={iris} shadow={r}>
+        {/* (round 3) "sums it up": its summary; "files it by topic": its topic */}
+        {f >= SUMS_AT - 4 && f < S.cardOpen && (
+          <Lift take={T} i={i} rect={SUMMARY} radius={10} lift={Math.max(upSum, 0.002)} rise={1.5} grow={0.012} ring={0.6 * upSum} />
+        )}
+        {f >= FILES_AT - 4 && f < S.cardOpen && (
+          <Lift take={T} i={i} rect={TOPIC} radius={8} lift={Math.max(upTopic, 0.002)} rise={1.5} grow={0.05} ring={0.7 * upTopic} />
+        )}
         {/* (round 2) the card, opened on "connects" */}
         <Tap x={OPENED[0] + 180} y={OPENED[1] + 172} t={prog(f, S.cardOpen - 10, S.cardOpen + 18, linear)} />
         {f >= S.related - 2 && f < S.skip && (

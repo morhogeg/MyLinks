@@ -643,6 +643,12 @@ const takes = {
       mark: ['main article[aria-busy="true"] svg'],
       pill: ['div[aria-live="polite"] div[class*="max-w-xs"]'],
       cover: ['main article.surface-card div[class*="h-28"]'],
+      // (round 3) the parts the narrator names, each lifted on its word
+      category: ['main article.surface-card *', S.category],
+      summary1: ['main article.surface-card p', 'Most saved posts'],
+      summary2: ['main article.surface-card p', 'This one follows'],
+      tag1: ['main article.surface-card *', S.tags[0]],
+      tag2: ['main article.surface-card *', S.tags[1]],
     };
     const roll60 = (n) => t.roll(n, { rects: RECTS, step: 1000 / 60 });
     const at = linkPath(S.id);

@@ -711,12 +711,13 @@ tick sounds; the narrator sits 8.1–17.0dB over the music in the speech band
 
 ## SAVE THIS (the organic Reel)
 
-`MachinaSaveThis` is a 23.8s vertical Reel built for Instagram, not a
+`MachinaSaveThis` is a 25.7s vertical Reel built for Instagram, not a
 feature explainer. **The idea: the reel saves itself.** It opens by
 predicting that the viewer will save this video and never watch it again.
 The save falls into a well of every other save. "Unless you save it to
 Machina" gathers them into the mark, and the real app reads the reel,
-connects it to two earlier saves, buries it under three weeks of newer
+sums it up, files it by topic, connects it to two earlier saves, buries
+it under three weeks of newer
 saves, and finds it again from
 "never watch it again". The found card's cover is the reel's first
 frame, so the camera dives into it and lands ON frame 0: the reel loops
@@ -748,14 +749,14 @@ npx remotion render src/index.ts MachinaSaveThis out/savethis/master.mp4 --crf=1
 | 0:07.0 | The brackets close on it: the mark, on "Machina" | | | impact, shimmer |
 | 0:07.5 | The mark lands on the processing card's own mark as the real app irises open: a share of this reel arriving | | | whoosh |
 | 0:07.9 | The pill, a phase a beat: Fetching the link, Reading the page, Writing the summary, Searching connections, Organizing & tagging | It reads every save, / from any app, | "It reads every save, from any app," | the band; a tick a phase |
-| 0:10.3 | "Saved to Machina"; the card: its cover is this reel's frame 0 | and connects it to / what you've saved before. | "and connects it to what you've saved before." | bell |
-| 0:10.7 | The thumb opens it: the sheet, then down to its Related cards (the procrastination talk, Four Thousand Weeks, each with its "why") | | | a tick; two linked notes |
-| 0:12.6 | Cut: the whole feed; seven newer saves land on the card, one an 8th, and bury it | THREE WEEKS LATER / Weeks later, buried / under everything else, | "Weeks later, buried under everything else," | the band drops; a thud per save |
-| 0:15.4 | Search your saves, tapped; "never watch it again" types; the feed narrows to one card | type what you remember. | "type what you remember." | a click a character |
-| 0:17.3 | The card lifts: this reel, found; the wordmark wipes in on the spoken name | MACHINA / Everything you save, / finally useful. | "Machina. Everything you save, finally useful." | the band lands, full |
-| 0:21.0 | The thumb taps the cover; the camera dives; the cover opens to the frame | | | whoosh, riser |
-| 0:21.9 | The poster: frame 0 again | See? You're / watching it again. | "See? You're watching it again." | thud, bell |
-| 0:23.8 | Loops into 0:00 without a cut | | | |
+| 0:10.3 | "Saved to Machina"; the card: its cover is this reel's frame 0; its summary lifts on "sums it up", its topic chip on "files it by topic" | understands it, sums it up, / files it by topic, | "understands it, sums it up, files it by topic," | bell |
+| 0:12.4 | The thumb opens it: the sheet, then down to its Related cards (the procrastination talk, Four Thousand Weeks, each with its "why") | and connects it to / what you've saved before. | "and connects it to what you've saved before." | a tick; two linked notes |
+| 0:14.5 | Cut: the whole feed; seven newer saves land on the card, one an 8th, and bury it | THREE WEEKS LATER / Weeks later, buried / under everything else, | "Weeks later, buried under everything else," | the band drops; a thud per save |
+| 0:17.3 | Search your saves, tapped; "never watch it again" types; the feed narrows to one card | type what you remember. | "type what you remember." | a click a character |
+| 0:19.1 | The card lifts: this reel, found; the wordmark wipes in on the spoken name | MACHINA / Everything you save, / finally useful. | "Machina. Everything you save, finally useful." | the band lands, full |
+| 0:22.9 | The thumb taps the cover; the camera dives; the cover opens to the frame | | | whoosh, riser |
+| 0:23.8 | The poster: frame 0 again | See? You're / watching it again. | "See? You're watching it again." | thud, bell |
+| 0:25.7 | Loops into 0:00 without a cut | | | |
 
 **What is real and what is not.** Every app pixel is the shipped app on
 `main` (2026-10-21), captured by `capture/shoot.mjs savethisClip`: the
