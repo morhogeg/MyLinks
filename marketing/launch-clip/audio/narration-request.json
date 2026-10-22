@@ -1,6 +1,6 @@
 {
   "_": "Voice narration on GitHub with Gemini TTS (.github/workflows/narration-tts.yml). Edit, commit, push: the workflow voices what is listed and commits the takes to audio/vo-takes/. `scripts`: synth-vo.py scripts to voice in `voice`. Bump `run` to re-run with no other change. Voice each line once (the daily quota is shared).",
-  "run": 15,
+  "run": 16,
   "voice": "Sulafat",
   "model": "gemini-3.8-flash-tts",
   "scripts": [
@@ -8,11 +8,11 @@
   ],
   "takes": [
     {
-      "name": "heap-b",
+      "name": "heap-c",
       "voice": "Sulafat",
-      "text": "Right down there, with your saves from countless apps.",
-      "style": "Amused and quick, a wry aside, pointing down into a deep hole, then a knowing nod at the pile; light, one easy breath, no drawn-out words. Pace: Brisk, playful and conversational, about 175 words a minute; pauses short and light, never a dramatic beat. The product name \"Machina\" is the Latin word, said the classical Latin way: MAH-kee-nah, stress on the FIRST syllable; \"ch\" is a hard \"k\"; open vowels, \"a\" as in \"father\" (not as in \"cat\"), a short \"ee\", and a clear \"ah\" at the end, not \"nuh\". Never mah-KEE-nah.",
-      "_style": "Amused and quick, a wry aside, pointing down into a deep hole, then a knowing nod at the pile; light, one easy breath, no drawn-out words."
+      "text": "Right down there, with a million saves you never opened.",
+      "style": "Wry and quick, half laughing, pointing down into a deep hole at the pile; \"a million\" with a little shrug, landing lightly on \"never opened\"; no drawn-out words. Pace: Brisk, playful and conversational, about 175 words a minute; pauses short and light, never a dramatic beat. The product name \"Machina\" is the Latin word, said the classical Latin way: MAH-kee-nah, stress on the FIRST syllable; \"ch\" is a hard \"k\"; open vowels, \"a\" as in \"father\" (not as in \"cat\"), a short \"ee\", and a clear \"ah\" at the end, not \"nuh\". Never mah-KEE-nah.",
+      "_style": "Wry and quick, half laughing, pointing down into a deep hole at the pile; \"a million\" with a little shrug, landing lightly on \"never opened\"; no drawn-out words."
     }
   ],
   "audition": [],

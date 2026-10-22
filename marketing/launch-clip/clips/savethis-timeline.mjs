@@ -116,11 +116,11 @@ export const CAPTIONS = [
   // the hook: the poster's own type, on screen from frame 0
   { at: 5, to: 54, place: 'scene', text: 'You’re going to\nsave this video.', duck: 0.4, style: 'A friendly, knowing call-out, half teasing, as if catching a friend in the act. Quick and light, one breath, no pause inside the line.', pace: PACE },
   { at: 54, to: 99, text: 'And never\nwatch it again.', duck: 0.45, style: 'Wry and lightly amused, a little deadpan; landing low and certain on "again".', pace: PACE },
-  // (owner, round 14: "with all the others" → "something like with all your
-  // saves from countless apps") the heap is every app's saves; the quicker
-  // of two reads, a touch quicker still, so the heap's line ends before
-  // "Unless" with no cut moved
-  { at: 99, to: 165, tempo: 1.05, text: 'Right down there,\nwith your saves from countless apps.', style: 'Amused and quick, a wry aside, pointing down into a deep hole, then a knowing nod at the pile; light, one easy breath, no drawn-out words.', pace: PACE },
+  // (owner, round 14: "with all the others" said nothing; round 15: "with
+  // your saves from countless apps" not clear enough, "something along the
+  // lines of with the other million saves you never opened again") where
+  // every save goes: unopened, like the hook's "never watch it again"
+  { at: 99, to: 165, tempo: 1.05, text: 'Right down there,\nwith a million saves\nyou never opened.', style: 'Amused and quick, a wry aside, pointing down into a deep hole, then a knowing nod at the pile; light, one easy breath, no drawn-out words.', pace: PACE },
   // (owner, round 2: no full stop after the name on screen; the voice keeps its take)
   { at: 166, to: 236, text: 'Unless you save it\nto Machina', tts: 'Unless you save it to Machina.', duck: 0.4, style: 'The turn: bright, warm and confident, a little conspiratorial; the name lands with a smile.', pace: PACE },
   { at: 238, to: 302, text: 'It reads every save,\nfrom any app,', style: 'Clear and easy, genuinely pleased; flowing straight on, the sentence is not finished.', pace: PACE },
