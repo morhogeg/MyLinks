@@ -44,45 +44,46 @@ export const onBeat = (f) => Math.round(f / BEAT_FRAMES) * BEAT_FRAMES;
  */
 export const HITS = {
   tapSave: beat(2), // the thumb fills the bookmark on "save"
-  // (owner, round 16) the hook reordered and given a beat more
+  // (owner, round 16) the hook reordered and given two beats more: the line
+  // under the fall read at its own easy pace
   drop: beat(4), // "Right down there,": the floor opens under it, and it falls
   land: beat(9), // it lands on the heap, as it is "buried with everything else you saved"
-  gather: beat(13), // "Unless…": the heap rushes up into one point
-  markStrike: beat(16), // the brackets close on it, on "Machina"
-  iris: beat(17), // the point opens into the app
-  phase0: beat(18), // the real pipeline, a phase a beat…
-  done: beat(23), // …and the card, read
+  gather: beat(14), // "Unless…": the heap rushes up into one point
+  markStrike: beat(17), // the brackets close on it, on "Machina"
+  iris: beat(18), // the point opens into the app
+  phase0: beat(19), // the real pipeline, a phase a beat…
+  done: beat(24), // …and the card, read
   // (owner, round 14: the cut from the whole graph to the three was too
   // much) only the three: the new save and its ties to two older saves, lit
-  graph: beat(27), // "…by topic,": CUT to the graph, the new save's ties lit
-  connect: beat(28), // "…connects it to what you've saved before"
+  graph: beat(28), // "…by topic,": CUT to the graph, the new save's ties lit
+  connect: beat(29), // "…connects it to what you've saved before"
   // (rounds 10, 11) the bridge: what all that reading adds up to, over
   // Ask's own opening screen, its suggestions questions about the saves
   // (owner, round 12: the graph a half second longer; round 13: a bit
   // less) half a beat more of it than round 11
-  knows: beat(32.5), // "Now every save…": CUT from the graph to Ask
+  knows: beat(33.5), // "Now every save…": CUT from the graph to Ask
   // (round 9) Ask, the solution's last word, each part on its own word;
   // (round 12) "So," said over Ask opening; (owner, round 14: no cut to the
   // composer and back) one shot: on "ask" the question is sent and Ask's
   // chat takes the opening's place, the answer streaming in
-  asked: beat(39), // "…ask": the question, sent; "and get the answer": it streams
-  proof: 617, // "with the proof": the saves it came from, cited, then each pinged in turn
+  asked: beat(40), // "…ask": the question, sent; "and get the answer": it streams
+  proof: 631, // "with the proof": the saves it came from, cited, then each pinged in turn
   // (owner, round 12: not the Ask chat under the tagline) the brand card;
   // (owner, round 13) the proof held half a second longer before it, after
   // its pings
-  tagline: beat(49), // "Machina. Everything you save, finally useful.": the app's own mark draws in
+  tagline: beat(50), // "Machina. Everything you save, finally useful.": the app's own mark draws in
   // (owner, round 13: the last frame is the logo, not the poster) the
   // promise over the logo, which holds to the loop
-  watch: beat(57), // "This time, you'll watch it again."
+  watch: beat(58), // "This time, you'll watch it again."
 };
 
 /** a whole beat, so the score's pulse runs straight through the loop */
-export const TOTAL_FRAMES = beat(62);
+export const TOTAL_FRAMES = beat(63);
 
 /** (owner, round 13) the three citations' highlights, an 8th apart from the
  *  beat after "proof" is said: as the camera settles on them, clear of the
  *  voice and of the music's duck under it (the score pings each) */
-export const CITE_PINGS = [0, 1, 2].map((k) => beat(45) + 7 * k);
+export const CITE_PINGS = [0, 1, 2].map((k) => beat(46) + 7 * k);
 
 /** (round 12) the sign-off's mark: the app's launch, a touch quicker than its
  *  39 frames, from just before the name; its point strikes at 0.56 of it */
@@ -121,18 +122,18 @@ export const CAPTIONS = [
   // million saves you never opened") one sentence with an aside: the floor
   // opens on "Right down there", it lands "buried", the pile under "and
   // never watch it again", "Unless" with the colour
-  { at: 54, to: 128, text: 'Right down there,\nburied with everything else you saved,', style: 'Amused and easy, a wry aside, as if pointing down into a deep hole; a small beat after "there,", then "buried with everything else you saved" clear and unhurried, the sentence carrying on.', pace: 'Easy and conversational, about 160 words a minute; one short beat after "there,", no rush.' },
-  { at: 131, to: 178, text: 'and never\nwatch it again.', tts: 'And never watch it again.', duck: 0.45, style: 'Wry and lightly amused, a little deadpan; landing low and certain on "again".', pace: PACE },
+  { at: 54, to: 149, text: 'Right down there,\nburied with everything else you saved,', style: 'Wry and warm, pointing down into a deep hole, then letting it land: "buried with everything else you saved" said plainly, the sentence carrying on; no drawn-out words.', pace: 'Easy and conversational, about 160 words a minute; one short beat after "there,", no rush.' },
+  { at: 150, to: 194, text: 'and never\nwatch it again.', tts: 'And never watch it again.', duck: 0.45, style: 'Wry and lightly amused, a little deadpan; landing low and certain on "again".', pace: PACE },
   // (owner, round 2: no full stop after the name on screen; the voice keeps its take)
-  { at: 181, to: 250, text: 'Unless you save it\nto Machina', tts: 'Unless you save it to Machina.', duck: 0.4, style: 'The turn: bright, warm and confident, a little conspiratorial; the name lands with a smile.', pace: PACE },
-  { at: 252, to: 316, text: 'It reads every save,\nfrom any app,', style: 'Clear and easy, genuinely pleased; flowing straight on, the sentence is not finished.', pace: PACE },
+  { at: 195, to: 264, text: 'Unless you save it\nto Machina', tts: 'Unless you save it to Machina.', duck: 0.4, style: 'The turn: bright, warm and confident, a little conspiratorial; the name lands with a smile.', pace: PACE },
+  { at: 266, to: 330, text: 'It reads every save,\nfrom any app,', style: 'Clear and easy, genuinely pleased; flowing straight on, the sentence is not finished.', pace: PACE },
   // (owner, round 3: "reads" alone undersold it) what the read IS, over the
   // finished card, each named part lifting on its word
-  { at: 318, to: 384, text: 'understands it, sums it up,\nfiles it by topic,', style: 'Brisk and pleased, rattling off the list with a smile; light, no drawn-out words, the sentence carries on.', pace: PACE },
+  { at: 332, to: 398, text: 'understands it, sums it up,\nfiles it by topic,', style: 'Brisk and pleased, rattling off the list with a smile; light, no drawn-out words, the sentence carries on.', pace: PACE },
   // (owner, round 2: "remembers what's in it" was not a strong enough
   // benefit; round 4: show the graph, not the Related cards list) the app's
   // graph: the thumb taps the new save's dot and its ties to older saves light
-  { at: 386, to: 446, text: 'and connects it to\nwhat you’ve saved before.', style: 'Clear and genuinely pleased, flowing on from the line before; a little lift on "connects", landing warmly on "saved before".', pace: PACE },
+  { at: 400, to: 460, text: 'and connects it to\nwhat you’ve saved before.', style: 'Clear and genuinely pleased, flowing on from the line before; a little lift on "connects", landing warmly on "saved before".', pace: PACE },
   // (owner, round 10: "So ask it anything" came too abruptly) the bridge,
   // what the reading adds up to, said as the solution, not the problem
   // again (round 9); (owner, round 11: "better than you do" read as
