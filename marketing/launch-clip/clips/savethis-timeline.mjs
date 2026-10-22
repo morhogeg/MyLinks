@@ -8,8 +8,8 @@
  * the save falls down a shaft onto every other save; "unless you save it to
  * Machina" floods them with colour and gathers them into the mark; the REAL
  * app reads it, maps it among the saves before it (its graph), buries it
- * under weeks of newer saves, and a search in the viewer's own words brings
- * it back. Its cover is this reel's first frame: the camera dives into it
+ * under weeks of newer saves, and Ask answers a real question from the
+ * saves, citing them (round 6: the proof), this reel among them. Its cover is this reel's first frame: the camera dives into it
  * ("This time, you'll watch it again.") and lands ON frame 0, so the reel
  * loops into its own hook without a cut.
  *
@@ -34,8 +34,9 @@ export const BAR = BAR_FRAMES / FPS; // 1.8667s
 export const beat = (n) => Math.round(n * BEAT_FRAMES);
 export const onBeat = (f) => Math.round(f / BEAT_FRAMES) * BEAT_FRAMES;
 
-/** frames a typed character stays (the capture types one per 60fps frame) */
-export const TYPE_FRAMES = 2;
+/** frames a typed character stays (the capture types one per 60fps frame,
+ *  the reel plays them one a frame: the question types at a brisk 30 a second) */
+export const TYPE_FRAMES = 1;
 
 /**
  * Picture events, in frames, each on the word it answers. Taps, landings and
@@ -54,17 +55,18 @@ export const HITS = {
   connect: beat(28), // "…connects it to": the thumb on its dot; its ties light on "what you've saved before"
   skip: beat(31), // three weeks later
   bury: beat(33), // newer saves land on top of it, from "buried"
-  fieldTap: beat(37), // "type what you remember": the search field
-  type: beat(37.5), // "never watch it again"
-  found: beat(41), // this video's card, alone ("There it is,…")
-  // (round 5) four beats later than before, for the payoff line
-  tagline: beat(45) + 4, // "Machina. Everything you save, finally useful."
-  cardTap: beat(53), // the thumb taps its cover…
-  poster: beat(55), // …the dive lands ON frame 0
+  // (round 6) Ask, not search: a real question, the answer and its proof
+  askTap: beat(37), // "ask your saves anything": the Ask tab
+  asking: beat(38), // the question, typed
+  send: beat(41.5), // sent: the answer streams ("Get the answer,…")
+  proof: beat(45), // the saves it came from, cited ("…and the proof")
+  tagline: beat(46) + 6, // "Machina. Everything you save, finally useful."
+  citeTap: beat(54), // the thumb opens this reel's citation: its card…
+  poster: beat(56), // …and the dive into its cover lands ON frame 0
 };
 
 /** a whole beat, so the score's pulse runs straight through the loop */
-export const TOTAL_FRAMES = beat(59);
+export const TOTAL_FRAMES = beat(60);
 export const TOTAL_SEC = TOTAL_FRAMES / FPS;
 
 /** The cut. One beat of story per scene. */
@@ -72,8 +74,8 @@ export const SCENES = [
   { id: 'hook', from: 0, dur: HITS.drop }, // the prediction, the save
   { id: 'shaft', from: HITS.drop, dur: HITS.gather - HITS.drop }, // where saves go
   { id: 'turn', from: HITS.gather, dur: HITS.iris - HITS.gather }, // gathered into the mark
-  { id: 'app', from: HITS.iris, dur: HITS.cardTap - HITS.iris }, // read, buried, found
-  { id: 'dive', from: HITS.cardTap, dur: HITS.poster - HITS.cardTap }, // into its cover
+  { id: 'app', from: HITS.iris, dur: HITS.citeTap - HITS.iris }, // read, buried, asked
+  { id: 'dive', from: HITS.citeTap, dur: HITS.poster - HITS.citeTap }, // into its cover
   { id: 'poster', from: HITS.poster, dur: TOTAL_FRAMES - HITS.poster }, // frame 0 again
 ];
 
@@ -85,7 +87,7 @@ export const SCENES = [
  * take's key in audio/vo-takes/, so changing any of them re-voices the line.
  * The captions ARE the script, spoken verbatim ("\n" breaks on screen only).
  * `place: 'scene'` lines are set by their scene (the poster's type, the
- * found card's lockup), not by Captions.
+ * tagline's lockup), not by Captions.
  *
  * NO em dashes, no literal "AI", no "second brain", no "library" (verify).
  */
@@ -109,14 +111,14 @@ export const CAPTIONS = [
   { at: 434, to: 514, text: 'Weeks later, buried\nunder everything else,', style: 'Storytelling, quick and a touch dramatic; trailing on into the next line.', pace: PACE },
   // (owner, round 6: show Ask, not finding) a real question about the
   // saves; the answer, and the saves it came from cited under it: the proof
-  { at: 518, to: 566, text: 'ask your saves anything.', style: 'Easy and inviting, the turn of the story: light and quick, a small lift on "anything"; no drawn-out words.', pace: PACE },
-  { at: 580, to: 640, text: 'Get the answer,\nand the proof.', style: 'Pleased and sure, two quick beats: "Get the answer," then "and the proof" landing with a small smile; no drawn-out words.', pace: PACE },
-  // the find: the name and the tagline, said once, over the save it just
-  // brought back (owner, round 2: the name in the voice); the drawn wordmark
-  // wipes in on "Machina"
+  { at: HITS.askTap, to: HITS.askTap + 44, text: 'ask your saves anything.', style: 'Warm and matter-of-fact, like the simplest thing in the world; quick and light, one breath.', pace: PACE },
+  { at: HITS.send + 15, to: HITS.tagline - 10, text: 'Get the answer,\nand the proof.', style: 'Pleased and sure, two quick beats: "Get the answer," then "and the proof" landing with a small smile; no drawn-out words.', pace: PACE },
+  // the name and the tagline, said once, over the answer and its proof
+  // (owner, round 2: the name in the voice); the drawn wordmark wipes in on
+  // "Machina"
   { at: HITS.tagline, to: HITS.tagline + 100, place: 'scene', text: 'Machina.\nEverything you save,\nfinally useful.', duck: 0.4, style: 'A confident, warm sign-off; the name with a smile, then the tagline sincere but brisk, no drawn-out words.', pace: PACE },
-  // the thumb taps the found card's cover and the camera dives into it,
-  // landing on frame 0 as the reel starts again under this line. (owner,
+  // the thumb opens this reel's citation and the camera dives into its
+  // card's cover, landing on frame 0 as the reel starts again under this line. (owner,
   // round 4: "See? You're watching it again." read as a riddle) The hook's
   // "never watch it again", answered as a promise
   { at: HITS.poster - 10, to: HITS.poster + 50, text: 'This time, you’ll\nwatch it again.', duck: 0.4, style: 'Warm and sure, a small smile in the voice: a promise, not a punchline. Light and quick, a short breath after "This time", landing softly on "again".', pace: PACE },
@@ -128,15 +130,15 @@ export const KICKERS = [{ at: 430, to: 514, text: 'Three weeks later' }];
 /** Risers END on the reveal they lead into. [from, to] in frames. */
 export const RISERS = [
   [HITS.gather, HITS.markStrike], // the heap rushing up into the mark
-  [HITS.type, HITS.found], // the query, into the card it finds
-  [HITS.cardTap, HITS.poster], // the dive into the cover
+  [HITS.asking, HITS.proof], // the question, into the answer's proof
+  [HITS.citeTap, HITS.poster], // the dive into the cover
 ];
 
 /**
  * Harmony, [from frame, chord], the house vocabulary (C major, the film's
  * voicings): the hook and the fall hang on the minor (the loss), the turn
- * lifts through V to I on the strike, the search sits on vi again and the
- * find lands home; the dive leaves on IV, which falls back to vi at the top
+ * lifts through V to I on the strike, the question sits on vi again and the
+ * proof lands home; the dive leaves on IV, which falls back to vi at the top
  * of the loop.
  */
 export const CHORDS = [
@@ -146,8 +148,8 @@ export const CHORDS = [
   [HITS.markStrike, 'Cmaj7'],
   [HITS.done, 'Fmaj7'],
   [HITS.skip, 'G6'],
-  [HITS.fieldTap, 'Am7'],
-  [HITS.found, 'Cmaj7'],
-  [HITS.cardTap, 'G6'],
+  [HITS.askTap, 'Am7'],
+  [HITS.proof, 'Cmaj7'],
+  [HITS.citeTap, 'G6'],
   [HITS.poster, 'Fmaj7'],
 ];

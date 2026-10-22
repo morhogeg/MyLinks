@@ -9,7 +9,7 @@
  * "Machina"; the band comes in under the reading (a tick on each phase, a
  * bell on "Saved to Machina"), drops out for "three weeks later" so each
  * save landing on top is its own thud, holds its breath for the typing, and
- * lands, full, on the find. The dive rises into the poster, and the poster
+ * lands, full, on the Ask answer's proof. The dive rises into the poster, and the poster
  * is as bare as the hook, because it IS the hook: the reel loops.
  *
  * THE LOOP: the arrangement is rendered twice in a row and the second copy
@@ -36,10 +36,10 @@ const { pad, sub, pulse, keys, bell, kick, hat, rim, shaker, clap, riser, whoosh
 const H = HITS;
 // the take's runs, so the typing ticks follow the picture
 const TAKE = JSON.parse(fs.readFileSync(path.join(root, 'src', 'reels', 'clips', 'savethis', 'takes.json'), 'utf8'))['clips/savethis/app'];
-const CHARS = TAKE.marks.result - TAKE.marks.typing;
+// (round 6) the question typed into Ask, a character a frame
+const CHARS = TAKE.marks.answer - TAKE.marks.asking;
 const SAVES_SINCE = (TAKE.marks.buried - TAKE.marks.bury0) / 14;
 const BURY_FROM = H.bury - 7;
-const NARROWED = H.type + 7 * TYPE_FRAMES;
 
 // ── where the narrator is speaking, in frames (from the voice manifest)
 const MANIFEST = JSON.parse(fs.readFileSync(path.join(root, 'out', 'vo', 'savethis', 'manifest.json'), 'utf8'));
@@ -64,13 +64,13 @@ const VOICINGS = {
 const chordAt = (frame) => VOICINGS[CHORDS.filter(([f]) => f <= frame).at(-1)[1]];
 
 /** the band's density along the story: bare hook, the fall, the turn, the
- *  reading, a breath for the skip, the typing held, the find full, the dive,
+ *  reading, a breath for the skip, the asking held, the proof full, the dive,
  *  the bare poster */
 const density = (f) =>
-  f < H.drop ? 0.18 : f < H.land ? 0.3 : f < H.gather ? 0.36 : f < H.markStrike ? 0.5 : f < H.phase0 ? 0.42 : f < H.skip ? 0.85 : f < H.fieldTap ? 0.55 : f < H.found ? 0.6 : f < H.cardTap ? 1 : f < H.poster ? 0.7 : 0.2;
+  f < H.drop ? 0.18 : f < H.land ? 0.3 : f < H.gather ? 0.36 : f < H.markStrike ? 0.5 : f < H.phase0 ? 0.42 : f < H.skip ? 0.85 : f < H.askTap ? 0.55 : f < H.proof ? 0.6 : f < H.citeTap ? 1 : f < H.poster ? 0.7 : 0.2;
 const DRUMS = [
   [H.phase0, H.skip],
-  [H.found, H.cardTap + 7],
+  [H.proof, H.citeTap + 7],
 ];
 const drumsAt = (f) => DRUMS.some(([a, b]) => f >= a && f < b);
 
@@ -88,7 +88,7 @@ const arrange = (o) => {
     pad(t(from), (to - from) / FPS + 0.05, ch.bass + 12, level * 0.55, 0);
   });
 
-  // ── bass + the pulse figure under the reading and the find
+  // ── bass + the pulse figure under the reading and the proof
   for (let f0 = 0; f0 < TOTAL_FRAMES; f0 += BAR_FRAMES) {
     const d = density(f0);
     const ch = chordAt(f0);
@@ -104,7 +104,7 @@ const arrange = (o) => {
         const fr = f0 + on * BEAT_FRAMES;
         if (fr < H.phase0 - 4 || fr >= H.poster) return;
         // the skip and the typing breathe: half the figure
-        if ((fr >= H.skip && fr < H.fieldTap) || (fr >= H.fieldTap && fr < H.found)) if (k % 2) return;
+        if ((fr >= H.skip && fr < H.askTap) || (fr >= H.askTap && fr < H.proof)) if (k % 2) return;
         const c = chordAt(fr);
         const step = shape[(k + f0 / BAR_FRAMES) % shape.length];
         const m = c.upper[0] + SCALE[step % 7] + Math.floor(step / 7) * 12 + (on >= 2.5 ? 12 : 0);
@@ -113,7 +113,7 @@ const arrange = (o) => {
     }
   }
 
-  // ── drums: under the reading, and full on the find
+  // ── drums: under the reading, and full on the proof
   for (let fr = 0; fr < TOTAL_FRAMES; fr += BEAT_FRAMES) {
     if (!drumsAt(fr)) continue;
     const d = density(fr);
@@ -177,18 +177,22 @@ const arrange = (o) => {
     tick(t(fr), 0.05, 0.8 + k * 0.05);
   }
 
-  // ── search: the tap, a click a character, the feed narrowing to one
-  tick(t(H.fieldTap), 0.11, 1.15);
-  for (let k = 0; k < CHARS; k++) tick(t(H.type + k * TYPE_FRAMES), 0.028, 1.5 + ((k * 7) % 5) * 0.06);
-  sub(t(NARROWED), 45, 0.22, 0.3);
+  // ── (round 6) Ask: the cut in, a click every other character (a typed
+  // character a frame), the send; the answer streams on the band
+  if (!voiced(H.askTap + 2, 12)) whoosh(t(H.askTap) + 0.02, 0.45, 0.035, -0.1);
+  tick(t(H.askTap), 0.09, 1.15);
+  for (let k = 0; k < CHARS; k += 2) tick(t(H.asking + k * TYPE_FRAMES), 0.024, 1.5 + ((k * 7) % 5) * 0.06);
+  tick(t(H.send), 0.11, 1.2);
+  sub(t(H.send), 45, 0.2, 0.3);
 
-  // ── the find: the band lands, the card lifts
-  sub(t(H.found), 36, 0.42, 0.6);
-  shimmer(t(clearOfVoice(H.found, 10)), [76, 83, 88], 0.045);
+  // ── the proof: the band lands, the citations lift one by one
+  sub(t(H.proof), 36, 0.42, 0.6);
+  [0, 4, 8].forEach((d, k) => pluck(t(H.proof + 2 + d), [76, 79, 83][k], 0.06, (k - 1) * 0.3, 0.4));
+  shimmer(t(clearOfVoice(H.proof, 10)), [76, 83, 88], 0.045);
 
-  // ── the dive: the thumb on the cover, a rise into the poster
-  tick(t(H.cardTap), 0.12, 1.1);
-  whoosh(t(H.cardTap) + 0.05, 0.85, 0.07, 0);
+  // ── the dive: the thumb on this reel's citation, its card, a rise into the poster
+  tick(t(H.citeTap), 0.12, 1.1);
+  whoosh(t(H.citeTap) + 0.05, 0.85, 0.07, 0);
   sub(t(H.poster), 33, 0.3, 0.7);
   bell(t(clearOfVoice(H.poster + 2, 4)), 81, 0.06, -0.1, 2.6);
 

@@ -711,18 +711,20 @@ tick sounds; the narrator sits 8.1–17.0dB over the music in the speech band
 
 ## SAVE THIS (the organic Reel)
 
-`MachinaSaveThis` is a 27.5s vertical Reel built for Instagram, not a
+`MachinaSaveThis` is a 28.0s vertical Reel built for Instagram, not a
 feature explainer. **The idea: the reel saves itself.** It opens by
 predicting that the viewer will save this video and never watch it again.
 The save falls into a well of every other save, all grey. "Unless you
 save it to Machina" floods them with the app's category colours and
 gathers them into the mark, and the real app reads the reel, sums it up,
-files it by topic, shows it on its graph tied to two earlier saves,
-buries it under three weeks of newer saves, and finds it again from
-"never watch it again" ("There it is, exactly the one you meant."). The
-found card's cover is the reel's first
-frame, so the camera dives into it and lands ON frame 0: the reel loops
-into its own hook ("This time, you'll watch it again.").
+files it by topic, shows it on its graph tied to two earlier saves, and
+buries it under three weeks of newer saves; then Ask answers a real
+question from the saves ("What do my saves say about putting things
+off?"), every source cited, this reel among them ("ask your saves
+anything. Get the answer, and the proof."). Its citation opens its card,
+whose cover is the reel's first frame, so the camera dives into it and
+lands ON frame 0: the reel loops into its own hook ("This time, you'll
+watch it again.").
 
 ```bash
 # today's app (a video branch's own web/ can be weeks old: capture main's)
@@ -754,12 +756,13 @@ npx remotion render src/index.ts MachinaSaveThis out/savethis/master.mp4 --crf=1
 | 0:12.1 | Cut on "topic": the app's graph, the saves mapped by topic (ATTENTION, MEANING, DESIGN…), its layout settling, the new save one of its dots | and connects it to / what you've saved before. | "and connects it to what you've saved before." | a tick |
 | 0:13.1 | The thumb taps its dot: on "what you've saved before" its ties to two older saves (Four Thousand Weeks, the procrastination talk) light up, the rest recedes, and the app's own camera glides in on the three | | | a tick; two linked notes |
 | 0:14.5 | Cut: the whole feed; seven newer saves land on the card, one an 8th, and bury it | THREE WEEKS LATER / Weeks later, buried / under everything else, | "Weeks later, buried under everything else," | the band drops; a thud per save |
-| 0:17.3 | Search your saves, tapped; "never watch it again" types; the feed narrows to one card | type what you remember. | "type what you remember." | a click a character |
-| 0:18.5 | The one card left lifts on its beat (0:19.1): this reel, found from a half-memory, not its title | There it is, / exactly the one you meant. | "There it is, exactly the one you meant." | the band lands, full |
-| 0:21.1 | The wordmark wipes in on the spoken name, then the tagline, over the found card | MACHINA / Everything you save, / finally useful. | "Machina. Everything you save, finally useful." | |
-| 0:24.7 | The thumb taps the cover; the camera dives; the cover opens to the frame | | | whoosh |
-| 0:25.3 | The poster: frame 0 again (from 0:25.7) | This time, you'll / watch it again. | "This time, you'll watch it again." | thud, bell |
-| 0:27.5 | Loops into 0:00 without a cut | | | |
+| 0:17.3 | Cut to Ask ("What do you want to recall?"); "What do my saves say about putting things off?" types | ask your saves anything. | "ask your saves anything." | the cut; a click every other character |
+| 0:19.4 | Sent: the answer streams, drawn from three saves | Get the answer, / and the proof. | "Get the answer, and the proof." | tick, low note |
+| 0:21.0 | The proof: the saves it came from, cited (Tim Urban's talk, Four Thousand Weeks, this reel), each lifting as it lands; the camera pulls back to the whole exchange | | | the band lands, full; three notes |
+| 0:21.7 | The wordmark wipes in on the spoken name, then the tagline, over the question, its answer and its proof | MACHINA / Everything you save, / finally useful. | "Machina. Everything you save, finally useful." | |
+| 0:25.2 | The thumb opens this reel's citation: its card, its cover the poster whole; the camera dives into it until it IS the frame | | | whoosh |
+| 0:25.8 | The poster: frame 0 again (from 0:26.1) | This time, you'll / watch it again. | "This time, you'll watch it again." | thud, bell |
+| 0:28.0 | Loops into 0:00 without a cut | | | |
 
 **What is real and what is not.** Every app pixel is the shipped app on
 `main` (2026-10-21), captured by `capture/shoot.mjs savethisClip`: the
@@ -768,12 +771,15 @@ the burial (the seven saves made since, re-inserted oldest first), the
 app's graph (round 4: the Home view switcher's Graph, then a tap on the
 new save's dot, which lights its ties to two saves dated before it,
 `SAVETHIS.related`, with the app's own focus, labels and camera glide),
-and the live search narrowing. The graph draws to a canvas, so the
+and Ask (round 6: the tab, a real question typed, the answer streamed
+from three saves with their citations, and the cited card opened). The
+graph draws to a canvas, so the
 capture reads its dots' positions off the app's own model each frame
 for the reel's camera; the capture build lifts the canvas's 2x
 resolution cap to the device's 4x so a push-in stays sharp (layout and
 drawing unchanged). Scripted, as in every capture: the backend
-(the stage changes, the card's analysis, the search hit). The one card
+(the stage changes, the card's analysis, the Ask answer and its
+sources, every claim in it taken from the three cards' own summaries). The one card
 written for this reel is the reel's own save (`SAVETHIS` in
 `capture/library.mjs`): what the app would make of this post, with the
 brand handle `@machinaapp` (the X handle; an Instagram handle is not
@@ -782,13 +788,16 @@ captured, so they are not shown. No recipe cards in this account (owner,
 2026-10-02).
 
 **Two deliberate breaks from the house rules.** The reel ends on the
-loop, not on the tagline: the tagline is said once, over the found card
-at 77%, and the last frame is frame 0. And the opening (the trapdoor,
-the well, the heap) is the reel's own motion, bigger than the kit's
-restraint allows, in the same ink-on-paper grade. (Round 4: colour
-enters with Machina, the app's own category colours flooding the heap
-on "Unless" and peaking on the graph; the hook, the poster and the loop
-stay ink on paper.)
+loop, not on the tagline: the tagline is said once, over the Ask
+answer and its proof at 77%, and the last frame is frame 0. And the
+opening (the trapdoor, the well, the heap) is the reel's own motion,
+bigger than the kit's restraint allows, in the same ink-on-paper grade.
+(Round 4: colour enters with Machina, the app's own category colours
+flooding the heap on "Unless" and peaking on the graph; the hook, the
+poster and the loop stay ink on paper. Round 6: a brighter grade, this
+reel only (`grade.ts`): the paper is the app's own #F9FAFB, not the
+house's darker set tone, since the app fills the frame here rather than
+sitting in a world; the vignette is a breath; the well stays grey.)
 
 **The loop.** The set's drift is periodic over the reel
 (`paperDriftAt`), every layer but the poster is gone by the last frame,

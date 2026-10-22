@@ -103,30 +103,28 @@
  },
  {
   "frame": 518,
-  "text": "type what you remember.",
+  "text": "ask your saves anything.",
   "words": [
-   0.01,
+   0.04,
    0.214,
-   0.518,
-   0.682
+   0.432,
+   0.694
   ]
  },
  {
-  "frame": 556,
-  "text": "There it is, exactly the one you meant.",
+  "frame": 596,
+  "text": "Get the answer, and the proof.",
   "words": [
-   0.0,
-   0.305,
-   0.457,
-   0.99,
-   1.354,
-   1.537,
-   1.719,
-   1.901
+   0.02,
+   0.142,
+   0.265,
+   0.82,
+   0.977,
+   1.135
   ]
  },
  {
-  "frame": 634,
+  "frame": 650,
   "text": "Makeena. Everything you save, finally useful.",
   "words": [
    0.03,
@@ -138,7 +136,7 @@
   ]
  },
  {
-  "frame": 760,
+  "frame": 774,
   "text": "This time, you\u2019ll watch it again.",
   "words": [
    0.04,

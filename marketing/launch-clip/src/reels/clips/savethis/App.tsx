@@ -3,7 +3,7 @@ import { AbsoluteFill } from 'remotion';
 import { CAPTIONS, FPS, HITS, TYPE_FRAMES } from '../../../../clips/savethis-timeline.mjs';
 import { AppShot, Lift, Tap } from '../../kit/AppShot';
 import { camAt, camVelocity, type Cam, type Key } from '../../kit/camera';
-import { EASE_GATHER, EASE_IN_OUT, EASE_MODAL, mix, prog } from '../../kit/curves';
+import { EASE_IN_OUT, EASE_MODAL, mix, prog } from '../../kit/curves';
 import { addTakes, at, center, rectOf, takeOf } from '../../kit/takes';
 import TAKES from './takes.json';
 import VO from './savethis-vo.json';
@@ -23,11 +23,13 @@ import VO from './savethis-vo.json';
  *          saved before", as the app's camera glides in on them
  *  skip    three weeks later: the card's date goes back, and the saves made
  *          since land on top of it, one an 8th
- *  search  Search your saves, tapped on "type"; "never watch it again"
- *          types, and the feed narrows to the one card left
- *  found   the card lifts on its beat; the tagline sits above it
- *  tap     the thumb taps its cover and the camera dives at it (Dive.tsx
- *          takes over once the cover fills the frame's width)
+ *  ask     (round 6) CUT to Ask on "ask your saves anything": a real
+ *          question types; sent, the answer streams from the saves, and the
+ *          three it came from land under it, cited (the proof), lifting one
+ *          by one; the tagline sits above them
+ *  tap     the thumb opens this reel's citation: its card, its cover the
+ *          poster whole, and the camera dives into it until it IS the frame
+ *          (Dive.tsx hands over to the poster itself)
  *
  * App motion plays at its real speed (two 60fps captures an output frame)
  * except where it must read (the result, one a frame).
@@ -41,7 +43,11 @@ const linear = (t: number) => t;
 
 /** the take's 8th-note runs, from its marks */
 const BURY = takeOf(T).marks.buried - takeOf(T).marks.bury0; // 7 saves x 14
-const CHARS = takeOf(T).marks.result - takeOf(T).marks.typing;
+/** (round 6) the Ask screen's opening, the question's characters, the
+ *  answer's streamed chunks (60fps captures, one a chunk) */
+const ASK_OPEN = takeOf(T).marks.asking - takeOf(T).marks.ask;
+const CHARS = takeOf(T).marks.answer - takeOf(T).marks.asking;
+const STREAM = takeOf(T).marks.sources - takeOf(T).marks.answer;
 /** (round 4) the take opens the graph this many 60fps frames before the
  *  thumb taps the new save's dot; the reel joins it so the tap lands on its
  *  beat, the whole graph played at half speed (one 60fps capture an output
@@ -51,10 +57,8 @@ const GRAPH_JOIN = GRAPH_TAP - (S.connect - S.graph);
 
 /** the saves since land one an 8th, the first just before "buried" */
 export const BURY_FROM = S.bury - 7;
-/** the eighth character ("never wa") is where the feed is down to one */
-export const NARROWED = S.type + 7 * TYPE_FRAMES;
-/** the typing's last character */
-export const TYPED = S.type + (CHARS - 1) * TYPE_FRAMES;
+/** the question's last character */
+export const ASKED = S.asking + (CHARS - 1) * TYPE_FRAMES;
 
 /** the take's frame for an output frame */
 export const frameAt = (f: number) => {
@@ -72,21 +76,34 @@ export const frameAt = (f: number) => {
   // three weeks later: the date goes back (the take's skip, eased over)
   if (f < BURY_FROM) return at(T, 'skip', ((f - S.skip) * 14) / (BURY_FROM - S.skip));
   // the saves since, one an 8th (14 captured frames each, at real speed)
-  if (f < S.fieldTap) return at(T, 'bury0', Math.min(BURY + 16, (f - BURY_FROM) * 2));
-  // the field tapped: its focus at real speed
-  if (f < S.type) return at(T, 'focus', (f - S.fieldTap) * 2);
-  // typed a character every TYPE_FRAMES
-  if (f <= TYPED) return at(T, 'typing', (f - S.type) / TYPE_FRAMES);
-  // the result settling, slowed so it reads, then held
-  return at(T, 'result', Math.min(59, f - TYPED - 1));
+  if (f < S.askTap) return at(T, 'bury0', Math.min(BURY + 16, (f - BURY_FROM) * 2));
+  // (round 6) CUT to Ask: its screen opening at real speed…
+  if (f < S.asking) return at(T, 'ask', Math.min(ASK_OPEN - 1, (f - S.askTap) * 2));
+  // …the question, a character every TYPE_FRAMES…
+  if (f < S.send) return at(T, 'asking', Math.min(CHARS - 1, (f - S.asking) / TYPE_FRAMES));
+  // …sent: the answer streams, a chunk a frame…
+  if (f < S.proof) return at(T, 'answer', Math.min(STREAM - 1, f - S.send));
+  // …and the saves it came from, cited: held to the tap
+  if (f < S.citeTap) return at(T, 'sources', Math.min(47, f - S.proof));
+  // this reel's citation opens its card, at real speed
+  return at(T, 'open', Math.min(59, (f - S.citeTap) * 2));
 };
 
 /** where things sit on the captured screen (points) */
 const MARK = rectOf(T, at(T, 'phase0'), 'mark');
 const PILL = rectOf(T, at(T, 'phase0'), 'pill');
-const FIELD = rectOf(T, at(T, 'home'), 'search');
-export const CARD = rectOf(T, at(T, 'result', 59), 'card');
-export const COVER = rectOf(T, at(T, 'result', 59), 'cover');
+/** (round 6) Ask: the composer as the question is typed, the answer and
+ *  the three citations once they are all there */
+const COMPOSER = rectOf(T, at(T, 'asking', CHARS - 1), 'composer');
+const SEND = rectOf(T, at(T, 'asking', CHARS - 1), 'send');
+const CITES = [1, 2, 3].map((k) => rectOf(T, at(T, 'sources', 47), `cite${k}`));
+const ANSWER = rectOf(T, at(T, 'sources', 47), 'answer');
+const BUBBLE = rectOf(T, at(T, 'sources', 47), 'bubble');
+/** the whole exchange, the question down to its proof: the frame it is
+ *  held in, its top just under the band, its bottom clear of the feed's UI */
+const EXCHANGE = { top: BUBBLE[1], bottom: CITES[2][1] + CITES[2][3], z: 2.05 };
+/** the opened card's cover: the poster, whole (object-contain, measured) */
+export const COVER = rectOf(T, at(T, 'open', 59), 'poster');
 /** (round 3) the parts of the read the narrator names: its summary, its topic */
 const union = (a: number[], b: number[]): [number, number, number, number] => {
   const x = Math.min(a[0], b[0]);
@@ -160,6 +177,24 @@ export const graphCam = (f: number): Cam => {
  *  as the app glides it up, clear of the panel sliding in below) */
 const dotAt = (i: number) => center(rectOf(T, i, 'node0'));
 
+/** (round 6) the Ask beat's framings (screen points; tuned on the take) */
+const ASK_CAM: Record<'open' | 'typing' | 'answer' | 'proof' | 'card', Cam> = {
+  open: { cx: 196.5, cy: center(COMPOSER).y - 150, z: 2.3, fx: 540, fy: 1220, rx: 0, ry: 0, rz: 0 },
+  typing: { cx: 196.5, cy: center(COMPOSER).y - 70, z: 2.55, fx: 540, fy: 1200, rx: 0, ry: 0, rz: 0 },
+  answer: { cx: 196.5, cy: ANSWER[1] + 60, z: 2.45, fx: 540, fy: 1000, rx: 0, ry: 0, rz: 0 },
+  proof: {
+    cx: 196.5,
+    cy: (EXCHANGE.top + EXCHANGE.bottom) / 2,
+    z: EXCHANGE.z,
+    fx: 540,
+    fy: 700 + ((EXCHANGE.bottom - EXCHANGE.top) / 2) * EXCHANGE.z,
+    rx: 0,
+    ry: 0,
+    rz: 0,
+  },
+  card: { cx: center(COVER).x, cy: center(COVER).y + 40, z: 2.75, fx: 540, fy: 1060, rx: 0, ry: 0, rz: 0 },
+};
+
 /** the camera when the app opens: the processing card, its mark in frame */
 const OPEN_CAM: Cam = { cx: 196.5, cy: 330, z: 2.3, fx: 540, fy: 1150, rx: 0, ry: 0, rz: 0 };
 /** where the card's mark is in frame on the iris (Opening.tsx lands on it) */
@@ -169,11 +204,12 @@ export const MARK_TO = {
   size: MARK[2] * OPEN_CAM.z,
 };
 
-/** the dive's end: the cover centred and exactly the frame's width, where
- *  its pixels ARE the poster's rows (see Dive.tsx) */
+/** the dive's end: the cover centred and exactly the frame's width; the
+ *  cover is the poster whole (9:16), so it is then exactly the frame, and
+ *  its pixels ARE frame 0 (see Dive.tsx) */
 export const DIVE_CAM = { cx: center(COVER).x, cy: center(COVER).y, z: 1080 / COVER[2], fx: 540, fy: 960 };
-/** the frame the camera reaches it: the hand-over to the poster */
-export const HANDOVER = S.cardTap + 14;
+/** the dive lands on the poster: the hand-over IS the poster frame */
+export const HANDOVER = S.poster;
 
 export const appKeys: Key[] = [
   { f: S.iris, ...OPEN_CAM },
@@ -193,19 +229,23 @@ export const appKeys: Key[] = [
   // whole feed, so the saves since are seen landing on it and pushing it under
   { f: S.skip, cx: 196.5, cy: 330, z: 2.3, fx: 540, fy: 1180, ease: linear },
   { f: S.skip + 18, cx: 196.5, cy: 430, z: 1.32, fx: 540, fy: 1210, ease: EASE_IN_OUT },
-  { f: S.fieldTap - 1, z: 1.26, ease: linear },
-  // the field, big, as it is tapped; the feed narrowing below it
-  { f: S.fieldTap + 10, cx: 196.5, cy: FIELD[1] + FIELD[3] / 2, z: 2.7, fx: 540, fy: 800, ease: EASE_MODAL },
-  { f: TYPED, z: 2.74, ease: linear },
-  // the one card left, whole
-  { f: TYPED + 14, cx: 196.5, cy: CARD[1] + CARD[3] / 2 - 20, z: 2.15, fx: 540, fy: 1180, ease: EASE_IN_OUT },
-  { f: S.cardTap - 8, z: 2.22, ease: linear },
-  // a breath back as the thumb comes down on the cover…
-  { f: S.cardTap, z: 2.12, ease: EASE_IN_OUT },
-  // …and the dive: the cover centred, exactly the frame's width (the hand-over)
-  { f: HANDOVER, ...DIVE_CAM, ease: EASE_GATHER },
-  // the app rushes on past the frame as the cover opens over it
-  { f: S.poster, ...DIVE_CAM, z: DIVE_CAM.z * 1.9, ease: EASE_MODAL },
+  { f: S.askTap - 1, z: 1.26, ease: linear },
+  // (round 6) CUT to Ask: "What do you want to recall?" over its composer
+  { f: S.askTap, ...ASK_CAM.open },
+  { f: S.asking - 1, z: ASK_CAM.open.z * 1.02, ease: linear },
+  // the question types: in on the composer
+  { f: S.asking + 10, ...ASK_CAM.typing, ease: EASE_MODAL },
+  { f: S.send - 1, z: ASK_CAM.typing.z * 1.02, ease: linear },
+  // CUT on the send: the question up top, the answer streaming under it
+  { f: S.send, ...ASK_CAM.answer },
+  { f: S.proof - 1, z: ASK_CAM.answer.z * 1.02, ease: linear },
+  // the proof: down onto the three citations as they land
+  { f: S.proof + 14, ...ASK_CAM.proof, ease: EASE_IN_OUT },
+  { f: S.citeTap, z: ASK_CAM.proof.z * 1.02, ease: linear },
+  // the thumb opens this reel's citation; its card rises, and the dive
+  // into its cover lands on the poster
+  { f: S.citeTap + 6, ...ASK_CAM.card, ease: EASE_MODAL },
+  { f: HANDOVER, ...DIVE_CAM, ease: EASE_IN_OUT },
 ];
 
 /** the reel's emphasis on the next beat after an arrival, eased away */
@@ -223,12 +263,13 @@ export const App: React.FC<{ f: number }> = ({ f }) => {
   // the iris: a circle from the card's mark, open by the time it lands
   const r = prog(f, S.iris - 1, S.iris + 18, EASE_IN_OUT);
   const iris = r < 0.999 ? { x: center(MARK).x, y: center(MARK).y, r: 6 + r * 790 } : null;
-  const up = f >= S.found ? lift(f, S.found, S.cardTap - S.found) : 0;
+  // (round 6) the proof: each citation lifts as it lands, one by one, and
+  // lets go before the thumb opens this reel's
+  const upCite = (k: number) => (f >= S.proof ? lift(f, S.proof + 2 + 4 * k, S.citeTap - 8 - (S.proof + 2 + 4 * k)) : 0);
   // the read's parts, each on the word that names it: the summary hands over
   // to the topic, which stays up into the cut to the topics' map
   const upSum = f >= SUMS_AT - 2 && f < S.graph ? lift(f, SUMS_AT - 2, S.graph - SUMS_AT + 2) : 0;
   const upTopic = f >= FILES_AT - 2 && f < S.graph ? prog(f, FILES_AT - 2, FILES_AT + 10, EASE_MODAL) : 0;
-  const tapCover = { x: center(COVER).x, y: center(COVER).y };
   return (
     <AbsoluteFill>
       <AppShot take={T} i={i} cam={cam} motion={{ x: v.x, y: v.y }} iris={iris} shadow={r}>
@@ -243,14 +284,17 @@ export const App: React.FC<{ f: number }> = ({ f }) => {
         {f >= S.connect - 9 && f < S.connect + 12 && (
           <Tap x={dotAt(i).x} y={dotAt(i).y} t={prog(f, S.connect - 9, S.connect + 12, linear)} />
         )}
-        {/* the field, tapped on "type" (the pad lands on the frame the app focuses) */}
-        <Tap x={center(FIELD).x - 60} y={center(FIELD).y} t={prog(f, S.fieldTap - 10, S.fieldTap + 18, linear)} />
-        {/* the one card, lifted on its beat (kept mounted at rest: its own raster) */}
-        {f >= S.found - 2 && (
-          <Lift take={T} i={i} rect={CARD} radius={20} lift={Math.max(up, 0.002)} rise={2} grow={0.014} ring={0.7 * up} />
+        {/* (round 6) the question, sent */}
+        {f >= S.send - 9 && f < S.send + 6 && <Tap x={center(SEND).x} y={center(SEND).y} t={prog(f, S.send - 9, S.send + 6, linear)} />}
+        {/* the proof: the citations, lifted one by one (kept mounted: their own raster) */}
+        {f >= S.proof && f < S.citeTap &&
+          CITES.map((r, k) => (
+            <Lift key={k} take={T} i={i} rect={r} radius={12} lift={Math.max(upCite(k), 0.002)} rise={1.5} grow={0.02} ring={0.6 * upCite(k)} />
+          ))}
+        {/* this reel's citation, opened */}
+        {f >= S.citeTap - 9 && f < S.citeTap + 4 && (
+          <Tap x={center(CITES[2]).x} y={center(CITES[2]).y} t={prog(f, S.citeTap - 9, S.citeTap + 4, linear)} />
         )}
-        {/* the cover, tapped */}
-        <Tap x={tapCover.x} y={tapCover.y} t={prog(f, S.cardTap - 10, S.cardTap + 18, linear)} size={40} />
       </AppShot>
     </AbsoluteFill>
   );

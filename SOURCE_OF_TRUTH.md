@@ -2637,6 +2637,28 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-22 (round 6) — SAVE THIS shows Ask, not search, and brightens
+  (owner: "the search feature is not strong enough, show Ask"; "ask, get the
+  answer and the proof (the cited card)"; "finding a card should not be a
+  feature"; "the ask question is lame, do it on a real card"; "a bit
+  grey").** Branch `claude/reel-save-this`. After the burial: a cut to the
+  real Ask tab ("What do you want to recall?"), "What do my saves say about
+  putting things off?" typed, the answer streamed from three real saves
+  (Tim Urban's talk, Four Thousand Weeks, this reel; every claim from their
+  cards' summaries), each cited and lifting as it lands; the tagline over
+  the whole exchange; the thumb opens this reel's citation and the dive
+  into its card's cover (the poster whole, object-contain) lands on frame
+  0. Narration: "ask your saves anything. Get the answer, and the proof."
+  (the brisker of two reads, 1.1s; 1.5s). 28.0s, 76 words. Grade, this reel
+  only: the paper is the app's #F9FAFB, cool pools halved, vignette 0.3,
+  grain lighter, the well lighter but grey (kit Paper/Lens/BandScrim take
+  optional props, defaults unchanged). Found on the way: the recorder
+  counted the Ask screen's screen-reader-only status line ("Searching your
+  library…", never drawn) as on-screen text; text in a 1px clipped box is
+  skipped now. **Verified:** gates (bans on 250 strings, windows, every
+  line 11.7 to 17.9dB over the music, −14.02 LUFS, −1.25 dBTP, seam step
+  0.078 against the score's own 0.111); stills of every beat;
+  the encode's last frame against frame 0 at 48.2dB PSNR (consecutive frames: 42.3dB). **Not verified:** listened to.
 - **2026-10-22 (round 5) — SAVE THIS says the payoff (owner: "it shows the
   result, but the narration should speak out about the payoff"; "summed up"
   was not strong enough).** Branch `claude/reel-save-this`. After "type what

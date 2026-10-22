@@ -17,7 +17,7 @@ import { POSTER } from './Poster';
 import VO from './savethis-vo.json';
 
 /**
- * SAVE THIS: the organic Reel. 21.5s, 1080 x 1920, the house look (Paper,
+ * SAVE THIS: the organic Reel. 28s, 1080 x 1920, the house look (Paper,
  * Lens, the kit's captions and camera) on its own clock
  * (clips/savethis-timeline.mjs). Every frame of app UI is the real app
  * (capture/shoot.mjs `savethisClip`); the opening and the dive are the
@@ -41,7 +41,7 @@ export const SaveThis: React.FC<{
   // type never sits on UI or on the well: the paper rises behind the band
   // while either is up, and lets go as the cover opens into the poster
   const scrim =
-    prog(f, HITS.drop + 2, HITS.drop + 12, EASE_IN_OUT) * (1 - prog(f, HANDOVER, HITS.poster, EASE_IN_OUT));
+    prog(f, HITS.drop + 2, HITS.drop + 12, EASE_IN_OUT) * (1 - prog(f, HANDOVER - 16, HANDOVER - 2, EASE_IN_OUT));
   return (
     <AbsoluteFill style={{ fontFamily: sans }}>
       {withAudio && <Audio src={staticFile(audioFile)} />}
@@ -81,10 +81,10 @@ export const SaveThis: React.FC<{
 };
 
 /**
- * The tagline, said once, over the save it just brought back: the drawn
+ * The tagline, said once, over the Ask answer and its proof: the drawn
  * wordmark wipes in, then "Everything you save, / finally useful." word by
- * word on the narrator's timing, in the band above the card. It leaves
- * before the thumb taps the cover.
+ * word on the narrator's timing, in the band above the exchange. It leaves
+ * before the thumb opens this reel's citation.
  */
 const TAG = CAPTIONS.find((c) => c.at === HITS.tagline)!;
 const TAG_T = VO.find((v) => v.frame === TAG.at);
