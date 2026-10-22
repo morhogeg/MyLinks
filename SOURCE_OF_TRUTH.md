@@ -2637,6 +2637,38 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-22 (round 12) — SAVE THIS: a clear "So,", the brand card, a
+  question about the three, a longer graph (owner: "'So' isn't heard";
+  "the final frame should show the Machina logo animated, not the Ask
+  chat"; "the answer is from 3 saves, so the question should be like 'what
+  connects my 3 saves about…'"; "the graph half a second more").** Branch
+  `claude/reel-save-this`. "So": the take had it, but `to_the_words`
+  (`audio/gemini_tts.py`) trimmed a quick, soft first word as breath; it now
+  keeps sound joined to the first word. Re-voiced "So, ask it anything, …"
+  (run 13, the clearer of two reads), "So," over Ask opening and the cut on
+  "ask"; word timing gains a per-line `runGap` and picks phrase breaks
+  jointly (`audio/synth-vo.py`). The sign-off is now `EndCard.tsx`: the app
+  dissolves into the paper, the app's own launch mark draws in (its point
+  striking on "Machina"), the wordmark, the tagline; then the mark settles
+  on the hook's line and its brackets part across it ("[ You're going to
+  save this video. ]") and off the frame, which is frame 0. That replaces
+  the citation tap and the dive (`Dive.tsx` removed; `OpeningMark` joins
+  `AnimatedMark` in `src/ui/Brand.tsx`). The question was re-shot in the
+  real app: "What connects my 3 saves about procrastination?" (the three
+  the graph just tied together), answered "All three agree: …"; the
+  gist-of-this-video suggestion no longer lifts. The graph runs a beat
+  longer, with a cut on the tap: on a phone the app raises its selection
+  sheet over the tapped dot's spot for the glide's first moments, which
+  every cut since round 4 showed for three frames (the every-sixth-frame
+  review stepped over them). Ask opening now glides down to the composer
+  (three seconds held read as stuck). 28.5s, 78 words. **Verified:** gates
+  (bans on 254 strings including every captured frame, windows, every line
+  12.8 to 19.3dB over the music, −14.01 LUFS, −1.25 dBTP, seam step 0.075
+  against the score's own 0.099); every third frame from the graph to the
+  brand card and every sixth elsewhere; every frame pair of the final file
+  scanned for one-frame flashes (none); the encode (854 frames, 28.47s,
+  −13.9 LUFS, −1.2 dBTP), its last frame against frame 0 at 51.6dB PSNR
+  (the hook's own first step: 45.4dB). **Not verified:** listened to.
 - **2026-10-22 (round 11, final) — SAVE THIS: "Now every save is one
   question away.", the tagline unstuck, and a finish pass (owner: "'better
   than you do' is argumentative"; "under the tagline the video is stuck on
