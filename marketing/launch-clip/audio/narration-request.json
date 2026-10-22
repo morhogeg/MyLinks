@@ -1,6 +1,6 @@
 {
   "_": "Voice narration on GitHub with Gemini TTS (.github/workflows/narration-tts.yml). Edit, commit, push: the workflow voices what is listed and commits the takes to audio/vo-takes/. `scripts`: synth-vo.py scripts to voice in `voice`. Bump `run` to re-run with no other change. Voice each line once (the daily quota is shared).",
-  "run": 12,
+  "run": 13,
   "voice": "Sulafat",
   "model": "gemini-3.8-flash-tts",
   "scripts": [
@@ -8,25 +8,18 @@
   ],
   "takes": [
     {
-      "name": "bridge-a",
+      "name": "askit-c",
       "voice": "Sulafat",
-      "text": "Now it knows what’s in every save.",
-      "style": "Warm and easy, a small smile, flowing on from the line before; light and quick, no drawn-out words. Pace: Brisk, playful and conversational, about 175 words a minute; pauses short and light, never a dramatic beat. The product name \"Machina\" is the Latin word, said the classical Latin way: MAH-kee-nah, stress on the FIRST syllable; \"ch\" is a hard \"k\"; open vowels, \"a\" as in \"father\" (not as in \"cat\"), a short \"ee\", and a clear \"ah\" at the end, not \"nuh\". Never mah-KEE-nah.",
-      "_style": "Warm and easy, a small smile, flowing on from the line before; light and quick, no drawn-out words."
+      "text": "So, ask it anything, and get the answer, with the proof.",
+      "style": "Confident and simple: a clear, warm \"So,\" to open, then one easy sentence in three quick beats; light and brisk, landing softly on \"proof\". Pace: Brisk, playful and conversational, about 175 words a minute; pauses short and light, never a dramatic beat. The product name \"Machina\" is the Latin word, said the classical Latin way: MAH-kee-nah, stress on the FIRST syllable; \"ch\" is a hard \"k\"; open vowels, \"a\" as in \"father\" (not as in \"cat\"), a short \"ee\", and a clear \"ah\" at the end, not \"nuh\". Never mah-KEE-nah.",
+      "_style": "Confident and simple: a clear, warm \"So,\" to open, then one easy sentence in three quick beats; light and brisk, landing softly on \"proof\"."
     },
     {
-      "name": "bridge-b",
+      "name": "askit-d",
       "voice": "Sulafat",
-      "text": "Now every save is one question away.",
-      "style": "Warm and easy, a small smile, flowing on from the line before; light and quick, no drawn-out words. Pace: Brisk, playful and conversational, about 175 words a minute; pauses short and light, never a dramatic beat. The product name \"Machina\" is the Latin word, said the classical Latin way: MAH-kee-nah, stress on the FIRST syllable; \"ch\" is a hard \"k\"; open vowels, \"a\" as in \"father\" (not as in \"cat\"), a short \"ee\", and a clear \"ah\" at the end, not \"nuh\". Never mah-KEE-nah.",
-      "_style": "Warm and easy, a small smile, flowing on from the line before; light and quick, no drawn-out words."
-    },
-    {
-      "name": "bridge-c",
-      "voice": "Sulafat",
-      "text": "Now it knows them all.",
-      "style": "Warm and easy, a small smile, flowing on from the line before; light and quick, no drawn-out words. Pace: Brisk, playful and conversational, about 175 words a minute; pauses short and light, never a dramatic beat. The product name \"Machina\" is the Latin word, said the classical Latin way: MAH-kee-nah, stress on the FIRST syllable; \"ch\" is a hard \"k\"; open vowels, \"a\" as in \"father\" (not as in \"cat\"), a short \"ee\", and a clear \"ah\" at the end, not \"nuh\". Never mah-KEE-nah.",
-      "_style": "Warm and easy, a small smile, flowing on from the line before; light and quick, no drawn-out words."
+      "text": "So, ask it anything, and get the answer, with the proof.",
+      "style": "Warm and sure, letting you in on it: a distinct \"So,\" with a small breath after it, then easy and brisk to the end, landing softly on \"proof\". Pace: Brisk, playful and conversational, about 175 words a minute; pauses short and light, never a dramatic beat. The product name \"Machina\" is the Latin word, said the classical Latin way: MAH-kee-nah, stress on the FIRST syllable; \"ch\" is a hard \"k\"; open vowels, \"a\" as in \"father\" (not as in \"cat\"), a short \"ee\", and a clear \"ah\" at the end, not \"nuh\". Never mah-KEE-nah.",
+      "_style": "Warm and sure, letting you in on it: a distinct \"So,\" with a small breath after it, then easy and brisk to the end, landing softly on \"proof\"."
     }
   ],
   "audition": [],

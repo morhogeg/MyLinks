@@ -271,7 +271,13 @@ def to_the_words(samples, sr, before=0.06, after=0.15, fade=0.03):
     i = a // hop
     while i > 0 and peak[i - 1] > quiet and (a - (i - 1) * hop) < 0.15 * sr:
         i -= 1
-    a = i * hop
+    # (2026-10-22) …and on through the first word's own soft onset while it
+    # is still sound by the end's bar: a quick, soft opening word ("So ask…")
+    # never makes the loud bar, so the first loud stretch was the NEXT word
+    # and its "S" was cut; a breath in, set off by a pause, stays out
+    while i > 0 and some[i - 1]:
+        i -= 1
+    a = max(0, i - 2) * hop
     j = b // hop
     while j < n and peak[j] > quiet and (j * hop - b) < 0.3 * sr:
         j += 1
