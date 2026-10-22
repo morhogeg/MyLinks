@@ -57,7 +57,8 @@ export const SaveThis: React.FC<{
         <AbsoluteFill
           style={{
             pointerEvents: 'none',
-            opacity: prog(f, HITS.connect + 2, HITS.connect + 18, EASE_IN_OUT),
+            // (round 12) up from the cut on the tap
+            opacity: f > HITS.connect ? 1 : 0,
             background: `linear-gradient(180deg, ${GRADE.tone} 0px, ${GRADE.tone} 700px, ${clearOf(GRADE.tone)} 930px)`,
           }}
         />
@@ -69,7 +70,7 @@ export const SaveThis: React.FC<{
         <AbsoluteFill
           style={{
             pointerEvents: 'none',
-            background: `linear-gradient(0deg, ${GRADE.tone} 0px, ${GRADE.tone} 200px, ${clearOf(GRADE.tone)} 330px)`,
+            background: `linear-gradient(0deg, ${GRADE.tone} 0px, ${GRADE.tone} 320px, ${clearOf(GRADE.tone)} 375px)`,
           }}
         />
       )}

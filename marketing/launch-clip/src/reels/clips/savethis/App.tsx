@@ -58,6 +58,9 @@ const STREAM = takeOf(T).marks.sources - takeOf(T).marks.answer;
  *  frame): its layout settling, then the app's camera gliding in */
 const GRAPH_TAP = takeOf(T).marks.graphTap - takeOf(T).marks.graph;
 const GRAPH_JOIN = GRAPH_TAP - (S.connect - S.graph);
+/** (round 12) the capture frames the cut on the tap skips: by then the app has
+ *  lifted the three clear of its sheet, under the frame's foot */
+const TAP_CUT = 12;
 
 /** the question's last character */
 export const ASKED = S.asking + (CHARS - 1) * TYPE_FRAMES;
@@ -72,8 +75,12 @@ export const frameAt = (f: number) => {
   if (f < S.graph) return at(T, 'done', Math.min(39, (f - S.done) * 2));
   // (round 4) CUT to the graph as its layout settles…
   if (f < S.connect) return at(T, 'graph', GRAPH_JOIN + (f - S.graph));
-  // …the tap: its ties light and the app's camera glides in on them
-  if (f < S.knows) return at(T, 'graphTap', Math.min(119, f - S.connect));
+  // …the tap, then (round 12) a cut on it to the three, lit, as the app's
+  // camera glides in on them: on a phone the app raises its selection sheet
+  // over the tapped dot's spot for the glide's first moments (TAP_CUT capture
+  // frames), and the cut skips them
+  if (f === S.connect) return at(T, 'graphTap');
+  if (f < S.knows) return at(T, 'graphTap', Math.min(119, TAP_CUT + (f - S.connect - 1)));
   // (round 10) CUT to Ask, its screen opening at real speed, then held…
   if (f < S.askTap) return at(T, 'ask', Math.min(ASK_OPEN - 1, ASK_JOIN + (f - S.knows) * 2));
   // (round 9) …CUT to its composer; on "ask" the question bursts in, a
@@ -149,7 +156,8 @@ export const graphCam = (f: number): Cam => {
   const i = frameAt(f);
   const isl = center(rectOf(T, i, 'island'));
   const ties = tiesAt(i);
-  const w = prog(f, S.connect, S.connect + 22, EASE_IN_OUT);
+  // (round 12) a cut on the tap: the island before it, the three after
+  const w = f > S.connect ? 1 : 0;
   // a breath wider on the cut (the settling layout's last titles), then in
   const zIsland = mix(GRAPH.zIsland[0], GRAPH.zIsland[1], prog(f, S.graph, S.connect, EASE_IN_OUT));
   // as wide as the titles need, never closer than the island's framing

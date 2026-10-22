@@ -39,7 +39,10 @@ const LOCK = { markY: 758, nameTop: 923, nameW: 440, lineTop: 1019 };
 /** the brackets' parting, in mark units each side: across the hook's widest
  *  line (its arms just outside it), then off the frame */
 const CITE = 790;
-const GONE = 1010;
+const GONE = 1100;
+/** the opening's soft edge, px: the hook emerges between the brackets, it is
+ *  not cut by them */
+const FEATHER = 60;
 const EASE_IN = (t: number) => t * t * t;
 
 export const EndCard: React.FC<{ f: number; paperDrift: number; show: boolean }> = ({ f, paperDrift, show }) => {
@@ -62,6 +65,12 @@ export const EndCard: React.FC<{ f: number; paperDrift: number; show: boolean }>
   // the poster shows between the brackets' arms (they start closed: the
   // opening grows from nothing), and the whole frame once they are gone
   const half = (116 * partA + spread) * K;
+  const L = 540 - half;
+  const R = 540 + half;
+  const mask =
+    f >= HITS.poster || L + FEATHER <= 0
+      ? undefined
+      : `linear-gradient(90deg, transparent ${L - FEATHER}px, #000 ${L + FEATHER}px, #000 ${R - FEATHER}px, transparent ${R + FEATHER}px)`;
 
   const rows = TAG.text.split('\n').slice(1);
   let k = 0;
@@ -69,7 +78,7 @@ export const EndCard: React.FC<{ f: number; paperDrift: number; show: boolean }>
     <AbsoluteFill style={{ pointerEvents: 'none' }}>
       {/* the hook, between the parting brackets */}
       {f >= O + 10 && (
-        <AbsoluteFill style={{ clipPath: half >= 540 ? undefined : `inset(0 ${540 - half}px 0 ${540 - half}px)` }}>
+        <AbsoluteFill style={{ WebkitMaskImage: mask, maskImage: mask, opacity: prog(f, O + 10, O + 18, EASE_IN_OUT) }}>
           <Paper drift={paperDrift} tone={GRADE.tone} cool={GRADE.cool} />
           <PosterArt />
         </AbsoluteFill>

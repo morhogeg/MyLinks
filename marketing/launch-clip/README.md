@@ -760,7 +760,7 @@ npx remotion render src/index.ts MachinaSaveThis out/savethis/master.mp4 --crf=1
 | 0:07.9 | The pill, a phase a beat: Fetching the link, Reading the page, Writing the summary, Searching connections, Organizing & tagging | It reads every save, / from any app, | "It reads every save, from any app," | the band; a tick a phase |
 | 0:10.3 | "Saved to Machina"; the card: its cover is this reel's frame 0; its summary lifts on "sums it up", its topic chip on "files it by topic" | understands it, sums it up, / files it by topic, | "understands it, sums it up, files it by topic," | bell |
 | 0:12.1 | Cut on "topic": the app's graph, the saves mapped by topic (ATTENTION, MEANING, DESIGN…), its layout settling, the new save one of its dots | and connects it to / what you've saved before. | "and connects it to what you've saved before." | a tick |
-| 0:13.1 | The thumb taps its dot: on "what you've saved before" its ties to two older saves (Four Thousand Weeks, the procrastination talk) light up, the rest recedes, and the app's own camera glides in on the three | | | a tick; two linked notes |
+| 0:13.1 | The thumb taps its dot, and a cut on the tap to the three, lit (its ties to two older saves, Four Thousand Weeks and the procrastination talk), the rest receded, as the app's own camera glides in on them (round 12: the cut skips the moment the app raises its selection sheet over the dot) | | | a tick; two linked notes |
 | 0:14.9 | Cut on the beat (round 12: the graph a beat longer) to Ask opening: its mark, "What do you want to recall? Answers come only from your 23 saves, with sources you can open.", and the one-tap questions it suggests about the saves | Now every save is / one question away. | "Now every save is one question away." | a click, a light note; the drums out |
 | 0:17.7 | "So," over Ask opening, then a cut on "ask" to its composer: "What connects my 3 saves about procrastination?" bursts in | So, ask it anything, / and get the answer, / with the proof. | "So, ask it anything, and get the answer, with the proof." | a click; soft keys |
 | 0:18.9 | On "get the answer": sent, the answer streams ("All three agree: …"), drawn from the three | | | tick, low note |
@@ -812,10 +812,13 @@ sitting in a world; the vignette is a breath; the well stays grey.)
 and the score is rendered twice in a row with the second copy kept, so
 its reverb and delay tails ring on into the start.
 
-**Finish (round 11, a frame-by-frame pass over the render).** Under the
-graph, paper over the frame's foot (Instagram's caption zone): the app's
-own tab bar rode just under the edge and its focus panel slid up as the
-thumb tapped. On the composer shot the screen has no studio shadow or
+**Finish (rounds 11 and 12, frame-by-frame passes over the render).**
+Under the graph, paper over the frame's foot (Instagram's caption zone),
+where the app's own tab bar rides just under the edge; and a cut on the
+tap (round 12), because on a phone the app raises its selection sheet
+over the tapped dot's spot while its camera lifts the three clear, and
+the reel's every-sixth-frame review had stepped over those frames since
+round 4. On the composer shot the screen has no studio shadow or
 glass edge (`AppShot`'s `edge`), so its foot, mid-frame there, melts into
 paper of its own tone instead of a grey band.
 
