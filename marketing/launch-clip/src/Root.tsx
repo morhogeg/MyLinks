@@ -171,6 +171,18 @@ export const RemotionRoot: React.FC = () => (
       height={SAVETHIS.HEIGHT}
       defaultProps={{ withAudio: false, withCaptions: true }}
     />
+    {/* (owner, round 17) the same reel without the paper fades at the app
+        screens' edges: the app as it looks, status bar and tab bar in view;
+        the captions keep a soft paper halo of their own */}
+    <Composition
+      id="MachinaSaveThisNoFade"
+      component={SaveThis}
+      durationInFrames={SAVETHIS.TOTAL_FRAMES}
+      fps={SAVETHIS.FPS}
+      width={SAVETHIS.WIDTH}
+      height={SAVETHIS.HEIGHT}
+      defaultProps={{ withAudio: true, withCaptions: true, fades: false }}
+    />
     <Composition
       id="MachinaSaveThisPoster"
       component={PosterStill}

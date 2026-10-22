@@ -31,14 +31,17 @@ export const SaveThis: React.FC<{
   withAudio?: boolean;
   withCaptions?: boolean;
   audioFile?: string;
-}> = ({ withAudio = true, withCaptions = true, audioFile = 'clips/savethis/score-vo.wav' }) => {
+  /** (owner, round 17) false: no paper fades over the app screens' edges
+   *  (MachinaSaveThisNoFade), the captions on a paper halo instead */
+  fades?: boolean;
+}> = ({ withAudio = true, withCaptions = true, audioFile = 'clips/savethis/score-vo.wav', fades = true }) => {
   const f = useCurrentFrame();
   // the reel runs on output frames: motion blur measures one frame
   CLOCK.perFrame = 1;
   const drift = paperDriftAt(f);
   // type never sits on UI or on the well: the paper rises behind the band
   // while either is up (to the end: under the last line it is paper on paper)
-  const scrim = prog(f, HITS.drop + 2, HITS.drop + 12, EASE_IN_OUT);
+  const scrim = fades ? prog(f, HITS.drop + 2, HITS.drop + 12, EASE_IN_OUT) : 0;
   return (
     <AbsoluteFill style={{ fontFamily: sans }}>
       {withAudio && <Audio src={staticFile(audioFile)} />}
@@ -52,7 +55,7 @@ export const SaveThis: React.FC<{
       <BandScrim opacity={scrim} tone={GRADE.tone} />
       {/* (round 4) on the lit ties, the paper rises further, over the
           graph's own header and legend */}
-      {f >= HITS.graph && f < HITS.knows && (
+      {fades && f >= HITS.graph && f < HITS.knows && (
         <AbsoluteFill
           style={{
             pointerEvents: 'none',
@@ -63,7 +66,7 @@ export const SaveThis: React.FC<{
       {/* (round 11) under the graph, paper over the frame's foot (Instagram's
           caption zone, well below the dots): the app's tab bar rides just
           under the edge, and its focus panel slides up as the thumb taps */}
-      {f >= HITS.graph && f < HITS.knows && (
+      {fades && f >= HITS.graph && f < HITS.knows && (
         <AbsoluteFill
           style={{
             pointerEvents: 'none',
@@ -73,7 +76,7 @@ export const SaveThis: React.FC<{
       )}
       {/* (round 7) on the proof, the paper rises over the question bubble
           (the camera is down on the answer and its citations) */}
-      {f >= HITS.proof && f < HITS.tagline + 4 && (
+      {fades && f >= HITS.proof && f < HITS.tagline + 4 && (
         <AbsoluteFill
           style={{
             pointerEvents: 'none',
@@ -93,6 +96,8 @@ export const SaveThis: React.FC<{
         kickers={KICKERS as ReelKicker[]}
         showCaptions={withCaptions}
         showKickers={withCaptions}
+        clean
+        halo={fades ? undefined : GRADE.tone}
       />
       <Lens vignette={GRADE.vignette} grain={GRADE.grain} />
     </AbsoluteFill>

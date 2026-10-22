@@ -53,7 +53,12 @@ export const Captions: React.FC<{
   kickers?: ReelKicker[];
   showCaptions?: boolean;
   showKickers?: boolean;
-}> = ({ frame, fps, captions, timing, kickers = [], showCaptions = true, showKickers = true }) => (
+  /** lines fade in and out, never cut by a mask (KineticLine `clean`) */
+  clean?: boolean;
+  /** with `clean`: a soft glow of this tone around the type, for lines set
+   *  over UI with no paper band under them */
+  halo?: string;
+}> = ({ frame, fps, captions, timing, kickers = [], showCaptions = true, showKickers = true, clean = false, halo }) => (
   <AbsoluteFill style={{ pointerEvents: 'none' }}>
     {showKickers &&
       kickers.map((k) => (
@@ -68,6 +73,9 @@ export const Captions: React.FC<{
         if (c.place === 'lockup' || c.place === 'mark') return null;
         const t = timing.find((x) => x.frame === c.at) ?? timing[i];
         const starts = t?.words.map((s) => Math.round(s * fps));
+        // a clean line waits for the one before it to be gone
+        const shown = captions.slice(0, i).filter((p) => p.place !== 'lockup' && p.place !== 'mark');
+        const before = shown[shown.length - 1];
         return (
           <div
             key={c.at}
@@ -90,6 +98,9 @@ export const Captions: React.FC<{
               sizes={c.sizes ?? (c.place === 'hook' ? [96, 52] : undefined)}
               weight={c.place === 'hook' ? 580 : 600}
               width={c.place === 'hook' ? 960 : 980}
+              clean={clean}
+              enterAt={clean && before ? before.to + 1 : undefined}
+              halo={halo}
             />
           </div>
         );

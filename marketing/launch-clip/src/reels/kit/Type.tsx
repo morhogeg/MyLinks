@@ -52,7 +52,17 @@ export const KineticLine: React.FC<{
   weight?: number;
   font?: string;
   tracking?: string;
-}> = ({ text, frame, from, to, starts, size = 64, sizes, width = 940, align = 'center', color = INK, weight = 600, font = sans, tracking = '-0.028em' }) => {
+  /** (SAVE THIS, round 17: the mask roll's sliced letters read as a
+   *  rendering bug on a phone) no mask: each line fades up into place, the
+   *  whole line fades out over its last frames, nothing is ever cut */
+  clean?: boolean;
+  /** with `clean`: the frame the previous line is gone by; this one never
+   *  shows before it, so two lines never share the band */
+  enterAt?: number;
+  /** with `clean`: a soft glow of this tone around the type */
+  halo?: string;
+}> = ({ text, frame, from, to, starts, size = 64, sizes, width = 940, align = 'center', color = INK, weight = 600, font = sans, tracking = '-0.028em', clean = false, enterAt, halo }) => {
+  if (clean) return <CleanLine {...{ text, frame, from, to, starts, size, sizes, width, align, color, weight, font, tracking, enterAt, halo }} />;
   // (2026-10-04, owner: the word-by-word blur reveal read "dated and laggy";
   // the full captions stay, in the Headline motion) each LINE rises out of
   // its own mask in one decisive move (HEAD_IN frames, ease-out quint, no
@@ -147,6 +157,64 @@ export const Kicker: React.FC<{ text: string; frame: number; from: number; to: n
           );
         })}
       </div>
+    </div>
+  );
+};
+
+/** frames a clean line takes to fade up into place, and to fade out */
+const CLEAN_IN = 6;
+const CLEAN_OUT = 3;
+
+const CleanLine: React.FC<{
+  text: string;
+  frame: number;
+  from: number;
+  to: number;
+  starts?: number[];
+  size: number;
+  sizes?: number[];
+  width: number;
+  align: 'center' | 'left';
+  color: string;
+  weight: number;
+  font: string;
+  tracking: string;
+  enterAt?: number;
+  halo?: string;
+}> = ({ text, frame, from, to, starts, size, sizes, width, align, color, weight, font, tracking, enterAt, halo }) => {
+  if (frame > to) return null;
+  const lines = text.split('\n').map((l) => l.split(' ').filter(Boolean));
+  const out = 1 - EASE_IN_OUT(Math.min(1, Math.max(0, (frame - (to - CLEAN_OUT)) / CLEAN_OUT)));
+  let w = -1;
+  return (
+    <div style={{ width, display: 'flex', flexDirection: 'column', alignItems: align === 'center' ? 'center' : 'flex-start', gap: 2 }}>
+      {lines.map((words, li) => {
+        const firstWord = w + 1;
+        w += words.length;
+        const at = Math.max(from + (starts?.[firstWord] ?? li * HEAD_STAGGER) - HEAD_LEAD, enterAt ?? -Infinity);
+        const tin = OUT_QUINT(Math.min(1, Math.max(0, (frame - at + 1) / CLEAN_IN)));
+        return (
+          <div
+            key={li}
+            style={{
+              opacity: tin * out,
+              transform: `translateY(${Math.round((1 - tin) * 12)}px)`,
+              fontFamily: font,
+              fontSize: sizes?.[li] ?? size,
+              fontWeight: weight,
+              lineHeight: 1.12,
+              letterSpacing: tracking,
+              color,
+              textAlign: align,
+              padding: '0.06em 0.1em 0.14em',
+              margin: '-0.06em 0 -0.14em',
+              textShadow: halo ? `0 0 10px ${halo}, 0 0 18px ${halo}, 0 0 28px ${halo}, 0 0 40px ${halo}` : undefined,
+            }}
+          >
+            {words.join(' ')}
+          </div>
+        );
+      })}
     </div>
   );
 };
