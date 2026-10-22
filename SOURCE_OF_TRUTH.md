@@ -2637,6 +2637,34 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-22 (round 17) — SAVE THIS: clean caption changes, the card's
+  own way into the graph, the save cited as an X post, and a no-fade
+  edition (owner: the 0:05 caption "breaking apart reads like a rendering
+  bug"; "0:13 feed to graph is a hard cut… add a visible step… the card
+  shrinking into its node"; "Machina has no Instagram account yet"; "keep a
+  version without the fade, it looks more like the real app").** Branch
+  `claude/reel-save-this`. The captions' mask roll (lines sliced as they
+  rose) is gone: each line fades up as it is said and the line before is
+  gone first (kit `KineticLine clean`). The take now goes the card's own
+  way: its ⋯ on "topic", the app's actions sheet, "See in graph" pressed on
+  "connects"; the sheet goes at once, as in the app, and the card lifts off
+  the feed and shrinks into its own dot, taking the dot's orange, as the
+  graph opens under it, ties lit; the dot pings as it lands (a tick on
+  each press, two notes and a sub on the landing). The shrink is the reel's
+  move on the card's own pixels; in the app the graph fades in. The reel's
+  own save is now an X post from @machinaapp (`x.com/machinaapp`), on the
+  card and in Ask's citation. `MachinaSaveThisNoFade`
+  (`final_reel_nofade.mp4`) is the same reel, sound and timing with no
+  paper over the screens' edges: every screen whose top is in frame hangs
+  under the captions, status bar in view (the card, graph and proof framed
+  wider; the graph opens in the very screen the feed leaves); where the
+  pill's close framing runs the app up under the type, each caption line
+  sits on a paper pill. **Verified:** gates (bans, windows, 80 words, every
+  line 11.1 to 21.7dB over the music, −14.03 LUFS, −1.25 dBTP, audio seam
+  step 0.022 against the score's own 0.107); the changed spans frame by
+  frame in stills and in both encodes; every frame pair scanned for
+  one-frame flashes (none, either edition); both encodes 882 frames, 29.4s,
+  −13.9 LUFS, −1.3 dBTP. **Not verified:** listened to; seen on a phone.
 - **2026-10-22 (round 16) — SAVE THIS: the hook reordered, at its own pace
   (owner: "is 'a million saves you never opened' good enough?"; "the pacing
   of that part is too fast and not clear"; the script reviewed for clarity
