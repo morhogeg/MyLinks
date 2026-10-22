@@ -1,6 +1,6 @@
 {
   "_": "Voice narration on GitHub with Gemini TTS (.github/workflows/narration-tts.yml). Edit, commit, push: the workflow voices what is listed and commits the takes to audio/vo-takes/. `scripts`: synth-vo.py scripts to voice in `voice`. Bump `run` to re-run with no other change. Voice each line once (the daily quota is shared).",
-  "run": 3,
+  "run": 4,
   "voice": "Sulafat",
   "model": "gemini-3.8-flash-tts",
   "scripts": [
@@ -8,18 +8,11 @@
   ],
   "takes": [
     {
-      "name": "connects-b",
+      "name": "list-b",
       "voice": "Sulafat",
-      "text": "and connects it to what you’ve saved before.",
-      "style": "Bright and easy, a small spark of delight on \"connects\"; light and quick, no drawn-out words. Pace: Brisk, playful and conversational, about 175 words a minute; pauses short and light, never a dramatic beat. The product name \"Machina\" is the Latin word, said the classical Latin way: MAH-kee-nah, stress on the FIRST syllable; \"ch\" is a hard \"k\"; open vowels, \"a\" as in \"father\" (not as in \"cat\"), a short \"ee\", and a clear \"ah\" at the end, not \"nuh\". Never mah-KEE-nah.",
-      "_style": "Bright and easy, a small spark of delight on \"connects\"; light and quick, no drawn-out words."
-    },
-    {
-      "name": "signoff-b",
-      "voice": "Sulafat",
-      "text": "Machina. Everything you save, finally useful.",
-      "style": "A confident, warm sign-off; the name with a smile, then the tagline sincere but brisk, no drawn-out words. Pace: Brisk, playful and conversational, about 175 words a minute; pauses short and light, never a dramatic beat. The product name \"Machina\" is the Latin word, said the classical Latin way: MAH-kee-nah, stress on the FIRST syllable; \"ch\" is a hard \"k\"; open vowels, \"a\" as in \"father\" (not as in \"cat\"), a short \"ee\", and a clear \"ah\" at the end, not \"nuh\". Never mah-KEE-nah.",
-      "_style": "A confident, warm sign-off; the name with a smile, then the tagline sincere but brisk, no drawn-out words."
+      "text": "understands it, sums it up, files it by topic,",
+      "style": "Brisk and pleased, rattling off the list with a smile; light, no drawn-out words, the sentence carries on. Pace: Brisk, playful and conversational, about 175 words a minute; pauses short and light, never a dramatic beat. The product name \"Machina\" is the Latin word, said the classical Latin way: MAH-kee-nah, stress on the FIRST syllable; \"ch\" is a hard \"k\"; open vowels, \"a\" as in \"father\" (not as in \"cat\"), a short \"ee\", and a clear \"ah\" at the end, not \"nuh\". Never mah-KEE-nah.",
+      "_style": "Brisk and pleased, rattling off the list with a smile; light, no drawn-out words, the sentence carries on."
     }
   ],
   "audition": [],

@@ -97,9 +97,12 @@ export const CAPTIONS = [
   // (owner, round 2: no full stop after the name on screen; the voice keeps its take)
   { at: 166, to: 236, text: 'Unless you save it\nto Machina', tts: 'Unless you save it to Machina.', duck: 0.4, style: 'The turn: bright, warm and confident, a little conspiratorial; the name lands with a smile.', pace: PACE },
   { at: 238, to: 302, text: 'It reads every save,\nfrom any app,', style: 'Clear and easy, genuinely pleased; flowing straight on, the sentence is not finished.', pace: PACE },
+  // (owner, round 3: "reads" alone undersold it) what the read IS, over the
+  // finished card, each named part lifting on its word
+  { at: 304, to: 372, text: 'understands it, sums it up,\nfiles it by topic,', style: 'Quick and satisfied, ticking off a list: each clause light and crisp, flowing straight on; the sentence is not finished.', pace: PACE },
   // (owner, round 2: "remembers what's in it" was not a strong enough
   // benefit) the card opens on the saves it connects to
-  { at: 304, to: 372, text: 'and connects it to\nwhat you’ve saved before.', style: 'Clear and genuinely pleased, flowing on from the line before; a little lift on "connects", landing warmly on "saved before".', pace: PACE },
+  { at: 376, to: 444, text: 'and connects it to\nwhat you’ve saved before.', style: 'Clear and genuinely pleased, flowing on from the line before; a little lift on "connects", landing warmly on "saved before".', pace: PACE },
   { at: 378, to: 458, text: 'Weeks later, buried\nunder everything else,', style: 'Storytelling, quick and a touch dramatic; trailing on into the next line.', pace: PACE },
   { at: 462, to: 508, text: 'type what you remember.', style: 'Easy and casual, like the simplest thing in the world.', pace: PACE },
   // the find: the name and the tagline, said once, over the save it just
