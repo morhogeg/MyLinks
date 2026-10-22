@@ -8,7 +8,7 @@
  *    band captions on screen at once;
  *  - every line at least 3dB over the music in the speech band;
  *  - the mix at the feeds' −14 LUFS (±0.5), true peak ≤ −1 dBTP;
- *  - the loop: the score's last and first moments at the same level.
+ *  - the loop: the step across the seam no bigger than the score's own.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -98,16 +98,19 @@ const I = lufs(mix.L, mix.R, mix.SR);
 const tp = truePeak(mix.L, mix.R);
 (Math.abs(I + 14) <= 0.5 && tp <= -1 ? ok : fail)(`mix: ${I.toFixed(2)} LUFS integrated, ${tp.toFixed(2)} dBTP (spec −14 ±0.5, ≤ −1)`);
 
-// ── the loop: the last and first 100ms of the score at the same level
-const rms = (a, b) => {
-  let s = 0;
-  for (let i = a; i < b; i++) s += ((score.L[i] + score.R[i]) / 2) ** 2;
-  return 10 * Math.log10(s / (b - a) || 1e-18);
-};
-const w = Math.round(0.1 * score.SR);
-const endDb = rms(score.n - w, score.n);
-const startDb = rms(0, w);
-(Math.abs(endDb - startDb) < 3 ? ok : fail)(`loop: the score ends at ${endDb.toFixed(1)}dB and starts at ${startDb.toFixed(1)}dB`);
+// ── the loop: the score's last sample runs into its first like any other
+// pair of neighbours (it is the second of two back-to-back renders, so its
+// end IS what precedes its start); the jump across the seam must sit inside
+// the file's own sample-to-sample range
+{
+  const mono = (i) => (score.L[i] + score.R[i]) / 2;
+  const steps = [];
+  for (let i = 1; i < score.n; i++) steps.push(Math.abs(mono(i) - mono(i - 1)));
+  steps.sort((a, b) => a - b);
+  const p999 = steps[Math.floor(steps.length * 0.999)];
+  const seam = Math.abs(mono(0) - mono(score.n - 1));
+  (seam <= p999 ? ok : fail)(`loop: the step across the seam is ${seam.toFixed(4)} (the score's own 99.9th-percentile step is ${p999.toFixed(4)})`);
+}
 void HITS;
 
 console.log(failed ? '\nFAILED' : '\nOK');

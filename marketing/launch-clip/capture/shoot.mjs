@@ -614,8 +614,14 @@ const takes = {
           const C = window.__capture;
           for (const id of s.without) C.remove(`users/${uid}/links/${id}`);
           for (const id of s.withoutCollections) C.remove(`users/${uid}/collections/${id}`);
-          // the saves made after it stay out until "three weeks later"
+          // the saves it connects to were saved before it (round 2)
           const now = Date.now();
+          for (const r of s.related) {
+            const p = `users/${uid}/links/${r.id}`;
+            const d = C.get(p);
+            if (d) C.set(p, { ...d, createdAt: now - r.age * day });
+          }
+          // the saves made after it stay out until "three weeks later"
           const out = [];
           for (const p of C.list(`users/${uid}/links/`)) {
             const d = C.get(p);
@@ -673,16 +679,51 @@ const takes = {
           sourceType: 'web',
           sourceName: s.sourceName,
           language: 'en',
-          relatedLinks: [],
+          relatedLinks: s.related.map((r, k) => ({ id: r.id, title: r.title, reason: r.reason, similarity: 0.87 - k * 0.02, commonConcepts: r.common })),
           collectionIds: [],
           reminderStatus: 'none',
           hideThumbnail: false,
           metadata: { originalTitle: s.title, estimatedReadTime: s.readTime, thumbnailUrl: s.cover, thumbnailIsVideo: true },
         }),
-      [at, S, now],
+      [at, { ...S, related: S.related.map((r) => ({ ...r, title: CARDS.find((c) => c.id === r.id).title })) }, now],
     );
     t.mark('done');
-    await roll60(96);
+    await roll60(40);
+
+    // 1b. (round 2) the thumb opens it: its own detail view, then down to
+    // its Related cards, the saves it connects to
+    const DETAIL = {
+      ...RECTS,
+      related: ['div', 'Related cards'],
+      relatedList: ['div[class*="grid gap-3"]', CARDS.find((c) => c.id === S.related[0].id).title],
+      detailTitle: ['h2', S.title],
+    };
+    await visible(page.locator('main article.surface-card').filter({ hasText: S.title })).click({ position: { x: 180, y: 172 } });
+    t.mark('open');
+    await t.roll(48, { rects: DETAIL, step: 1000 / 60 });
+    await t.thaw();
+    await page.waitForTimeout(500);
+    await t.freeze();
+    // (anchored on a reason line: the "Related cards" heading carries an icon,
+    // so it is not a text-only element and tagScroller would fall through to
+    // the page behind the sheet)
+    await tagScroller(S.related[0].reason);
+    t.mark('related');
+    await rollScroll(t, await scrollTargetFor(S.related.at(-1).reason, 700), 5, DETAIL);
+    t.mark('relatedHold');
+    await t.roll(30, { rects: DETAIL, step: 1000 / 60 });
+    // back to the feed (not shown: the reel cuts to three weeks later)
+    await t.thaw();
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(900);
+    if (await page.locator('[role=dialog]').count()) {
+      await page.locator('[role=dialog] button[aria-label="Close"]').first().click().catch(() => {});
+      await page.waitForTimeout(900);
+    }
+    await visible(page.getByPlaceholder('Search your saves')).waitFor({ timeout: 10000 });
+    await page.evaluate(() => document.scrollingElement.scrollTo({ top: 0, behavior: 'instant' }));
+    await page.waitForTimeout(300);
+    await t.freeze();
 
     // 2. three weeks later: dated back, then the saves made since, oldest
     // first, each landing on top of the feed as it arrives

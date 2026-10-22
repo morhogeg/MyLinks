@@ -159,6 +159,13 @@ const arrange = (o) => {
   for (let k = 0; k < 5; k++) tick(t(H.phase0 + k * BEAT_FRAMES), 0.07, 1.2 + k * 0.1);
   bell(t(H.done), 88, 0.1, 0.2, 2.2);
   sub(t(H.done), 48, 0.26, 0.3);
+  // (round 2) the thumb opens it; its Related cards land: two notes, linked
+  tick(t(H.cardOpen), 0.11, 1.12);
+  if (!voiced(H.cardOpen + 2, 12)) whoosh(t(H.cardOpen) + 0.02, 0.45, 0.035, 0.15);
+  const linked = clearOfVoice(H.related, 10);
+  pluck(t(linked), 76, 0.1, -0.2, 0.45);
+  pluck(t(linked + 4), 83, 0.09, 0.2, 0.45);
+  sub(t(H.related), 43, 0.22, 0.3);
 
   // ── three weeks later: a breath, then one thud per save landing on top,
   // each a step higher, an 8th apart

@@ -37,14 +37,14 @@
  },
  {
   "frame": 166,
-  "text": "Unless you save it to Makeena.",
+  "text": "Unless you save it to Makeena",
   "words": [
    0.03,
-   0.491,
-   0.754,
-   1.083,
-   1.28,
-   1.478
+   0.506,
+   0.778,
+   1.118,
+   1.322,
+   1.526
   ]
  },
  {
@@ -62,17 +62,20 @@
  },
  {
   "frame": 304,
-  "text": "and remembers what\u2019s in it.",
+  "text": "and connects it to what you\u2019ve saved before.",
   "words": [
    0.03,
-   0.207,
-   0.65,
-   0.96,
-   1.093
+   0.197,
+   0.573,
+   0.698,
+   0.824,
+   1.033,
+   1.325,
+   1.576
   ]
  },
  {
-  "frame": 350,
+  "frame": 378,
   "text": "Weeks later, buried under everything else,",
   "words": [
    0.05,
@@ -84,7 +87,7 @@
   ]
  },
  {
-  "frame": 434,
+  "frame": 462,
   "text": "type what you remember.",
   "words": [
    0.01,
@@ -94,18 +97,19 @@
   ]
  },
  {
-  "frame": 494,
-  "text": "Everything you save, finally useful.",
+  "frame": 522,
+  "text": "Makeena. Everything you save, finally useful.",
   "words": [
    0.03,
-   0.475,
-   0.637,
-   1.13,
-   1.525
+   0.95,
+   1.348,
+   1.493,
+   2.18,
+   2.655
   ]
  },
  {
-  "frame": 586,
+  "frame": 656,
   "text": "See? You\u2019re watching it again.",
   "words": [
    0.03,

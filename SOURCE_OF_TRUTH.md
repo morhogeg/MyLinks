@@ -2637,6 +2637,23 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-22 (later) — SAVE THIS round 2 (owner: "the video part is
+  perfect, keep it").** Branch `claude/reel-save-this`. (1) The sign-off says
+  the name: "Machina. Everything you save, finally useful." (the wordmark wipes
+  in on the spoken name; take `signoff-b`, the brisker of two directions,
+  3.1s). (2) No full stop after "to Machina" on screen; the voice keeps its
+  take (`tts` on the caption). (3) "and remembers what's in it" was not a
+  strong enough benefit: now "and connects it to what you've saved before."
+  over the app opening the card on its Related cards (the procrastination talk,
+  marked strong, and Four Thousand Weeks, each with its one-line why; both
+  re-dated before the reel's save in this take, so the burial is seven saves).
+  23.8s. Found and fixed on the way: `tagScroller` anchors on a text-only
+  element, and the detail's "Related cards" heading carries an icon, so it
+  scrolled the feed behind the sheet; the take anchors on a reason line now.
+  The loop gate now measures the step across the seam (a level comparison
+  was the wrong test). **Verified:** gates (bans, windows, every line 11 to
+  18dB over the music, −14.0 LUFS, −1.25 dBTP, seam step inside the score's
+  own range); stills of every changed beat. **Not verified:** listened to.
 - **2026-10-22 — SAVE THIS: an organic Instagram Reel where the reel saves
   itself (owner: "something extraordinary, not another video with captions
   and the app's screens").** Branch `claude/reel-save-this` (built on

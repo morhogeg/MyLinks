@@ -617,6 +617,18 @@ export const SAVETHIS = {
   /** what the viewer remembers of it, typed into Search your saves */
   query: 'never watch it again',
   hits: ['savethis'],
+  /**
+   * The saves it connects to (owner, round 2: show what the read is FOR): the
+   * app's Related cards, with the one-line "why" the graph service writes
+   * (its tone, as in EDGES). Both are on what we mean to get back to and
+   * what deserves the attention, which is what this post is about. In this
+   * take they are dated BEFORE it (they were already saved when it arrives),
+   * so they are not among the saves that bury it.
+   */
+  related: [
+    { id: 'procrastinator', age: 23, reason: 'Both about what we mean to come back to, and never do.', common: ['attention'] },
+    { id: 'fourthousand', age: 27, reason: 'What to keep, when you can’t keep everything.', common: ['attention'] },
+  ],
   /** no cooking content in this reel (owner, 2026-10-02) */
   without: ['marcella', 'chicken'],
   withoutCollections: ['cook'],

@@ -80,10 +80,12 @@ const TAG_T = VO.find((v) => v.frame === TAG.at);
 const TaglineLockup: React.FC<{ f: number; show: boolean }> = ({ f, show }) => {
   if (!show || f < TAG.at - 8 || f > TAG.to + 1) return null;
   const starts = TAG_T?.words.map((s) => TAG.at + Math.round(s * FPS)) ?? [];
-  const word = prog(f, TAG.at - 6, TAG.at + 10, EASE_MODAL);
+  // (round 2) the first word is the name: the drawn wordmark wipes in as
+  // the narrator says "Machina", then the line, word by word
+  const word = prog(f, (starts[0] ?? TAG.at) - 3, (starts[0] ?? TAG.at) + 12, EASE_MODAL);
   const out = prog(f, TAG.to - 8, TAG.to, EASE_IN_OUT);
-  const rows = TAG.text.split('\n');
-  let k = -1;
+  const rows = TAG.text.split('\n').slice(1);
+  let k = 0;
   return (
     <AbsoluteFill style={{ pointerEvents: 'none', opacity: 1 - out, transform: `translateY(${Math.round(-out * 14)}px)` }}>
       <div style={{ position: 'absolute', left: 0, right: 0, top: 282, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>

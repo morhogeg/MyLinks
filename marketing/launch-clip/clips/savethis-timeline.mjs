@@ -57,12 +57,12 @@ export const HITS = {
   type: beat(33.5), // "never watch it again"
   found: beat(37), // this video's card, alone
   tagline: beat(37) + 4, // "Machina. Everything you save, finally useful."
-  cardTap: beat(44), // the thumb taps its cover…
-  poster: beat(46), // …the dive lands ON frame 0
+  cardTap: beat(45), // the thumb taps its cover…
+  poster: beat(47), // …the dive lands ON frame 0
 };
 
 /** a whole beat, so the score's pulse runs straight through the loop */
-export const TOTAL_FRAMES = beat(50);
+export const TOTAL_FRAMES = beat(51);
 export const TOTAL_SEC = TOTAL_FRAMES / FPS;
 
 /** The cut. One beat of story per scene. */
@@ -105,9 +105,9 @@ export const CAPTIONS = [
   // the find: the name and the tagline, said once, over the save it just
   // brought back (owner, round 2: the name in the voice); the drawn wordmark
   // wipes in on "Machina"
-  { at: HITS.tagline, to: 606, place: 'scene', text: 'Machina.\nEverything you save,\nfinally useful.', duck: 0.4, style: 'Warm and confident with a smile: the name said proudly, a short beat, then the line light and quick, no drawn-out words.', pace: PACE },
+  { at: HITS.tagline, to: 622, place: 'scene', text: 'Machina.\nEverything you save,\nfinally useful.', duck: 0.4, style: 'A confident, warm sign-off; the name with a smile, then the tagline sincere but brisk, no drawn-out words.', pace: PACE },
   // the dive lands on frame 0, and the reel starts again under this line
-  { at: 642, to: 690, text: 'See? You’re\nwatching it again.', duck: 0.4, style: 'Playful and delighted, a little laugh in the voice on "See?", then landing the joke warmly.', pace: PACE },
+  { at: 656, to: 704, text: 'See? You’re\nwatching it again.', duck: 0.4, style: 'Playful and delighted, a little laugh in the voice on "See?", then landing the joke warmly.', pace: PACE },
 ];
 
 /** a small letterspaced label above the line, with it (the kit's Kicker) */
