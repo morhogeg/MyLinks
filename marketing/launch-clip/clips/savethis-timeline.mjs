@@ -49,18 +49,20 @@ export const HITS = {
   iris: beat(16), // the point opens into the app
   phase0: beat(17), // the real pipeline, a phase a beat…
   done: beat(22), // …and the card, read
-  skip: beat(25), // three weeks later
-  bury: beat(27), // newer saves land on top of it, from "buried"
-  fieldTap: beat(31), // "type what you remember": the search field
-  type: beat(31.5), // "never watch it again"
-  found: beat(35), // this video's card, alone
-  tagline: beat(35) + 4, // "Everything you save, finally useful."
-  cardTap: beat(40), // the thumb taps its cover…
-  poster: beat(42), // …the dive lands ON frame 0
+  cardOpen: beat(23), // the thumb opens it: "and connects it…"
+  related: beat(25.5), // …its Related cards, the saves it connects to
+  skip: beat(27), // three weeks later
+  bury: beat(29), // newer saves land on top of it, from "buried"
+  fieldTap: beat(33), // "type what you remember": the search field
+  type: beat(33.5), // "never watch it again"
+  found: beat(37), // this video's card, alone
+  tagline: beat(37) + 4, // "Machina. Everything you save, finally useful."
+  cardTap: beat(44), // the thumb taps its cover…
+  poster: beat(46), // …the dive lands ON frame 0
 };
 
 /** a whole beat, so the score's pulse runs straight through the loop */
-export const TOTAL_FRAMES = beat(46);
+export const TOTAL_FRAMES = beat(50);
 export const TOTAL_SEC = TOTAL_FRAMES / FPS;
 
 /** The cut. One beat of story per scene. */
@@ -92,19 +94,24 @@ export const CAPTIONS = [
   { at: 5, to: 54, place: 'scene', text: 'You’re going to\nsave this video.', duck: 0.4, style: 'A friendly, knowing call-out, half teasing, as if catching a friend in the act. Quick and light, one breath, no pause inside the line.', pace: PACE },
   { at: 54, to: 99, text: 'And never\nwatch it again.', duck: 0.45, style: 'Wry and lightly amused, a little deadpan; landing low and certain on "again".', pace: PACE },
   { at: 100, to: 162, text: 'Right down there,\nwith all the others.', style: 'Amused and quick, a wry aside, as if pointing down into a deep hole; light, no drawn-out words.', pace: PACE },
-  { at: 166, to: 236, text: 'Unless you save it\nto Machina.', duck: 0.4, style: 'The turn: bright, warm and confident, a little conspiratorial; the name lands with a smile.', pace: PACE },
+  // (owner, round 2: no full stop after the name on screen; the voice keeps its take)
+  { at: 166, to: 236, text: 'Unless you save it\nto Machina', tts: 'Unless you save it to Machina.', duck: 0.4, style: 'The turn: bright, warm and confident, a little conspiratorial; the name lands with a smile.', pace: PACE },
   { at: 238, to: 302, text: 'It reads every save,\nfrom any app,', style: 'Clear and easy, genuinely pleased; flowing straight on, the sentence is not finished.', pace: PACE },
-  { at: 304, to: 348, text: 'and remembers\nwhat’s in it.', style: 'Warm and reassuring, settling down softly at the end.', pace: PACE },
-  { at: 350, to: 430, text: 'Weeks later, buried\nunder everything else,', style: 'Storytelling, quick and a touch dramatic; trailing on into the next line.', pace: PACE },
-  { at: 434, to: 480, text: 'type what you remember.', style: 'Easy and casual, like the simplest thing in the world.', pace: PACE },
-  // the find: the tagline, said once, over the save it just brought back
-  { at: HITS.tagline, to: 556, place: 'scene', text: 'Everything you save,\nfinally useful.', duck: 0.4, style: 'Warm and sincere with a quiet smile; light and quick, no drawn-out words.', pace: PACE },
+  // (owner, round 2: "remembers what's in it" was not a strong enough
+  // benefit) the card opens on the saves it connects to
+  { at: 304, to: 372, text: 'and connects it to\nwhat you’ve saved before.', style: 'Clear and genuinely pleased, flowing on from the line before; a little lift on "connects", landing warmly on "saved before".', pace: PACE },
+  { at: 378, to: 458, text: 'Weeks later, buried\nunder everything else,', style: 'Storytelling, quick and a touch dramatic; trailing on into the next line.', pace: PACE },
+  { at: 462, to: 508, text: 'type what you remember.', style: 'Easy and casual, like the simplest thing in the world.', pace: PACE },
+  // the find: the name and the tagline, said once, over the save it just
+  // brought back (owner, round 2: the name in the voice); the drawn wordmark
+  // wipes in on "Machina"
+  { at: HITS.tagline, to: 606, place: 'scene', text: 'Machina.\nEverything you save,\nfinally useful.', duck: 0.4, style: 'Warm and confident with a smile: the name said proudly, a short beat, then the line light and quick, no drawn-out words.', pace: PACE },
   // the dive lands on frame 0, and the reel starts again under this line
-  { at: 586, to: 634, text: 'See? You’re\nwatching it again.', duck: 0.4, style: 'Playful and delighted, a little laugh in the voice on "See?", then landing the joke warmly.', pace: PACE },
+  { at: 642, to: 690, text: 'See? You’re\nwatching it again.', duck: 0.4, style: 'Playful and delighted, a little laugh in the voice on "See?", then landing the joke warmly.', pace: PACE },
 ];
 
 /** a small letterspaced label above the line, with it (the kit's Kicker) */
-export const KICKERS = [{ at: 346, to: 430, text: 'Three weeks later' }];
+export const KICKERS = [{ at: 374, to: 458, text: 'Three weeks later' }];
 
 /** Risers END on the reveal they lead into. [from, to] in frames. */
 export const RISERS = [
