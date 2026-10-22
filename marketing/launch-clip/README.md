@@ -711,10 +711,12 @@ tick sounds; the narrator sits 8.1–17.0dB over the music in the speech band
 
 ## SAVE THIS (the organic Reel)
 
-`MachinaSaveThis` is a 28.5s vertical Reel built for Instagram, not a
+`MachinaSaveThis` is a 29.4s vertical Reel built for Instagram, not a
 feature explainer. **The idea: the reel saves itself.** It opens by
-predicting that the viewer will save this video and never watch it again.
-The save falls into a well of every other save, all grey. "Unless you
+predicting that the viewer will save this video, "right down there,
+buried with everything else you saved, and never watch it again" (round
+16's order: "Unless" answers "never"). The save falls into a well of
+every other save, all grey. "Unless you
 save it to Machina" floods them with the app's category colours and
 gathers them into the mark, and the real app reads the reel, sums it up,
 files it by topic, and shows it on its graph tied to two earlier saves.
@@ -749,24 +751,24 @@ npx remotion render src/index.ts MachinaSaveThis out/savethis/master.mp4 --crf=1
 |---|---|---|---|---|
 | 0:00 | The poster: type over an empty bookmark (frame 0, also the cover) | You're going to / save this video. | "You're going to save this video." | bare Am7 pad |
 | 0:00.9 | The thumb fills the bookmark with ink, on "save" | | | click and a low thock |
-| 0:01.9 | The type rolls out; the paper splits under the bookmark and swings down like a trapdoor | And never / watch it again. | "And never watch it again." | whoosh |
+| 0:01.8 | The type rolls out; the paper splits under the bookmark and swings down like a trapdoor, on "Right down there" | Right down there, / buried with everything else you saved, | "Right down there, buried with everything else you saved," (round 16) | whoosh |
 | 0:02.3 | It falls into a well lined with grey, unreadable saves | | | a scale run falling |
-| 0:04.2 | It lands on the heap, in the beat after "there," | Right down there, / with a million saves / you never opened. | "Right down there, with a million saves you never opened." (round 15; "a million" as it lands) | thud |
-| 0:04.5 | The camera dives at the heap: hundreds of saves | | | whoosh |
-| 0:05.6 | Colour floods the grey heap on "Unless" (the app's own category colours, a wave out from the point); then the heap and the well rush into one point | Unless you save it / to Machina | "Unless you save it to Machina." | riser |
-| 0:07.0 | The brackets close on it: the mark, on "Machina" | | | impact, shimmer |
-| 0:07.5 | The mark lands on the processing card's own mark as the real app irises open: a share of this reel arriving | | | whoosh |
-| 0:07.9 | The pill, a phase a beat: Fetching the link, Reading the page, Writing the summary, Searching connections, Organizing & tagging | It reads every save, / from any app, | "It reads every save, from any app," | the band; a tick a phase |
-| 0:10.3 | "Saved to Machina"; the card: its cover is this reel's frame 0; its summary lifts on "sums it up", its topic chip on "files it by topic" | understands it, sums it up, / files it by topic, | "understands it, sums it up, files it by topic," | bell |
-| 0:12.1 | Cut on "topic" to the app's graph (round 14: only the three, no map of every save first): the new save's dot, just tapped, its ties to two older saves lit and titled (Four Thousand Weeks and the procrastination talk), the rest receded, as the app's own camera settles on them | and connects it to / what you've saved before. | "and connects it to what you've saved before." | a tick; two linked notes on "connects" |
-| 0:14.7 | Cut to Ask opening, settled and held still (rounds 14 and 15: its whole mark, its own header), "What do you want to recall? Answers come only from your 23 saves, with sources you can open.", and the one-tap questions it suggests about the saves; one slow push from here to the proof | Now every save is / one question away. | "Now every save is one question away." | a click, a light note; the drums out |
-| 0:17.4 | "So," over Ask opening; on "ask" the question is sent and the chat takes the opening's place in the same shot (round 14: no cut to the composer and back): "What connects my 3 saves about procrastination?" | So, ask it anything, / and get the answer, / with the proof. | "So, ask it anything, and get the answer, with the proof." | a click, a low note |
-| 0:17.8 | The answer streams under the question ("All three agree: …"), drawn from the three | | | |
-| 0:20.1 | On "proof": the camera settles on the answer and the saves it came from, cited (Tim Urban's talk, Four Thousand Weeks, this reel); the paper rises over the question | | | the band lands, full |
-| 0:20.5 | (Round 13) On the next beat each citation is highlighted in turn, an 8th apart: it pops forward and two ink rings leave its edge like a sonar ping; then held, half a second longer than round 12 | | | a rising ping on each |
-| 0:21.9 | The app dissolves into the paper; the app's own launch mark draws in (corner ticks, brackets closing, the point striking on "Machina"), the wordmark wipes in, then the tagline word by word, on one line (round 13) | MACHINA / Everything you save, finally useful. | "Machina. Everything you save, finally useful." | the brand's impact, lighter; shimmer |
-| 0:26.1 | The lockup holds to the last frame on a slow push (round 13: the last frame is the logo) | This time, you'll / watch it again. | "This time, you'll watch it again." | the drums out, the pad up to the hook's register; a bell rings over the loop |
-| 0:28.5 | The loop cuts on the beat from the logo to the hook (0:00) | | | |
+| 0:04.2 | It lands on the heap | | | thud |
+| 0:05.0 | The camera dives into the heap, slowly (round 16: the hook two beats longer): hundreds of saves | and never / watch it again. | "and never watch it again." | |
+| 0:06.5 | Colour floods the grey heap on "Unless" (the app's own category colours, a wave out from the point); then the heap and the well rush into one point | Unless you save it / to Machina | "Unless you save it to Machina." | riser |
+| 0:07.9 | The brackets close on it: the mark, on "Machina" | | | impact, shimmer |
+| 0:08.4 | The mark lands on the processing card's own mark as the real app irises open: a share of this reel arriving | | | whoosh |
+| 0:08.9 | The pill, a phase a beat: Fetching the link, Reading the page, Writing the summary, Searching connections, Organizing & tagging | It reads every save, / from any app, | "It reads every save, from any app," | the band; a tick a phase |
+| 0:11.2 | "Saved to Machina"; the card: its cover is this reel's frame 0; its summary lifts on "sums it up", its topic chip on "files it by topic" | understands it, sums it up, / files it by topic, | "understands it, sums it up, files it by topic," | bell |
+| 0:13.1 | Cut on "topic" to the app's graph (round 14: only the three, no map of every save first): the new save's dot, just tapped, its ties to two older saves lit and titled (Four Thousand Weeks and the procrastination talk), the rest receded, as the app's own camera settles on them | and connects it to / what you've saved before. | "and connects it to what you've saved before." | a tick; two linked notes on "connects" |
+| 0:15.6 | Cut to Ask opening, settled and held still (rounds 14 and 15: its whole mark, its own header), "What do you want to recall? Answers come only from your 23 saves, with sources you can open.", and the one-tap questions it suggests about the saves; one slow push from here to the proof | Now every save is / one question away. | "Now every save is one question away." | a click, a light note; the drums out |
+| 0:18.3 | "So," over Ask opening; on "ask" the question is sent and the chat takes the opening's place in the same shot (round 14: no cut to the composer and back): "What connects my 3 saves about procrastination?" | So, ask it anything, / and get the answer, / with the proof. | "So, ask it anything, and get the answer, with the proof." | a click, a low note |
+| 0:18.7 | The answer streams under the question ("All three agree: …"), drawn from the three | | | |
+| 0:21.0 | On "proof": the camera settles on the answer and the saves it came from, cited (Tim Urban's talk, Four Thousand Weeks, this reel); the paper rises over the question | | | the band lands, full |
+| 0:21.5 | (Round 13) On the next beat each citation is highlighted in turn, an 8th apart: it pops forward and two ink rings leave its edge like a sonar ping; then held, half a second longer than round 12 | | | a rising ping on each |
+| 0:22.9 | The app dissolves into the paper; the app's own launch mark draws in (corner ticks, brackets closing, the point striking on "Machina"), the wordmark wipes in, then the tagline word by word, on one line (round 13) | MACHINA / Everything you save, finally useful. | "Machina. Everything you save, finally useful." | the brand's impact, lighter; shimmer |
+| 0:27.1 | The lockup holds to the last frame on a slow push (round 13: the last frame is the logo) | This time, you'll / watch it again. | "This time, you'll watch it again." | the drums out, the pad up to the hook's register; a bell rings over the loop |
+| 0:29.4 | The loop cuts on the beat from the logo to the hook (0:00) | | | |
 
 **What is real and what is not.** Every app pixel is the shipped app on
 `main` (2026-10-21), captured by `capture/shoot.mjs savethisClip`: the
