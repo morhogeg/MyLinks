@@ -36,7 +36,7 @@ import { fileURLToPath } from 'node:url';
 import { startServer } from './server.mjs';
 import { openDevice } from './device.mjs';
 import { Take } from './recorder.mjs';
-import { ASK, CAPTURE_USER, CARDS, SAVE, SEARCH, SYNTHESIS } from './library.mjs';
+import { ASK, CAPTURE_USER, CARDS, SAVE, SAVETHIS, SEARCH, SYNTHESIS } from './library.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.join(here, '..', 'public', 'reel', 'app');
@@ -586,6 +586,133 @@ const takes = {
     await t.roll(24, { rects: RECTS, step: 1000 / 60 });
     await t.thaw();
     return t.save();
+  },
+
+  // SAVE THIS (clips/savethis-timeline.mjs): one continuous use of Home.
+  //  1. a share-sheet save of this very reel arrives (the placeholder card
+  //     the server writes for a shared link), the pill narrates the real
+  //     phases, and it resolves into its card, whose cover is the reel's own
+  //     frame 0 (public/clips/savethis/cover.jpg);
+  //  2. three weeks later: it is dated back, and the saves made since land
+  //     on top of it one by one, the way the feed receives them;
+  //  3. "never watch it again" typed into Search your saves: the feed
+  //     narrows as it types, and the one card left is this reel.
+  // No cooking content in this reel (owner, 2026-10-02): the two recipe
+  // cards and their collection are out of the account for this take. All
+  // app motion is rolled at 60fps (the reel plays it at real speed, two
+  // captured frames per output frame, or slowed, one).
+  async savethisClip() {
+    const S = SAVETHIS;
+    const DAY = 86_400_000;
+    const cover = path.join(here, '..', 'public', 'clips', 'savethis', 'cover.jpg');
+    if (!fs.existsSync(cover)) throw new Error('savethisClip: render the poster first (MachinaSaveThisPoster → public/clips/savethis/cover.jpg)');
+    fs.copyFileSync(cover, path.join(here, '..', 'out', 'capture', 'app', 'out', S.cover.slice(1)));
+    let later = [];
+    await fresh(async () => {
+      later = await page.evaluate(
+        ([uid, s, day]) => {
+          const C = window.__capture;
+          for (const id of s.without) C.remove(`users/${uid}/links/${id}`);
+          for (const id of s.withoutCollections) C.remove(`users/${uid}/collections/${id}`);
+          // the saves made after it stay out until "three weeks later"
+          const now = Date.now();
+          const out = [];
+          for (const p of C.list(`users/${uid}/links/`)) {
+            const d = C.get(p);
+            if (!d || now - d.createdAt >= s.buriedAge * day) continue;
+            out.push([p, { ...d, collectionIds: (d.collectionIds ?? []).filter((c) => !s.withoutCollections.includes(c)) }]);
+            C.remove(p);
+          }
+          return out.sort((a, b) => a[1].createdAt - b[1].createdAt);
+        },
+        [UID, S, DAY],
+      );
+    });
+    const t = new Take(dev, OUT, 'clips/savethis/app');
+    const RECTS = {
+      search: R.search,
+      firstCard: R.firstCard,
+      card: ['main article.surface-card', S.title],
+      processing: ['main article[aria-busy="true"]'],
+      mark: ['main article[aria-busy="true"] svg'],
+      pill: ['div[aria-live="polite"] div[class*="max-w-xs"]'],
+      cover: ['main article.surface-card div[class*="h-28"]'],
+    };
+    const roll60 = (n) => t.roll(n, { rects: RECTS, step: 1000 / 60 });
+    const at = linkPath(S.id);
+    t.mark('home');
+    await t.snap({ rects: RECTS });
+
+    // 1. the save arrives as the server's placeholder, and is read
+    await t.freeze();
+    const now = await page.evaluate(() => Date.now());
+    await page.evaluate(
+      ([p, d]) => window.__capture.set(p, d),
+      [at, { url: S.url, title: 'Analyzing link…', status: 'processing', processingStartedAt: now, createdAt: now, sourceType: 'web', tags: [], category: '', summary: '' }],
+    );
+    t.mark('arrive');
+    await roll60(40);
+    const stages = [null, 'scraping', 'analyzing', 'connecting', 'organizing'];
+    for (let i = 0; i < stages.length; i++) {
+      if (stages[i]) await page.evaluate(([p, st]) => window.__capture.merge(p, { processingStage: st }), [at, stages[i]]);
+      t.mark(`phase${i}`);
+      await roll60(28);
+    }
+    await page.evaluate(
+      ([p, s, now]) =>
+        window.__capture.set(p, {
+          url: s.url,
+          title: s.title,
+          summary: s.summary,
+          detailedSummary: s.summary,
+          category: s.category,
+          tags: s.tags,
+          concepts: s.concepts,
+          status: 'unread',
+          createdAt: now,
+          sourceType: 'web',
+          sourceName: s.sourceName,
+          language: 'en',
+          relatedLinks: [],
+          collectionIds: [],
+          reminderStatus: 'none',
+          hideThumbnail: false,
+          metadata: { originalTitle: s.title, estimatedReadTime: s.readTime, thumbnailUrl: s.cover, thumbnailIsVideo: true },
+        }),
+      [at, S, now],
+    );
+    t.mark('done');
+    await roll60(96);
+
+    // 2. three weeks later: dated back, then the saves made since, oldest
+    // first, each landing on top of the feed as it arrives
+    await page.evaluate(([p, d]) => window.__capture.merge(p, { createdAt: d }), [at, now - S.buriedAge * DAY]);
+    t.mark('skip');
+    await roll60(14);
+    for (let k = 0; k < later.length; k++) {
+      await page.evaluate(([p, d]) => window.__capture.set(p, d), later[k]);
+      t.mark(`bury${k}`);
+      await roll60(14);
+    }
+    t.mark('buried');
+    await roll60(40);
+
+    // 3. Search your saves: the field tapped, the query typed a character
+    // at a time on the stepped clock, the feed narrowing as it types
+    await visible(page.getByPlaceholder('Search your saves')).click();
+    t.mark('focus');
+    await roll60(16);
+    t.mark('typing');
+    for (const ch of S.query) {
+      await page.keyboard.type(ch);
+      await t.advance();
+      await t.snap({ rects: RECTS });
+    }
+    // the debounce and the meaning search answer on the stepped clock
+    t.mark('result');
+    await roll60(60);
+    await t.thaw();
+    return t.save({ later: later.map(([p]) => p.split('/').pop()) });
   },
 };
 

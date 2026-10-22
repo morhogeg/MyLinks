@@ -16,7 +16,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ASK, CAPTURE_USER, CARDS, SEARCH } from './library.mjs';
+import { ASK, CAPTURE_USER, CARDS, SAVETHIS, SEARCH } from './library.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(here, '..', 'out', 'capture', 'app', 'out');
@@ -28,6 +28,7 @@ const TYPES = {
   '.json': 'application/json',
   '.txt': 'text/plain; charset=utf-8',
   '.png': 'image/png',
+  '.jpg': 'image/jpeg',
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
   '.woff2': 'font/woff2',
@@ -89,7 +90,7 @@ export function startServer(port = 4600) {
         }
         const q = String(body.query ?? '').trim().toLowerCase();
         // the reel's query, and every clip query that names its hits
-        const answer = [SEARCH, ...Object.values(SEARCH.clip ?? {})].find((x) => x.hits && x.query.toLowerCase() === q);
+        const answer = [SEARCH, ...Object.values(SEARCH.clip ?? {}), SAVETHIS].find((x) => x.hits && x.query.toLowerCase() === q);
         const hits = answer ? answer.hits : [];
         return json(res, 200, { links: hits.map((id) => ({ id })), mode: 'judge' });
       }

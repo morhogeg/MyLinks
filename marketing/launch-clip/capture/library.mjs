@@ -590,6 +590,38 @@ export const SYNTHESIS = {
   cardCount: 5,
 };
 
+/**
+ * SAVE THIS (clips/savethis-timeline.mjs): the reel's own Instagram post,
+ * saved from the share sheet, as the app would file it. Its cover is the
+ * reel's frame 0 (public/clips/savethis/cover.jpg, served to the capture),
+ * so the card reads as the video the viewer is watching. The summary is what
+ * the post says, in the app's voice; its words "never", "watch" and "again"
+ * are why the search finds it literally, with no other card matching. The
+ * handle is the brand's (`@machinaapp`, as on X).
+ */
+export const SAVETHIS = {
+  id: 'savethis',
+  url: 'https://www.instagram.com/machinaapp/',
+  title: 'You’re going to save this video',
+  summary:
+    'Most saved posts never get watched again. This one follows a save into Machina, which reads it and finds it again from whatever you remember.',
+  category: 'Productivity',
+  tags: ['saving', 'memory'],
+  concepts: ['memory', 'attention'],
+  sourceName: '@machinaapp',
+  readTime: 1,
+  /** served by the capture server from the static export's root */
+  cover: '/capture-savethis-cover.jpg',
+  /** days old it is when it is found again ("three weeks later") */
+  buriedAge: 20,
+  /** what the viewer remembers of it, typed into Search your saves */
+  query: 'never watch it again',
+  hits: ['savethis'],
+  /** no cooking content in this reel (owner, 2026-10-02) */
+  without: ['marcella', 'chicken'],
+  withoutCollections: ['cook'],
+};
+
 /** The card the Save beat captures (it is also the first Ask source). */
 export const SAVE = {
   id: 'tailend',

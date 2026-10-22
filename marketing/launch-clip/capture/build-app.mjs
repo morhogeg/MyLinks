@@ -22,7 +22,9 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const clip = path.join(here, '..');
-const web = path.join(clip, '..', '..', 'web');
+// CAPTURE_WEB: another checkout's web/ (a video branch whose own web/ is
+// older than main's captures today's app from a worktree of main)
+const web = process.env.CAPTURE_WEB ? path.resolve(process.env.CAPTURE_WEB) : path.join(clip, '..', '..', 'web');
 const app = path.join(clip, 'out', 'capture', 'app');
 
 if (!fs.existsSync(path.join(web, 'node_modules', 'next'))) {

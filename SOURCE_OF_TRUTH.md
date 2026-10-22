@@ -2637,6 +2637,32 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-22 — SAVE THIS: an organic Instagram Reel where the reel saves
+  itself (owner: "something extraordinary, not another video with captions
+  and the app's screens").** Branch `claude/reel-save-this` (built on
+  `claude/light-find`'s kit), not merged; README "SAVE THIS". 21.5s,
+  1080×1920, 30fps, H.264 + AAC. Hook on frame 0: "You're going to save this
+  video. And never watch it again." The bookmark falls through a trapdoor into
+  a well of every other save, the heap gathers into the mark on "Machina",
+  and the REAL app (today's `main`, captured through `CAPTURE_WEB`, a new
+  `build-app.mjs` switch, because the video branches' own `web/` is from
+  late September) reads the reel, buries it under nine newer saves, and
+  finds it from "never watch it again". Its cover is the reel's frame 0, so
+  the dive lands on frame 0 and the reel loops into its own hook ("See?
+  You're watching it again."). Narration: Gemini TTS Sulafat via
+  `narration-tts.yml` (runs 1 and 2; two lines re-voiced quicker). New:
+  `SAVETHIS` demo card + query (`capture/library.mjs`), `savethisClip` take,
+  `audio/savethis-score.mjs` (rendered twice, second copy kept, so it
+  loops), `audio/vo-to-44k.py` (soxr resample before the mix),
+  `audio/savethis-verify.mjs`. **Verified:** the gates pass (bans clean on
+  179 strings incl. every captured frame, every line 11 to 18dB over the
+  music in the speech band, −14.0 LUFS, −1.2 dBTP, 56 words); frame review
+  of every beat; the last frame matches frame 0. **Not verified:** nobody
+  has listened (no audio device here), including how "Machina" is said in
+  this take; the Instagram handle `@machinaapp` is assumed (only the X
+  handle is recorded). **Breaks two house rules on purpose:** it ends on the
+  loop, not the tagline (the tagline is said once at 77%), and the opening's
+  motion is bigger than the kit's restraint.
 - **2026-10-01 — Demo account: Mark Manson's essay replaces the old essay card.**
   Branch `claude/clip-find`, not merged. Owner: no mentions of the previous author
   anywhere. The demo account's essay card (`capture/library.mjs`) is now Mark

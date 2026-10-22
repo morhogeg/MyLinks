@@ -709,6 +709,82 @@ tick sounds; the narrator sits 8.1–17.0dB over the music in the speech band
 (the Gemini voice, noise sounds kept clear of it); the mix is −14.0 LUFS,
 −1.25 dBTP. Nobody has listened to it on speakers.
 
+## SAVE THIS (the organic Reel)
+
+`MachinaSaveThis` is a 21.5s vertical Reel built for Instagram, not a
+feature explainer. **The idea: the reel saves itself.** It opens by
+predicting that the viewer will save this video and never watch it again.
+The save falls into a well of every other save. "Unless you save it to
+Machina" gathers them into the mark, and the real app reads the reel,
+buries it under three weeks of newer saves, and finds it again from
+"never watch it again". The found card's cover is the reel's first
+frame, so the camera dives into it and lands ON frame 0: the reel loops
+into its own hook ("See? You're watching it again.").
+
+```bash
+# today's app (a video branch's own web/ can be weeks old: capture main's)
+git worktree add --detach <dir> origin/main && (cd <dir>/web && npm ci)
+CAPTURE_WEB=<dir>/web node capture/build-app.mjs
+# the poster first: the capture serves it to the app as the card's cover
+npx remotion still src/index.ts MachinaSaveThisPoster public/clips/savethis/cover.jpg --image-format=jpeg --jpeg-quality=92
+CAPTURE_ONLY=savethisClip node capture/shoot.mjs
+git checkout src/reels/data/takes.json   # shoot.mjs rewrites it from the takes present
+python3 audio/synth-vo.py savethis && python3 audio/vo-to-44k.py out/vo/savethis
+node audio/savethis-score.mjs && node audio/mix-vo.mjs savethis
+node audio/savethis-verify.mjs           # bans, windows, voice over music, −14 LUFS, the loop
+npx remotion render src/index.ts MachinaSaveThis out/savethis/master.mp4 --crf=14
+```
+
+| Time | Picture | On screen | Voice | Sound |
+|---|---|---|---|---|
+| 0:00 | The poster: type over an empty bookmark (frame 0, also the cover) | You're going to / save this video. | "You're going to save this video." | bare Am7 pad |
+| 0:00.9 | The thumb fills the bookmark with ink, on "save" | | | click and a low thock |
+| 0:01.9 | The type rolls out; the paper splits under the bookmark and swings down like a trapdoor | And never / watch it again. | "And never watch it again." | whoosh |
+| 0:02.3 | It falls into a well lined with grey, unreadable saves | | | a scale run falling |
+| 0:04.2 | It lands on the heap, in the beat after "there," | Right down there, / with all the others. | "Right down there, with all the others." | thud |
+| 0:04.5 | The camera dives at the heap: hundreds of saves | | | whoosh |
+| 0:05.6 | The heap and the well rush into one point | Unless you save it / to Machina. | "Unless you save it to Machina." | riser |
+| 0:07.0 | The brackets close on it: the mark, on "Machina" | | | impact, shimmer |
+| 0:07.5 | The mark lands on the processing card's own mark as the real app irises open: a share of this reel arriving | | | whoosh |
+| 0:07.9 | The pill, a phase a beat: Fetching the link, Reading the page, Writing the summary, Searching connections, Organizing & tagging | It reads every save, / from any app, | "It reads every save, from any app," | the band; a tick a phase |
+| 0:10.3 | "Saved to Machina"; the card: its cover is this reel's frame 0 | and remembers / what's in it. | "and remembers what's in it." | bell |
+| 0:11.7 | The whole feed; nine newer saves land on the card, one an 8th, and bury it | THREE WEEKS LATER / Weeks later, buried / under everything else, | "Weeks later, buried under everything else," | the band drops; a thud per save |
+| 0:14.5 | Search your saves, tapped; "never watch it again" types; the feed narrows to one card | type what you remember. | "type what you remember." | a click a character |
+| 0:16.3 | The card lifts: this reel, found | MACHINA / Everything you save, / finally useful. | "Everything you save, finally useful." | the band lands, full |
+| 0:18.7 | The thumb taps the cover; the camera dives; the cover opens to the frame | | | whoosh, riser |
+| 0:19.6 | The poster: frame 0 again | See? You're / watching it again. | "See? You're watching it again." | thud, bell |
+| 0:21.5 | Loops into 0:00 without a cut | | | |
+
+**What is real and what is not.** Every app pixel is the shipped app on
+`main` (2026-10-21), captured by `capture/shoot.mjs savethisClip`: the
+share-sheet placeholder card, the pill's real phase labels, the card,
+the burial (the nine saves made since, re-inserted oldest first), and
+the live search narrowing. Scripted, as in every capture: the backend
+(the stage changes, the card's analysis, the search hit). The one card
+written for this reel is the reel's own save (`SAVETHIS` in
+`capture/library.mjs`): what the app would make of this post, with the
+brand handle `@machinaapp` (the X handle; an Instagram handle is not
+recorded anywhere). The iOS share sheet and Instagram's UI are not
+captured, so they are not shown. No recipe cards in this account (owner,
+2026-10-02).
+
+**Two deliberate breaks from the house rules.** The reel ends on the
+loop, not on the tagline: the tagline is said once, over the found card
+at 77%, and the last frame is frame 0. And the opening (the trapdoor,
+the well, the heap) is the reel's own motion, bigger than the kit's
+restraint allows, in the same ink-on-paper grade.
+
+**The loop.** The set's drift is periodic over the reel
+(`paperDriftAt`), every layer but the poster is gone by the last frame,
+and the score is rendered twice in a row with the second copy kept, so
+its reverb and delay tails ring on into the start.
+
+**Voice.** Gemini TTS, Sulafat, per-line direction (the timeline is the
+script). Two lines were re-voiced quicker (run 2: the shaft line read
+3.84s, the tagline 3.13s). Lines are resampled to 44.1kHz with soxr
+before the mix (`audio/vo-to-44k.py`): the mix's linear interpolation
+of 24kHz voice is the REVISIT clip's "metallic" sizzle.
+
 ## Motion language
 
 The rules every Machina video follows, and the kit component that implements

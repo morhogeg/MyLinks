@@ -6,6 +6,9 @@ import { Film } from './Film';
 import { MachinaReel } from './reels/MachinaReel';
 import * as FIND from '../clips/find-timeline.mjs';
 import { FindClip } from './reels/clips/find/FindClip';
+import * as SAVETHIS from '../clips/savethis-timeline.mjs';
+import { PosterStill } from './reels/clips/savethis/PosterStill';
+import { SaveThis } from './reels/clips/savethis/SaveThis';
 
 /**
  * Compositions:
@@ -146,6 +149,35 @@ export const RemotionRoot: React.FC = () => (
       width={FIND.WIDTH}
       height={FIND.HEIGHT}
       defaultProps={{ withAudio: false, withCaptions: false }}
+    />
+    {/* SAVE THIS, the organic Reel (src/reels/clips/savethis,
+        clips/savethis-timeline.mjs). The poster is its frame 0, rendered
+        alone as the cover the app shows (the capture reads it) */}
+    <Composition
+      id="MachinaSaveThis"
+      component={SaveThis}
+      durationInFrames={SAVETHIS.TOTAL_FRAMES}
+      fps={SAVETHIS.FPS}
+      width={SAVETHIS.WIDTH}
+      height={SAVETHIS.HEIGHT}
+      defaultProps={{ withAudio: true, withCaptions: true }}
+    />
+    <Composition
+      id="MachinaSaveThisSilent"
+      component={SaveThis}
+      durationInFrames={SAVETHIS.TOTAL_FRAMES}
+      fps={SAVETHIS.FPS}
+      width={SAVETHIS.WIDTH}
+      height={SAVETHIS.HEIGHT}
+      defaultProps={{ withAudio: false, withCaptions: true }}
+    />
+    <Composition
+      id="MachinaSaveThisPoster"
+      component={PosterStill}
+      durationInFrames={1}
+      fps={SAVETHIS.FPS}
+      width={SAVETHIS.WIDTH}
+      height={SAVETHIS.HEIGHT}
     />
   </>
 );
