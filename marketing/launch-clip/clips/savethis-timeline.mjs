@@ -109,8 +109,11 @@ export const CAPTIONS = [
   // brought back (owner, round 2: the name in the voice); the drawn wordmark
   // wipes in on "Machina"
   { at: HITS.tagline, to: 678, place: 'scene', text: 'Machina.\nEverything you save,\nfinally useful.', duck: 0.4, style: 'A confident, warm sign-off; the name with a smile, then the tagline sincere but brisk, no drawn-out words.', pace: PACE },
-  // the dive lands on frame 0, and the reel starts again under this line
-  { at: 712, to: 760, text: 'See? You’re\nwatching it again.', duck: 0.4, style: 'Playful and delighted, a little laugh in the voice on "See?", then landing the joke warmly.', pace: PACE },
+  // the thumb taps the found card's cover and the camera dives into it,
+  // landing on frame 0 as the reel starts again under this line. (owner,
+  // round 4: "See? You're watching it again." read as a riddle) The hook's
+  // "never watch it again", answered as a promise
+  { at: 692, to: 764, text: 'This time, you’ll\nwatch it again.', duck: 0.4, style: 'Warm and sure, a small smile in the voice: a promise, not a punchline. Light and quick, a short breath after "This time", landing softly on "again".', pace: PACE },
 ];
 
 /** a small letterspaced label above the line, with it (the kit's Kicker) */
