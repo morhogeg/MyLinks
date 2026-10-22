@@ -2637,6 +2637,28 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-22 (round 16) — SAVE THIS: the hook reordered, at its own pace
+  (owner: "is 'a million saves you never opened' good enough?"; "the pacing
+  of that part is too fast and not clear"; the script reviewed for clarity
+  and benefits, and the hook agreed in chat before building).** Branch
+  `claude/reel-save-this`. The opening now reads "You're going to save this
+  video. Right down there, buried with everything else you saved, and never
+  watch it again. Unless you save it to Machina." ("Unless" answers "never
+  watch it again"; the owner's order, without a "forgot" that said the same
+  thing twice). The middle line is the plainer of two reads at its natural
+  pace (3.08s, a beat after "there," and after "buried"); "and never watch
+  it again" keeps its take (`tts` keeps the key, the caption continues the
+  sentence in lowercase). The hook takes two beats more and everything from
+  the gather on follows (29.4s); the dive into the pile slows with it (its
+  largest frame step 20.0 to 15.9). The other ten lines were reviewed and
+  kept: they read naturally and carry the benefits in order (any app;
+  understood and summed up; filed by topic; connected; asked; answered
+  with sources). **Verified:** gates (bans, windows, 80 words, every line
+  11.4 to 21.8dB over the music, −14.02 LUFS, −1.26 dBTP, audio seam step
+  0.039 against the score's own 0.104); the hook every fifth frame, the
+  rest every fourteenth; every frame pair scanned for one-frame flashes
+  (none); the encode (882 frames, 29.4s, −13.9 LUFS, −1.3 dBTP). **Not
+  verified:** listened to.
 - **2026-10-22 (round 15) — SAVE THIS: "with a million saves you never
   opened", Ask opening held still (owner: "'with your saves from countless
   apps' is not clear enough; something along the lines of with the other
