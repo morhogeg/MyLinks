@@ -191,12 +191,15 @@ const dotAt = (i: number) => center(rectOf(T, i, 'node0'));
  * the camera goes down onto the answer and its citations, and the paper
  * (SaveThis.tsx PROOF_SCRIM) rises over the bubble.
  */
-const ASK_CAM: Record<'screen' | 'typing' | 'answer' | 'proof', Cam> = {
+const ASK_CAM: Record<'screen' | 'screenDown' | 'typing' | 'answer' | 'proof', Cam> = {
   // (round 10) Ask opening: its mark, "What do you want to recall?", its
   // promise and the questions it suggests about the saves (y 210 to 570 on
   // the take), clear under the band; at least the frame's width (393pt at
-  // 2.75), so the screen's edges never show
-  screen: { cx: 196.5, cy: 395, z: 2.8, fx: 540, fy: 1090, rx: 0, ry: 0, rz: 0 },
+  // 2.75), so the screen's edges never show. (round 12: three seconds held
+  // read as stuck) it glides down across the suggestions toward the
+  // composer, where "ask" cuts in; the screen's foot stays under the frame
+  screen: { cx: 196.5, cy: 335, z: 2.8, fx: 540, fy: 1090, rx: 0, ry: 0, rz: 0 },
+  screenDown: { cx: 196.5, cy: 480, z: 2.9, fx: 540, fy: 1090, rx: 0, ry: 0, rz: 0 },
   // the composer the width of the frame: the question, big, on clean paper
   typing: { cx: 196.5, cy: center(COMPOSER).y, z: 3.0, fx: 540, fy: 1150, rx: 0, ry: 0, rz: 0 },
   answer: { cx: 196.5, cy: BUBBLE[1] + 140, z: 2.5, fx: 540, fy: 720 + 140 * 2.5, rx: 0, ry: 0, rz: 0 },
@@ -229,9 +232,9 @@ export const appKeys: Key[] = [
   { f: S.graph - 1, z: 2.5, ease: linear },
   // (round 4) S.graph to S.knows: the graph, on its own camera (graphCam)
   { f: S.knows - 1, ...ASK_CAM.screen },
-  // (rounds 10–12) CUT to Ask opening on "Now every save", a slow push…
+  // (rounds 10–12) CUT to Ask opening on "Now every save", gliding down…
   { f: S.knows, ...ASK_CAM.screen },
-  { f: S.askTap - 1, z: ASK_CAM.screen.z * 1.06, ease: linear },
+  { f: S.askTap - 1, ...ASK_CAM.screenDown, ease: EASE_IN_OUT },
   // (round 9) …CUT to its composer on "So ask it anything": the question
   // bursts in
   { f: S.askTap, ...ASK_CAM.typing },
