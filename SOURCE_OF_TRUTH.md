@@ -2637,6 +2637,30 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-22 (round 13) — SAVE THIS: the logo to the last frame, a ping
+  on each citation (owner: "final frame: the Machina logo, keep 'this time
+  you'll watch it'"; "the graph lingers a bit too long"; "the proof should
+  linger half a second longer"; "a cool highlight around each citation, a
+  ping for each"; "the tagline in one line").** Branch
+  `claude/reel-save-this`. `EndCard.tsx`: the lockup (the app's mark drawing
+  in, the wordmark, "Everything you save, finally useful." now on one line)
+  holds to the last frame on a slow push under "This time, you'll watch it
+  again."; the bracket opening into the poster is gone (`OpeningMark`
+  removed), and the loop cuts on the beat to the hook (verify now gates
+  that the last line is still up on the last frame). The graph cuts to Ask
+  half a beat sooner. On the beat after "proof", an 8th apart
+  (`CITE_PINGS`), each citation pops forward and two ink rings leave its
+  edge (the kit's new `Ping`, riding the card's own lift), each with a
+  rising ping in the score (`synth.mjs` `ping`, E6 G6 B6), which the score
+  lifts back up through the mix's duck under the voice so the three land
+  alike. The proof holds a beat longer for it. 28.5s, 78 words.
+  **Verified:** gates (bans on 254 strings, windows, every line 12.5 to
+  19.7dB over the music, −14.04 LUFS, −1.26 dBTP, audio seam step 0.057
+  against the score's own 0.104); the pings within 1.1dB of each other in
+  the mix; every third frame from the graph to the brand card and every
+  sixth to twelfth elsewhere; every frame pair scanned for one-frame flashes
+  (none); the encode (854 frames, 28.47s, −13.9 LUFS, −1.1 dBTP).
+  **Not verified:** listened to.
 - **2026-10-22 (round 12) — SAVE THIS: a clear "So,", the brand card, a
   question about the three, a longer graph (owner: "'So' isn't heard";
   "the final frame should show the Machina logo animated, not the Ask
