@@ -1,6 +1,6 @@
 {
   "_": "Voice narration on GitHub with Gemini TTS (.github/workflows/narration-tts.yml). Edit, commit, push: the workflow voices what is listed and commits the takes to audio/vo-takes/. `scripts`: synth-vo.py scripts to voice in `voice`. Bump `run` to re-run with no other change. Voice each line once (the daily quota is shared).",
-  "run": 11,
+  "run": 12,
   "voice": "Sulafat",
   "model": "gemini-3.8-flash-tts",
   "scripts": [
@@ -8,11 +8,25 @@
   ],
   "takes": [
     {
-      "name": "knows-b",
+      "name": "bridge-a",
       "voice": "Sulafat",
-      "text": "Now it knows your saves better than you do.",
-      "style": "Playful and sure, letting you in on it with a grin; brisk and light, one breath, no drawn-out words. Pace: Brisk, playful and conversational, about 175 words a minute; pauses short and light, never a dramatic beat. The product name \"Machina\" is the Latin word, said the classical Latin way: MAH-kee-nah, stress on the FIRST syllable; \"ch\" is a hard \"k\"; open vowels, \"a\" as in \"father\" (not as in \"cat\"), a short \"ee\", and a clear \"ah\" at the end, not \"nuh\". Never mah-KEE-nah.",
-      "_style": "Playful and sure, letting you in on it with a grin; brisk and light, one breath, no drawn-out words."
+      "text": "Now it knows what’s in every save.",
+      "style": "Warm and easy, a small smile, flowing on from the line before; light and quick, no drawn-out words. Pace: Brisk, playful and conversational, about 175 words a minute; pauses short and light, never a dramatic beat. The product name \"Machina\" is the Latin word, said the classical Latin way: MAH-kee-nah, stress on the FIRST syllable; \"ch\" is a hard \"k\"; open vowels, \"a\" as in \"father\" (not as in \"cat\"), a short \"ee\", and a clear \"ah\" at the end, not \"nuh\". Never mah-KEE-nah.",
+      "_style": "Warm and easy, a small smile, flowing on from the line before; light and quick, no drawn-out words."
+    },
+    {
+      "name": "bridge-b",
+      "voice": "Sulafat",
+      "text": "Now every save is one question away.",
+      "style": "Warm and easy, a small smile, flowing on from the line before; light and quick, no drawn-out words. Pace: Brisk, playful and conversational, about 175 words a minute; pauses short and light, never a dramatic beat. The product name \"Machina\" is the Latin word, said the classical Latin way: MAH-kee-nah, stress on the FIRST syllable; \"ch\" is a hard \"k\"; open vowels, \"a\" as in \"father\" (not as in \"cat\"), a short \"ee\", and a clear \"ah\" at the end, not \"nuh\". Never mah-KEE-nah.",
+      "_style": "Warm and easy, a small smile, flowing on from the line before; light and quick, no drawn-out words."
+    },
+    {
+      "name": "bridge-c",
+      "voice": "Sulafat",
+      "text": "Now it knows them all.",
+      "style": "Warm and easy, a small smile, flowing on from the line before; light and quick, no drawn-out words. Pace: Brisk, playful and conversational, about 175 words a minute; pauses short and light, never a dramatic beat. The product name \"Machina\" is the Latin word, said the classical Latin way: MAH-kee-nah, stress on the FIRST syllable; \"ch\" is a hard \"k\"; open vowels, \"a\" as in \"father\" (not as in \"cat\"), a short \"ee\", and a clear \"ah\" at the end, not \"nuh\". Never mah-KEE-nah.",
+      "_style": "Warm and easy, a small smile, flowing on from the line before; light and quick, no drawn-out words."
     }
   ],
   "audition": [],
