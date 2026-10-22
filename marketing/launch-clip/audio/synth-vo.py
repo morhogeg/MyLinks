@@ -186,12 +186,45 @@ def savethis_script():
 SCRIPTS["savethis"] = (savethis_script, os.path.join(VO, "savethis"))
 WORD_TIMING["savethis"] = os.path.join(ROOT, "src", "reels", "clips", "savethis", "savethis-vo.json")
 
+
+# ── FIND THE BOOK, the needle reel ───────────────────────────────────────────
+# Read from clips/needle-timeline.mjs exactly as SAVE THIS's are, and voiced
+# the same way (Gemini TTS, Sulafat, a line's own style and pace):
+# out/vo/needle/ + src/reels/clips/needle/needle-vo.json
+def needle_script():
+    js = (
+        "import('./clips/needle-timeline.mjs').then(m => console.log(JSON.stringify("
+        "{ fps: m.FPS, captions: m.CAPTIONS })))"
+    )
+    raw = subprocess.run(["node", "-e", js], cwd=ROOT, check=True, capture_output=True, text=True).stdout
+    data = json.loads(raw)
+    return [
+        {
+            "frame": c["at"],
+            "start": c["at"] / data["fps"],
+            "window": (c["to"] - c["at"]) / data["fps"],
+            "text": " ".join((c.get("say") or c["text"]).split()).replace("Machina", SAY_NAME),
+            "speed": SPEED,
+            "style": c.get("style"),
+            "tts": " ".join((c.get("tts") or c.get("say") or c["text"]).split()),
+            "max_pause": c.get("maxPause"),
+            "tempo": c.get("tempo"),
+            "run_gap": c.get("runGap"),
+            "pace": c.get("pace"),
+        }
+        for c in data["captions"]
+    ]
+
+
+SCRIPTS["needle"] = (needle_script, os.path.join(VO, "needle"))
+WORD_TIMING["needle"] = os.path.join(ROOT, "src", "reels", "clips", "needle", "needle-vo.json")
+
 # a script's own engine (VO_ENGINE overrides): the FIND clip is voiced by
 # Gemini TTS, Sulafat, with its own tone and line-by-line direction (owner,
 # 2026-10-03: each video gets its own tone); everything else stays on Kokoro
-ENGINE = {"find": "gemini", "savethis": "gemini"}
+ENGINE = {"find": "gemini", "savethis": "gemini", "needle": "gemini"}
 # and its Gemini model (GEMINI_TTS_MODEL overrides)
-GEMINI_MODEL = {"find": "gemini-3.8-flash-tts", "savethis": "gemini-3.8-flash-tts"}
+GEMINI_MODEL = {"find": "gemini-3.8-flash-tts", "savethis": "gemini-3.8-flash-tts", "needle": "gemini-3.8-flash-tts"}
 
 
 def speech_runs(samples, sr, gap=0.09):
