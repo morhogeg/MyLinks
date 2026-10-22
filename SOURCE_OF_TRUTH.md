@@ -2684,6 +2684,20 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-22 — REVIEWER ACCOUNT PREPPED FOR SUBMISSION (`as-prep`, owner's
+  go).** `machinareviewer` (`users/cJSmZgLyC7bMmPZq1IVZFSpPW9x2`): entitlement
+  set to a fresh 14-day Pro trial ending **2026-11-05 08:02 UTC** (plan pro,
+  source trial, `trialEndsAt` = `proUntil`, `nudgedAt` null), and
+  `aiConsentAt` deleted. Both read back after the write. The 19 Oct consent
+  stamp came from the owner's own fresh-install test (agreeing re-sets it), so
+  the notice now shows only because the field is gone. **Owner: don't sign
+  into `machinareviewer` on your phone until review ends** (the app's local
+  cache re-uploads consent). The "wait for the test subscription to stop
+  renewing (~24 Oct)" condition was moot: it transferred to the owner's
+  account on 19 Oct. Only gate left before review: `as-submit`. Found, not
+  fixed: `rebuild_connections` callable 401s on cold instances (97 of 206
+  calls since 10-08) because the Admin SDK is initialized lazily inside
+  handlers and the callable wrapper verifies the token first.
 - **2026-10-21 (later) — SCALE CHECK: SEARCH CAP 10 → 50, ERROR ALERTS LIVE
   (owner: "if I launch today, is the backend ready?").** Answer: yes to
   ~200 active users; the binding limit was the Gemini spend cap (₪500, sized
