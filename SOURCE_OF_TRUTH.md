@@ -2651,7 +2651,9 @@ exact-match, capped.
   word gate is back to the brief's 75). **Verified:** gates (bans on 252
   strings including every captured frame, windows, every line 10.7 to
   17.5dB over the music, −14.04 LUFS, −1.25 dBTP, seam step 0.019 against
-  the score's own 0.119); stills of every beat. **Not verified:**
+  the score's own 0.119); stills of every beat; the encode (714 frames,
+  −14.0 LUFS, −1.3 dBTP), its last frame against frame 0 at 51.8dB PSNR
+  (the hook's own first step, frame 0 to 1: 45.4dB). **Not verified:**
   listened to.
 - **2026-10-22 (round 8) — SAVE THIS: the Ask section rebuilt (owner: "no
   connection between 'you'll never watch it again' and 'ask'"; "you say the
