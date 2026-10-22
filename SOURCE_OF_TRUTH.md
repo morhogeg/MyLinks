@@ -2637,6 +2637,21 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-22 (round 8) — SAVE THIS: the Ask section rebuilt (owner: "no
+  connection between 'you'll never watch it again' and 'ask'"; "you say the
+  answer and the proof without saying you get it: ask, get, the answer, the
+  proof").** Branch `claude/reel-save-this`. The section now reads "But
+  you'll never rewatch them all." (the feed flicked) / "Machina already
+  did." (the link: it has been through every save; over the Ask screen's
+  own promise, "What do you want to recall? Answers come only from your 23
+  saves, with sources you can open.") / "So ask it anything, and get the
+  answer, with the proof." (one sentence, each part on its own picture: a
+  cut to the composer and the question on "ask", the answer streaming on
+  "get the answer", the three citations landing on "proof"; the brisker of
+  two reads of each new line). Same capture as round 7; only the cut,
+  the voice and the score changed. 26.6s, 80 words (the word gate's
+  ceiling is now 80). **Verified:** gates (bans on 254 strings including every captured frame, windows, every line 10.6 to 18.8dB over the music, −14.01 LUFS, −1.18 dBTP, seam step 0.034 against the score's own 0.111); stills of every beat; the encode's last frame against frame 0 at 47.8dB PSNR (consecutive frames: 42.3dB). **Not verified:**
+  listened to.
 - **2026-10-22 (round 7) — SAVE THIS: the problem, then Ask as its payoff
   (owner: "it doesn't need the weeks later, not relevant"; "a sentence before
   Ask showing the issue, then Ask is the payoff"; "Apple grade").** Branch

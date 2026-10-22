@@ -23,10 +23,13 @@ import VO from './savethis-vo.json';
  *          saved before", as the app's camera glides in on them
  *  issue   (round 7) "But you'll never rewatch them all": CUT to the feed,
  *          flicked down past every other save
- *  ask     CUT to Ask on "So ask your saves anything": a real question
- *          bursts in; sent, the answer streams from the saves, and the three
- *          it came from land under it, cited (the proof), lifting one by
- *          one; the tagline sits above them
+ *  ask     (round 8) "Machina already did": CUT to the Ask screen, its own
+ *          words ("What do you want to recall? Answers come only from your
+ *          saves, with sources you can open."); "So ask it anything": CUT
+ *          to its composer, a real question bursting in; "and get the
+ *          answer": sent, the answer streams from the saves; "with the
+ *          proof": the three it came from land under it, cited, lifting one
+ *          by one; the tagline sits above them
  *  tap     the thumb opens this reel's citation: its card, its cover the
  *          poster whole, and the camera dives into it until it IS the frame
  *          (Dive.tsx hands over to the poster itself)
@@ -196,7 +199,11 @@ const FEED_CAM: Cam = { cx: 196.5, cy: 430, z: 2.3, fx: 540, fy: 1150, rx: 0, ry
  * the camera goes down onto the answer and its citations, and the paper
  * (SaveThis.tsx PROOF_SCRIM) rises over the bubble.
  */
-const ASK_CAM: Record<'typing' | 'answer' | 'proof' | 'card', Cam> = {
+const ASK_CAM: Record<'screen' | 'typing' | 'answer' | 'proof' | 'card', Cam> = {
+  // the Ask screen's own promise, the frame's width: its mark, "What do you
+  // want to recall?" and "Answers come only from your saves, with sources
+  // you can open." (y 220 to 345 on the take)
+  screen: { cx: 196, cy: 282, z: 3.2, fx: 540, fy: 1000, rx: 0, ry: 0, rz: 0 },
   // the composer the width of the frame: the question, big, on clean paper
   typing: { cx: 196.5, cy: center(COMPOSER).y, z: 3.0, fx: 540, fy: 1150, rx: 0, ry: 0, rz: 0 },
   answer: { cx: 196.5, cy: BUBBLE[1] + 140, z: 2.5, fx: 540, fy: 720 + 140 * 2.5, rx: 0, ry: 0, rz: 0 },
@@ -237,8 +244,11 @@ export const appKeys: Key[] = [
   // (round 7) CUT to the feed: held while it is flicked past
   { f: S.issue, ...FEED_CAM },
   { f: S.askTap - 1, z: FEED_CAM.z * 1.03, ease: linear },
-  // CUT to Ask: its composer, the question bursting in, held
-  { f: S.askTap, ...ASK_CAM.typing },
+  // (round 8) CUT to the Ask screen on "Machina already did"…
+  { f: S.askTap, ...ASK_CAM.screen },
+  { f: S.asking - 1, z: ASK_CAM.screen.z * 1.03, ease: linear },
+  // …CUT to its composer on "So ask it anything": the question bursts in
+  { f: S.asking, ...ASK_CAM.typing },
   { f: S.send - 1, z: ASK_CAM.typing.z * 1.03, ease: linear },
   // CUT on the send: the question up top, the answer streaming under it
   { f: S.send, ...ASK_CAM.answer },

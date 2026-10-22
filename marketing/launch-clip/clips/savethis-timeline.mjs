@@ -55,19 +55,19 @@ export const HITS = {
   done: beat(22), // …and the card, read
   graph: beat(26), // "…by topic,": CUT to the graph, the saves mapped by topic
   connect: beat(28), // "…connects it to": the thumb on its dot; its ties light on "what you've saved before"
-  // (round 7) the problem, then Ask as its payoff
+  // (round 7) the problem; (round 8) the link, then Ask, on its words
   issue: beat(31), // "But you'll never rewatch them all": the feed, flicked
-  askTap: beat(34.5), // "So ask your saves anything": CUT to Ask
-  asking: beat(35.5), // the question, typed
-  send: beat(37.5), // sent: the answer streams ("Get the answer,…")
-  proof: beat(40.5), // the saves it came from, cited ("…and the proof")
-  tagline: beat(42), // "Machina. Everything you save, finally useful."
-  citeTap: beat(50), // the thumb opens this reel's citation: its card…
-  poster: beat(52), // …and the dive into its cover lands ON frame 0
+  askTap: beat(34.5), // "Machina already did": CUT to the Ask screen
+  asking: beat(37.5), // "So ask it anything": CUT to its composer, the question types
+  send: 550, // "and get the answer": sent, the answer streams
+  proof: beat(41.5), // "with the proof": the saves it came from, cited
+  tagline: beat(43), // "Machina. Everything you save, finally useful."
+  citeTap: beat(51), // the thumb opens this reel's citation: its card…
+  poster: beat(53), // …and the dive into its cover lands ON frame 0
 };
 
 /** a whole beat, so the score's pulse runs straight through the loop */
-export const TOTAL_FRAMES = beat(56);
+export const TOTAL_FRAMES = beat(57);
 export const TOTAL_SEC = TOTAL_FRAMES / FPS;
 
 /** The cut. One beat of story per scene. */
@@ -116,10 +116,10 @@ export const CAPTIONS = [
   // "the answer, and the proof" never said who gets it) the link: it has
   // already been through every save; over the Ask screen ("What do you want
   // to recall? Answers come only from your saves, with sources you can open.")
-  { at: 483, to: 516, text: 'Machina already did.', style: 'Knowing and warm, the twist, with a small smile: the name light, "already did" landing with quiet confidence; quick, no drawn-out words.', pace: PACE },
+  { at: HITS.askTap, to: HITS.asking - 3, text: 'Machina already did.', style: 'Matter-of-fact and pleased, a quiet reveal; one quick breath, the name with a smile.', pace: PACE },
   // …so ask it: the question types on "ask it anything", the answer streams
   // on "get the answer", the saves it came from land on "proof"
-  { at: 518, to: 604, text: 'So ask it anything,\nand get the answer,\nwith the proof.', style: 'Easy and clear, like explaining the simplest thing: three light beats, each landing cleanly, a small lift on "proof"; brisk, no drawn-out words.', pace: PACE },
+  { at: HITS.asking - 1, to: HITS.tagline - 6, text: 'So ask it anything,\nand get the answer,\nwith the proof.', style: 'Confident and simple, one easy sentence in three quick beats; light and brisk, landing softly on "proof".', pace: PACE },
   // the name and the tagline, said once, over the answer and its proof
   // (owner, round 2: the name in the voice); the drawn wordmark wipes in on
   // "Machina"

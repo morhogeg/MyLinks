@@ -102,30 +102,33 @@
   ]
  },
  {
-  "frame": 486,
-  "text": "So ask your saves anything.",
+  "frame": 483,
+  "text": "Makeena already did.",
+  "words": [
+   0.03,
+   0.468,
+   0.906
+  ]
+ },
+ {
+  "frame": 524,
+  "text": "So ask it anything, and get the answer, with the proof.",
   "words": [
    0.01,
-   0.157,
-   0.352,
-   0.597,
-   0.891
+   0.121,
+   0.269,
+   0.38,
+   0.749,
+   0.897,
+   1.045,
+   1.193,
+   1.489,
+   1.853,
+   2.001
   ]
  },
  {
-  "frame": 532,
-  "text": "Get the answer, and the proof.",
-  "words": [
-   0.02,
-   0.142,
-   0.265,
-   0.82,
-   0.977,
-   1.135
-  ]
- },
- {
-  "frame": 588,
+  "frame": 602,
   "text": "Makeena. Everything you save, finally useful.",
   "words": [
    0.03,
@@ -137,7 +140,7 @@
   ]
  },
  {
-  "frame": 718,
+  "frame": 732,
   "text": "This time, you\u2019ll watch it again.",
   "words": [
    0.04,

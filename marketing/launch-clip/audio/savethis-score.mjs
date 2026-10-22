@@ -174,7 +174,11 @@ const arrange = (o) => {
 
   // ── (round 6) Ask: the cut in, the question bursting in (a soft click a
   // frame, two characters each), the send; the answer streams on the band
+  // (round 8) "Machina already did": the cut to the Ask screen, a light note
+  // on its reveal; "So ask it anything": the cut to its composer
   tick(t(H.askTap), 0.09, 1.15);
+  pluck(t(H.askTap + 1), 79, 0.05, 0, 0.5);
+  tick(t(H.asking), 0.07, 1.25);
   for (let k = 0; k < CHARS; k += 2) tick(t(H.asking + k * TYPE_FRAMES), 0.02, 1.5 + ((k * 7) % 5) * 0.06);
   tick(t(H.send), 0.11, 1.2);
   sub(t(H.send), 45, 0.2, 0.3);
