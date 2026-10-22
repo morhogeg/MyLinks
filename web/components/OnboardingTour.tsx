@@ -376,7 +376,7 @@ function buildSteps(native: boolean): Step[] {
             icon: <MessageCircleQuestion className="w-4 h-4" />,
             eyebrow: 'Recall',
             title: 'Ask, and find',
-            body: 'Ask in plain words and get a real answer drawn only from what you saved, with citations. Search the same way: “that video about waking up early” finds it, in English or Hebrew.',
+            body: 'Ask a question and get an answer built only from your saves, with links to the sources it used. Search works by meaning too: “that video about waking up early” finds it, even if you don’t remember the title.',
             visual: <AskMock />,
         },
         {
