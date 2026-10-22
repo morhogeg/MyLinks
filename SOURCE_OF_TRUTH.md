@@ -2741,7 +2741,12 @@ exact-match, capped.
   `tests/test_share_moderation.py`). Not verified: the check against live
   Gemini, the Swift change compiled (CI will), anything on a device.
   `docs/APP_STORE.md` §2 age-rating answers and §3 review notes updated (owner
-  pastes the new notes bullet). Owner console list (subscriptions attached to
+  pastes the new notes bullet). **SHIPPED:** merge `d5aac129`
+  (`Deploy-Functions: publish_share_http, share_page, trial_nudges`) →
+  functions run #140 green, Python tests #163 and E2E #69 green, Vercel live
+  (curl: Terms and Privacy dated Oct 22, share 404 page shows the contact
+  line), TestFlight run #382 = **build 1382** (gated, entitlements verified).
+  **Owner: attach 1382 to 1.0 in place of 1381** before submitting. Owner console list (subscriptions attached to
   1.0, age questions, description Pro paragraph, screenshots 1+5 faces) is in
   the report.
 - **2026-10-22 — REVIEWER ACCOUNT PREPPED FOR SUBMISSION (`as-prep`, owner's
