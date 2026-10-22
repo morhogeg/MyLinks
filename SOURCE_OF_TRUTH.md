@@ -1849,15 +1849,21 @@ The multi-user auth work described below **was** fully written but not live:
     - Old links keep working — the Firebase host stays live and unchanged, so
       nothing already shared breaks. Do NOT retire it, and do NOT remove it from
       either authorized-domain list (it is the `authDomain`).
-    - **[x] Mail — DONE 2026-08-06.** Cloudflare **Email Routing** (free) on
-      `mymachina.app`: `hello@` and `support@` both forward to the owner's Gmail,
-      delivery owner-tested. Three `route{1,2,3}.mx.cloudflare.net` MX records
-      plus an SPF TXT, and Cloudflare **locks** them — unlock only to swap
-      providers. **Receive-only:** replies go out as the personal Gmail. Real
-      sending needs Google Workspace (≈$7/mo), which means *replacing* the MX
-      records — a swap, not an addition; never run both at once. (The destination
-      auto-verified with no confirmation email because it matches the Cloudflare
-      account's own address — that is expected, not a bug.)
+    - **[x] Mail — moved to Google Workspace (owner, before 2026-10-22).** The
+      domain's MX records are now Google's five (`aspmx.l.google.com` priority
+      1, `alt1/alt2` 5, `alt3/alt4` 10), DNS-only at Cloudflare, so mail to
+      `@mymachina.app` lands in Workspace and can be sent from it. This
+      replaced the 2026-08-06 setup (Cloudflare **Email Routing**, three
+      `route{1,2,3}.mx.cloudflare.net` records, forward-only to the personal
+      Gmail). **Do not re-add the Cloudflare MX records** — running both
+      providers splits delivery. Open owner steps, seen in live DNS 2026-10-22:
+      (a) the SPF TXT still reads `include:_spf.mx.cloudflare.net
+      include:_spf.google.com` — drop the Cloudflare include once Email
+      Routing is off; (b) **no DKIM** (`google._domainkey` is empty) — generate
+      it in Admin console → Apps → Gmail → Authenticate email and add the TXT,
+      or mail sent as `support@` is likely to land in spam; (c) **no DMARC**
+      (`_dmarc` is empty) — add `v=DMARC1; p=none; rua=mailto:support@mymachina.app`
+      after DKIM is in place (Cloudflare's dashboard also recommends this).
     - **[x] App Store URLs — updated in `docs/APP_STORE.md`** to the new domain,
       plus a `support@mymachina.app` row. ⚠️ Both the Support and Marketing URLs
       point at the app root, which is now the **public landing page** — task 25
@@ -1913,9 +1919,10 @@ The multi-user auth work described below **was** fully written but not live:
       pattern as the Search Console TXT); (2) in the Admin console create a
       Google **Group** `support@mymachina.app` and add `morhogeg@gmail.com` as
       its **owner**; (3) back in Branding, pick it from the dropdown (may take
-      a while to appear) and save. **Do NOT touch the MX records** — mail to
-      `support@` keeps flowing through Cloudflare to Gmail exactly as today
-      (§4 task 26); the group exists only as the selectable identity. Caveat:
+      a while to appear) and save. **Superseded 2026-10-22:** the domain is now
+      on Google Workspace (see the Mail bullet under task 22), so steps (1)–(2)
+      are no longer needed — create `support@` as a Workspace user or Group in
+      the existing Admin console and pick it in Branding. Caveat:
       any Branding edit can trigger a quick re-review — verification just
       passed, so expect at worst a short re-check, and don't bundle other
       branding changes into the same save.
@@ -2683,6 +2690,25 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-10-22 — `www.mymachina.app` FIXED; mail is on Google Workspace
+  (console only, no code).** Vercel showed `www` as "Invalid Configuration"
+  because the 2026-08-06 cutover only created `CNAME @`, so `www` didn't exist
+  in DNS (Cloudflare's authoritative nameserver returned no record).
+  Owner added Cloudflare `CNAME www → b62645f73a7993cc.vercel-dns-017.com`,
+  **DNS-only**; Vercel issued the Let's Encrypt cert on its own (the
+  interim "Failed To Generate Cert" badge was stale and cleared without a
+  click), then `www` was set to **308 → `mymachina.app`**. Verified with
+  curl: `https://www.mymachina.app/some/path?x=1` → 308 to
+  `https://mymachina.app/some/path?x=1`. The bare domain stays the one
+  Production host (share links are built bare; sign-in state is per-origin,
+  so serving both would split sessions). **Keep `my-links-sable.vercel.app`**
+  as is: links from before August use it, `SourceByline.tsx`/`share_service.py`
+  list it as a Machina host, `vercel.json` allows it in `frame-ancestors`, and
+  it is the fallback if the brand domain's DNS breaks. The owner also confirmed
+  that the MX records moved to Google Workspace on purpose; §4 task 22's Mail bullet
+  is rewritten and 25d is marked superseded. New owner steps there: drop the
+  stale Cloudflare SPF include, add DKIM, add DMARC.
 
 - **2026-10-21 (later) — SCALE CHECK: SEARCH CAP 10 → 50, ERROR ALERTS LIVE
   (owner: "if I launch today, is the backend ready?").** Answer: yes to
