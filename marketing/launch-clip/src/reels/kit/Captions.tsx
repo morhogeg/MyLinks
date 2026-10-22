@@ -31,12 +31,16 @@ export const SLOTS = { kicker: 290, top: 346 };
  */
 export const BAND = { solid: 510, clear: 720 };
 
-export const BandScrim: React.FC<{ opacity?: number }> = ({ opacity = 1 }) => (
+/** a #RRGGBB tone at no opacity, for a gradient that fades it out */
+export const clearOf = (hex: string) =>
+  `rgba(${parseInt(hex.slice(1, 3), 16)},${parseInt(hex.slice(3, 5), 16)},${parseInt(hex.slice(5, 7), 16)},0)`;
+
+export const BandScrim: React.FC<{ opacity?: number; tone?: string }> = ({ opacity = 1, tone = '#EEF0F4' }) => (
   <AbsoluteFill
     style={{
       pointerEvents: 'none',
       opacity,
-      background: `linear-gradient(180deg, #EEF0F4 0px, #EEF0F4 ${BAND.solid}px, rgba(238,240,244,0) ${BAND.clear}px)`,
+      background: `linear-gradient(180deg, ${tone} 0px, ${tone} ${BAND.solid}px, ${clearOf(tone)} ${BAND.clear}px)`,
     }}
   />
 );

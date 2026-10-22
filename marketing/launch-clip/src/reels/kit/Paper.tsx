@@ -12,12 +12,16 @@ import { Grain, SET_BG, Vignette } from '../../film/effects';
  * Grade rules: light only (ink on paper, never a dark flip), no colour casts,
  * no gradients that band; grain and a whisper of vignette are the lens.
  */
-export const Paper: React.FC<{ drift?: number; lift?: number; children?: React.ReactNode }> = ({
-  drift = 0,
-  lift = 1,
-  children,
-}) => (
-  <AbsoluteFill style={{ background: SET_BG, overflow: 'hidden' }}>
+export const Paper: React.FC<{
+  drift?: number;
+  lift?: number;
+  /** the paper's base tone (default the film's SET_BG) */
+  tone?: string;
+  /** how much of the two cool pools (1: the film's) */
+  cool?: number;
+  children?: React.ReactNode;
+}> = ({ drift = 0, lift = 1, tone = SET_BG, cool = 1, children }) => (
+  <AbsoluteFill style={{ background: tone, overflow: 'hidden' }}>
     <AbsoluteFill
       style={{
         background:
@@ -48,6 +52,7 @@ export const Paper: React.FC<{ drift?: number; lift?: number; children?: React.R
         top: 980,
         background: 'radial-gradient(circle, rgba(52,64,84,0.06) 0%, rgba(52,64,84,0) 62%)',
         filter: 'blur(30px)',
+        opacity: cool,
       }}
     />
     <div
@@ -59,6 +64,7 @@ export const Paper: React.FC<{ drift?: number; lift?: number; children?: React.R
         top: -260,
         background: 'radial-gradient(circle, rgba(52,64,84,0.05) 0%, rgba(52,64,84,0) 64%)',
         filter: 'blur(36px)',
+        opacity: cool,
       }}
     />
     {/* on the paper only: the app's screens and the type sit on top of it */}
@@ -97,9 +103,9 @@ export const Dither: React.FC = () => (
 );
 
 /** The lens over everything: grain + the lightest vignette. */
-export const Lens: React.FC = () => (
+export const Lens: React.FC<{ vignette?: number; grain?: number }> = ({ vignette = 0.8, grain = 0.045 }) => (
   <>
-    <Vignette strength={0.8} />
-    <Grain opacity={0.045} />
+    <Vignette strength={vignette} />
+    <Grain opacity={grain} />
   </>
 );

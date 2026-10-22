@@ -599,8 +599,9 @@ const takes = {
   //     (back to Card after, unrecorded);
   //  2. three weeks later: it is dated back, and the saves made since land
   //     on top of it one by one, the way the feed receives them;
-  //  3. "never watch it again" typed into Search your saves: the feed
-  //     narrows as it types, and the one card left is this reel.
+  //  3. (round 6) Ask: the hook's own words, half-remembered, asked; the
+  //     answer streams from the saves, citing this reel, and its citation
+  //     opens the card on its cover (the poster, whole).
   // No cooking content in this reel (owner, 2026-10-02): the two recipe
   // cards and their collection are out of the account for this take. All
   // app motion is rolled at 60fps (the reel plays it at real speed, two
@@ -812,20 +813,77 @@ const takes = {
     t.mark('buried');
     await roll60(40);
 
-    // 3. Search your saves: the field tapped, the query typed a character
-    // at a time on the stepped clock, the feed narrowing as it types
-    await visible(page.getByPlaceholder('Search your saves')).click();
-    t.mark('focus');
-    await roll60(16);
-    t.mark('typing');
-    for (const ch of S.query) {
+    // 3. (round 6: Ask, not search) the Ask tab; the question in the
+    // viewer's own half-memory, typed a character a 60fps frame; the answer
+    // streamed from the saves, citing this reel; its citation opens the
+    // card, whose cover (the poster, whole) the reel dives into
+    const ASKR = {
+      askTab: R.askTab,
+      composer: R.composer,
+      send: R.send,
+      bubble: ['div', S.ask.question],
+      answer: ['div', 'You saved it three weeks ago'],
+      chip: [`button[title="${S.title}"]`],
+      graphChip: ['button', 'Graph'],
+    };
+    const rollAsk = (n) => t.roll(n, { rects: ASKR, step: 1000 / 60 });
+    await tab('Ask').click();
+    t.mark('ask');
+    await rollAsk(24);
+    await t.thaw();
+    await visible(page.locator('textarea')).click();
+    await page.waitForTimeout(200);
+    await t.freeze();
+    t.mark('asking');
+    for (const ch of S.ask.question) {
       await page.keyboard.type(ch);
-      await t.advance();
-      await t.snap({ rects: RECTS });
+      await t.advance(1000 / 60);
+      await t.snap({ rects: ASKR });
     }
-    // the debounce and the meaning search answer on the stepped clock
-    t.mark('result');
-    await roll60(60);
+    // sent, the first words already on their way: its thinking line
+    // ("Searching your library…") is on no frame ("library" is off the
+    // brand's list; the reel cuts on the send)
+    await t.thaw();
+    await page.keyboard.press('Enter');
+    for (let k = 0; k < 80 && !server.chatOpen(); k++) await page.waitForTimeout(25);
+    server.advanceChat(6);
+    await until('You saved it');
+    await t.freeze();
+    t.mark('answer');
+    for (let done = false; !done; ) {
+      done = server.advanceChat(6);
+      await page.waitForTimeout(90); // the chunk crosses the (real) network
+      await t.advance(1000 / 60);
+      await t.snap({ rects: ASKR });
+    }
+    server.finishChat();
+    await page.waitForTimeout(400);
+    t.mark('sources');
+    await rollAsk(48);
+    // its citation opens the card: the cover is the poster, whole
+    // (object-contain), so the reel measures the picture inside the frame
+    await page.evaluate(() => {
+      window.__coverBox = () => {
+        const img = [...document.querySelectorAll('img')].find(
+          (i) => i.src.includes('savethis-cover') && getComputedStyle(i).objectFit === 'contain' && i.getClientRects().length,
+        );
+        if (!img || !img.naturalWidth) return {};
+        const b = img.getBoundingClientRect();
+        const k = Math.min(b.width / img.naturalWidth, b.height / img.naturalHeight);
+        const w = img.naturalWidth * k;
+        const h = img.naturalHeight * k;
+        return { poster: { x: b.x + (b.width - w) / 2, y: b.y + (b.height - h) / 2, w, h } };
+      };
+    });
+    const DETAIL = { ...ASKR, detailTitle: ['h2', S.title] };
+    await visible(page.locator(`button[title="${S.title}"]`)).click();
+    t.mark('open');
+    for (let k = 0; k < 60; k++) {
+      if (k > 0) await t.advance(1000 / 60);
+      else await page.evaluate(() => window.__rec.adopt());
+      await t.snap({ rects: DETAIL, caret: 'hide' });
+      Object.assign(t.frames.at(-1).rects, await page.evaluate(() => window.__coverBox()));
+    }
     await t.thaw();
     return t.save({ later: later.map(([p]) => p.split('/').pop()) });
   },

@@ -4,11 +4,11 @@ import { CAPTIONS, FPS, HITS, KICKERS, TOTAL_FRAMES } from '../../../../clips/sa
 import { sans } from '../../../fonts';
 import { Wordmark } from '../../../ui/Brand';
 import { Tap } from '../../kit/AppShot';
-import { BandScrim, Captions, type ReelCaption, type ReelKicker } from '../../kit/Captions';
+import { BandScrim, Captions, clearOf, type ReelCaption, type ReelKicker } from '../../kit/Captions';
 import { CLOCK } from '../../kit/camera';
 import { EASE_IN_OUT, EASE_MODAL, prog } from '../../kit/curves';
 import { Lens, Paper } from '../../kit/Paper';
-import { SET_BG } from '../../../film/effects';
+import { GRADE } from './grade';
 import { INK } from '../../kit/Type';
 import { App, HANDOVER, MARK_TO } from './App';
 import { Dive } from './Dive';
@@ -45,7 +45,7 @@ export const SaveThis: React.FC<{
   return (
     <AbsoluteFill style={{ fontFamily: sans }}>
       {withAudio && <Audio src={staticFile(audioFile)} />}
-      <Paper drift={drift} />
+      <Paper drift={drift} tone={GRADE.tone} cool={GRADE.cool} />
       <App f={f} />
       <Opening f={f} markTo={MARK_TO} paperDrift={drift} />
       <Dive f={f} paperDrift={drift} />
@@ -53,7 +53,7 @@ export const SaveThis: React.FC<{
       <div style={{ position: 'absolute', left: 0, top: 0, width: 1080, height: 1920 }}>
         <Tap x={POSTER.bookmark.x} y={POSTER.bookmark.y + 18} t={prog(f, HITS.tapSave - 10, HITS.tapSave + 18, (t) => t)} size={120} />
       </div>
-      <BandScrim opacity={scrim} />
+      <BandScrim opacity={scrim} tone={GRADE.tone} />
       {/* (round 4) once the app's camera glides in on the lit ties, the
           paper rises further, over the graph's own header and legend */}
       {f >= HITS.connect && f < HITS.skip && (
@@ -61,7 +61,7 @@ export const SaveThis: React.FC<{
           style={{
             pointerEvents: 'none',
             opacity: prog(f, HITS.connect + 2, HITS.connect + 18, EASE_IN_OUT),
-            background: `linear-gradient(180deg, ${SET_BG} 0px, ${SET_BG} 700px, rgba(238,240,244,0) 930px)`,
+            background: `linear-gradient(180deg, ${GRADE.tone} 0px, ${GRADE.tone} 700px, ${clearOf(GRADE.tone)} 930px)`,
           }}
         />
       )}
@@ -75,7 +75,7 @@ export const SaveThis: React.FC<{
         showCaptions={withCaptions}
         showKickers={withCaptions}
       />
-      <Lens />
+      <Lens vignette={GRADE.vignette} grain={GRADE.grain} />
     </AbsoluteFill>
   );
 };

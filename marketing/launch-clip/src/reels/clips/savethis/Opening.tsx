@@ -3,8 +3,8 @@ import { AbsoluteFill, random } from 'remotion';
 import { HITS } from '../../../../clips/savethis-timeline.mjs';
 import { MarkAssembly } from '../../kit/Brand';
 import { EASE_GATHER, EASE_IN_OUT, EASE_MODAL, EASE_SPRING, mix, prog } from '../../kit/curves';
-import { SET_BG } from '../../../film/effects';
 import { Paper } from '../../kit/Paper';
+import { GRADE } from './grade';
 import { Bookmark, POSTER, PosterArt } from './Poster';
 
 /**
@@ -245,7 +245,7 @@ export const Opening: React.FC<{ f: number; markTo: MarkTarget; paperDrift: numb
         <AbsoluteFill style={{ opacity: wellLight }}>
           <AbsoluteFill
             style={{
-              background: `radial-gradient(46% 30% at ${(C.x / 1080) * 100}% ${(C.y / 1920) * 100}%, #AEB5C0 0%, #D3D8DF 34%, ${SET_BG} 78%)`,
+              background: `radial-gradient(46% 30% at ${(C.x / 1080) * 100}% ${(C.y / 1920) * 100}%, #BCC2CC 0%, #DDE1E7 34%, ${GRADE.tone} 78%)`,
             }}
           />
           {tiles.map((t, i) => {
@@ -313,7 +313,7 @@ export const Opening: React.FC<{ f: number; markTo: MarkTarget; paperDrift: numb
               <div style={{ position: 'absolute', top: 0, left: side === 0 ? 0 : -540, width: 1080, height: 1920 }}>
                 {/* the set itself, exactly as the reel's Paper draws it: on
                     frame 0 the doors ARE the poster (and the cover) */}
-                <Paper drift={paperDrift} />
+                <Paper drift={paperDrift} tone={GRADE.tone} cool={GRADE.cool} />
                 <div style={{ position: 'absolute', inset: 0, transform: `scale(${push})`, transformOrigin: `540px ${PUSH_Y}px` }}>
                   <PosterArt sinceTap={f - HITS.tapSave} typeOut={prog(f, HITS.drop - 2, HITS.drop + 6, (t) => t)} hideBookmark />
                 </div>

@@ -2,6 +2,7 @@ import React from 'react';
 import { AbsoluteFill } from 'remotion';
 import { sans } from '../../../fonts';
 import { Lens, Paper } from '../../kit/Paper';
+import { GRADE } from './grade';
 import { PosterArt } from './Poster';
 
 /**
@@ -12,8 +13,8 @@ import { PosterArt } from './Poster';
  */
 export const PosterStill: React.FC = () => (
   <AbsoluteFill style={{ fontFamily: sans }}>
-    <Paper />
+    <Paper tone={GRADE.tone} cool={GRADE.cool} />
     <PosterArt />
-    <Lens />
+    <Lens vignette={GRADE.vignette} grain={GRADE.grain} />
   </AbsoluteFill>
 );

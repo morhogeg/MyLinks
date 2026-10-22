@@ -4,6 +4,7 @@ import { HITS } from '../../../../clips/savethis-timeline.mjs';
 import { EASE_IN_OUT, EASE_MODAL, mix, prog } from '../../kit/curves';
 import { Paper } from '../../kit/Paper';
 import { COVER, DIVE_CAM, HANDOVER } from './App';
+import { GRADE } from './grade';
 import { BANNER_BAND, PosterArt } from './Poster';
 
 /**
@@ -40,7 +41,7 @@ export const Dive: React.FC<{ f: number; paperDrift: number }> = ({ f, paperDrif
         clipPath: `inset(${y0}px 0px ${1920 - y1}px 0px round ${radius}px ${radius}px 0px 0px)`,
       }}
     >
-      <Paper drift={paperDrift} />
+      <Paper drift={paperDrift} tone={GRADE.tone} cool={GRADE.cool} />
       <PosterArt />
       {shade > 0.001 && (
         <div

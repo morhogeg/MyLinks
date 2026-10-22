@@ -54,7 +54,7 @@ const json = (res, code, body) => {
 };
 
 const cardSource = (id) => {
-  const c = CARDS.find((x) => x.id === id);
+  const c = [...CARDS, SAVETHIS].find((x) => x.id === id);
   return { id, title: c.title, category: c.category, sourceName: c.sourceName ?? null, url: c.url || null };
 };
 
@@ -103,7 +103,10 @@ export function startServer(port = 4600) {
           Connection: 'keep-alive',
         });
         res.flushHeaders?.();
-        chat = { res, sent: 0, text: ASK.answer, sourcesSent: false };
+        // the reel's question gets its own answer; anything else, the film's
+        const q = String(body.question ?? '').trim();
+        const a = q === SAVETHIS.ask.question ? SAVETHIS.ask : ASK;
+        chat = { res, sent: 0, text: a.answer, sources: a.sources, sourcesSent: false };
         return;
       }
       case '/api/client-error':
@@ -153,7 +156,7 @@ export function startServer(port = 4600) {
         finishChat: () => {
           if (!chat) return;
           if (chat.sent < chat.text.length) sse(chat.res, { type: 'token', text: chat.text.slice(chat.sent) });
-          sse(chat.res, { type: 'sources', sources: ASK.sources.map(cardSource) });
+          sse(chat.res, { type: 'sources', sources: chat.sources.map(cardSource) });
           sse(chat.res, { type: 'done' });
           chat.res.end();
           chat = null;
