@@ -153,7 +153,7 @@ export const CAPTIONS = [
   // over the logo, which holds to the loop (owner, round 13). (owner, round
   // 4: "See? You're watching it again." read as a riddle) The hook's "never
   // watch it again", answered as a promise
-  { at: HITS.watch, to: TOTAL_FRAMES + 6, text: 'This time, you’ll\nwatch it again.', duck: 0.4, style: 'Warm and sure, a small smile in the voice: a promise, not a punchline. Light and quick, a short breath after "This time", landing softly on "again".', pace: PACE },
+  { at: HITS.watch, to: TOTAL_FRAMES + 6, text: 'This time,\nyou’ll watch it again.', duck: 0.4, style: 'Warm and sure, a small smile in the voice: a promise, not a punchline. Light and quick, a short breath after "This time", landing softly on "again".', pace: PACE },
 ];
 
 /** a small letterspaced label above the line, with it (the kit's Kicker) */

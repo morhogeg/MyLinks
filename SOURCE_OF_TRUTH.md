@@ -2658,7 +2658,11 @@ exact-match, capped.
   0.039 against the score's own 0.104); the hook every fifth frame, the
   rest every fourteenth; every frame pair scanned for one-frame flashes
   (none); the encode (882 frames, 29.4s, −13.9 LUFS, −1.3 dBTP). **Not
-  verified:** listened to.
+  verified:** listened to. Then (owner: the last caption did not follow the
+  voice) "This time, / you'll watch it again." breaks on the narrator's
+  pause, so "you'll" no longer shows during it; the other captions already
+  broke at their pauses. The last 102 frames re-rendered and spliced (56dB
+  PSNR to the master where unchanged).
 - **2026-10-22 (round 15) — SAVE THIS: "with a million saves you never
   opened", Ask opening held still (owner: "'with your saves from countless
   apps' is not clear enough; something along the lines of with the other

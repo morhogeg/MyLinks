@@ -767,7 +767,7 @@ npx remotion render src/index.ts MachinaSaveThis out/savethis/master.mp4 --crf=1
 | 0:21.0 | On "proof": the camera settles on the answer and the saves it came from, cited (Tim Urban's talk, Four Thousand Weeks, this reel); the paper rises over the question | | | the band lands, full |
 | 0:21.5 | (Round 13) On the next beat each citation is highlighted in turn, an 8th apart: it pops forward and two ink rings leave its edge like a sonar ping; then held, half a second longer than round 12 | | | a rising ping on each |
 | 0:22.9 | The app dissolves into the paper; the app's own launch mark draws in (corner ticks, brackets closing, the point striking on "Machina"), the wordmark wipes in, then the tagline word by word, on one line (round 13) | MACHINA / Everything you save, finally useful. | "Machina. Everything you save, finally useful." | the brand's impact, lighter; shimmer |
-| 0:27.1 | The lockup holds to the last frame on a slow push (round 13: the last frame is the logo) | This time, you'll / watch it again. | "This time, you'll watch it again." | the drums out, the pad up to the hook's register; a bell rings over the loop |
+| 0:27.1 | The lockup holds to the last frame on a slow push (round 13: the last frame is the logo) | This time, / you'll watch it again. | "This time, you'll watch it again." | the drums out, the pad up to the hook's register; a bell rings over the loop |
 | 0:29.4 | The loop cuts on the beat from the logo to the hook (0:00) | | | |
 
 **What is real and what is not.** Every app pixel is the shipped app on
