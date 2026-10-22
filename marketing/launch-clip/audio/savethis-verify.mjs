@@ -62,9 +62,10 @@ for (let i = 1; i < band.length; i++) if (band[i].at < band[i - 1].to) fail(`cap
 if (CAPTIONS.at(-1).to - 5 < TOTAL_FRAMES) fail('the last line leaves before the last frame');
 ok(`timing: ${CAPTIONS.length} lines inside their windows; the last one up on the last frame`);
 const totalWords = CAPTIONS.reduce((n, c) => n + c.text.split(/\s+/).length, 0);
-// the brief's "under about 75"; (owner, rounds 5 to 8, and round 10's
-// bridge into Ask) the ceiling is 80
-(totalWords <= 80 ? ok : fail)(`script: ${totalWords} words (about 75: at most 80)`);
+// the brief's "under about 75"; (owner, rounds 5 to 8, round 10's bridge
+// into Ask, and round 15's "a million saves you never opened") the ceiling
+// is 81
+(totalWords <= 81 ? ok : fail)(`script: ${totalWords} words (about 75: at most 81)`);
 
 // ── the mix
 const wav = (rel) => {

@@ -24,9 +24,9 @@ import VO from './savethis-vo.json';
  *  knows   (rounds 10–12) "Now every save is one question away": CUT
  *          to Ask opening, its own words ("What do you want to recall?
  *          Answers come only from your 23 saves, with sources you can
- *          open.") over the questions it suggests about the saves, as its
- *          mark finishes drawing in (round 14: the whole mark, its point
- *          struck, not the brackets alone)
+ *          open.") over the questions it suggests about the saves: (owner,
+ *          rounds 14 and 15) the screen settled, its whole mark (not the
+ *          brackets alone) and its own header, held still under a slow push
  *  ask     (round 9) "So, ask it anything": (owner, round 14: no cut to the
  *          composer and back) one shot: on "ask" the question is sent and
  *          the chat takes the opening's place, a real question (round 12:
@@ -48,13 +48,14 @@ const S = HITS;
 const linear = (t: number) => t;
 
 /** the take's runs, from its marks: (round 6) the Ask screen's opening and
- *  the question typed (the empty screen all the while: the composer is
- *  under the frame), the answer's streamed chunks (60fps captures, one a
- *  chunk) */
+ *  the question typed under it, the answer's streamed chunks (60fps
+ *  captures, one a chunk). (owner, round 15: Ask opening's logo and header
+ *  "jittery and clunky") The opening's first frames cross-fade Home's
+ *  header into Ask's and launch the mark mid-way, and while the question is
+ *  typed the empty screen steps 12pt down and back with the composer: the
+ *  reel holds the last of them, the screen settled, its mark whole */
 const ASK_OPEN = takeOf(T).marks.answer - takeOf(T).marks.ask;
-/** the cut lands on the Ask screen most of the way faded in, not on the
- *  blank frame its opening starts from */
-const ASK_JOIN = 8;
+const ASK_HELD = at(T, 'ask', ASK_OPEN - 1);
 const STREAM = takeOf(T).marks.sources - takeOf(T).marks.answer;
 /** (round 12) the graph joins the take this many 60fps frames after the
  *  thumb taps the new save's dot: by then the app has lifted the three clear
@@ -73,9 +74,8 @@ export const frameAt = (f: number) => {
   // (round 14) CUT to the three, lit, as the app's camera glides in on them,
   // at half speed (one 60fps capture an output frame)
   if (f < S.knows) return at(T, 'graphTap', Math.min(119, TAP_CUT + (f - S.graph)));
-  // (round 10) CUT to Ask, its screen opening at real speed (its mark drawing
-  // in, its point striking) while the question is typed below the frame…
-  if (f < S.asked) return at(T, 'ask', Math.min(ASK_OPEN - 1, ASK_JOIN + (f - S.knows) * 2));
+  // (round 10) CUT to Ask opening, settled (round 15), held…
+  if (f < S.asked) return ASK_HELD;
   // …(round 14) sent on "ask", the answer streaming, a chunk every 2 frames…
   if (f < S.proof) return at(T, 'answer', Math.min(STREAM - 1, Math.floor((f - S.asked) / 2)));
   // …and the saves it came from, cited: held into the sign-off
@@ -162,13 +162,7 @@ const ASK_CAM: Record<'chat' | 'proof', Cam> = {
   chat: { cx: 196.5, cy: BUBBLE[1] + 140, z: 2.5, fx: 540, fy: 720 + 140 * 2.5, rx: 0, ry: 0, rz: 0 },
   proof: { cx: 196.5, cy: PROOF.cy, z: PROOF.z, fx: 540, fy: PROOF.fy, rx: 0, ry: 0, rz: 0 },
 };
-/** (round 14) the take types the question under Ask opening, and its
- *  composer sheds and regains a line as it does: the empty screen, centred
- *  over the composer, steps down half that and back. The camera steps with
- *  it, so the opening holds still (the step is under the band and the
- *  frame's foot) */
-const ASK_REST = rectOf(T, at(T, 'ask'), 'composer')[1];
-const askStep = (i: number) => (rectOf(T, i, 'composer')[1] - ASK_REST) / 2;
+
 
 /** the camera when the app opens: the processing card, its mark in frame */
 const OPEN_CAM: Cam = { cx: 196.5, cy: 330, z: 2.3, fx: 540, fy: 1150, rx: 0, ry: 0, rz: 0 };
@@ -192,14 +186,14 @@ export const appKeys: Key[] = [
   // a slow push on the topic, into the cut
   { f: S.graph - 1, z: 2.5, ease: linear },
   // (round 4) S.graph to S.knows: the graph, on its own camera (graphCam)
-  { f: S.knows - 1, ...ASK_CAM.chat, z: ASK_CAM.chat.z * 0.96 },
-  // (rounds 10–14) CUT to Ask opening on "Now every save", one slow push
+  { f: S.knows - 1, ...ASK_CAM.chat, z: ASK_CAM.chat.z * 0.98 },
+  // (rounds 10–15) CUT to Ask opening on "Now every save", one slow push
   // (the status bar stays under the band; most of it over the opening,
   // where the screen is still) through the question sent on "ask" and the
   // answer streaming in…
-  { f: S.knows, ...ASK_CAM.chat, z: ASK_CAM.chat.z * 0.96 },
-  { f: S.asked, z: ASK_CAM.chat.z * 1.02, ease: linear },
-  { f: S.proof - 1, z: ASK_CAM.chat.z * 1.04, ease: linear },
+  { f: S.knows, ...ASK_CAM.chat, z: ASK_CAM.chat.z * 0.98 },
+  { f: S.asked, z: ASK_CAM.chat.z * 1.035, ease: linear },
+  { f: S.proof - 1, z: ASK_CAM.chat.z * 1.05, ease: linear },
   // the proof: down onto the three citations as they land
   { f: S.proof + 14, ...ASK_CAM.proof, ease: EASE_IN_OUT },
   // held, a slow push, into the sign-off (round 12: the app gives way to
@@ -220,8 +214,7 @@ export const App: React.FC<{ f: number }> = ({ f }) => {
   // the graph's camera rides the app's, so what it shows stays put: no
   // smear from its own travel
   const inGraph = f >= S.graph && f < S.knows;
-  const cam0 = inGraph ? graphCam(f) : camAt(appKeys, f);
-  const cam = f >= S.knows && f < S.asked ? { ...cam0, cy: cam0.cy + askStep(i) } : cam0;
+  const cam = inGraph ? graphCam(f) : camAt(appKeys, f);
   const v = inGraph ? { x: 0, y: 0 } : camVelocity(appKeys, f, 1);
   // the iris: a circle from the card's mark, open by the time it lands
   const r = prog(f, S.iris - 1, S.iris + 18, EASE_IN_OUT);
@@ -270,7 +263,7 @@ export const App: React.FC<{ f: number }> = ({ f }) => {
       {/* (round 14) the question sent: Ask opening gives way to its chat in
           place, over three frames */}
       {f >= S.asked && f < S.asked + 3 && (
-        <AppShot take={T} i={at(T, 'ask', ASK_OPEN - 1)} cam={cam} shadow={0} edge={0} opacity={1 - prog(f, S.asked - 1, S.asked + 3, linear)} />
+        <AppShot take={T} i={ASK_HELD} cam={cam} shadow={0} edge={0} opacity={1 - prog(f, S.asked - 1, S.asked + 3, linear)} />
       )}
     </AbsoluteFill>
   );

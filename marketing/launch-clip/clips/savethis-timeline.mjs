@@ -120,9 +120,9 @@ export const CAPTIONS = [
   // your saves from countless apps" not clear enough, "something along the
   // lines of with the other million saves you never opened again") where
   // every save goes: unopened, like the hook's "never watch it again"
-  { at: 99, to: 165, tempo: 1.05, text: 'Right down there,\nwith a million saves\nyou never opened.', style: 'Amused and quick, a wry aside, pointing down into a deep hole, then a knowing nod at the pile; light, one easy breath, no drawn-out words.', pace: PACE },
+  { at: 99, to: 166, tempo: 1.06, text: 'Right down there,\nwith a million saves\nyou never opened.', style: 'Amused and quick, a wry aside, pointing down into a deep hole, then a knowing nod at the pile; light, one easy breath, no drawn-out words.', pace: PACE },
   // (owner, round 2: no full stop after the name on screen; the voice keeps its take)
-  { at: 166, to: 236, text: 'Unless you save it\nto Machina', tts: 'Unless you save it to Machina.', duck: 0.4, style: 'The turn: bright, warm and confident, a little conspiratorial; the name lands with a smile.', pace: PACE },
+  { at: 167, to: 236, text: 'Unless you save it\nto Machina', tts: 'Unless you save it to Machina.', duck: 0.4, style: 'The turn: bright, warm and confident, a little conspiratorial; the name lands with a smile.', pace: PACE },
   { at: 238, to: 302, text: 'It reads every save,\nfrom any app,', style: 'Clear and easy, genuinely pleased; flowing straight on, the sentence is not finished.', pace: PACE },
   // (owner, round 3: "reads" alone undersold it) what the read IS, over the
   // finished card, each named part lifting on its word
