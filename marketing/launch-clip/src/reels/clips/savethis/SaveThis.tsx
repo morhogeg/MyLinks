@@ -17,7 +17,7 @@ import { POSTER } from './Poster';
 import VO from './savethis-vo.json';
 
 /**
- * SAVE THIS: the organic Reel. 28s, 1080 x 1920, the house look (Paper,
+ * SAVE THIS: the organic Reel. 24s, 1080 x 1920, the house look (Paper,
  * Lens, the kit's captions and camera) on its own clock
  * (clips/savethis-timeline.mjs). Every frame of app UI is the real app
  * (capture/shoot.mjs `savethisClip`); the opening and the dive are the
@@ -56,7 +56,7 @@ export const SaveThis: React.FC<{
       <BandScrim opacity={scrim} tone={GRADE.tone} />
       {/* (round 4) once the app's camera glides in on the lit ties, the
           paper rises further, over the graph's own header and legend */}
-      {f >= HITS.connect && f < HITS.issue && (
+      {f >= HITS.connect && f < HITS.askTap && (
         <AbsoluteFill
           style={{
             pointerEvents: 'none',

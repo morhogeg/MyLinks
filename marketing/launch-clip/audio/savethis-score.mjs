@@ -7,10 +7,10 @@
  * the bookmark's click on "save"); the save falls on a scale run down to a
  * thud on the heap; the heap rushes up a riser into the brand's impact on
  * "Machina"; the band comes in under the reading (a tick on each phase, a
- * bell on "Saved to Machina"), drops out for "three weeks later" so each
- * save landing on top is its own thud, holds its breath for the typing, and
- * lands, full, on the Ask answer's proof. The dive rises into the poster, and the poster
- * is as bare as the hook, because it IS the hook: the reel loops.
+ * bell on "Saved to Machina") and the graph, holds its breath for the
+ * question, and lands, full, on the Ask answer's proof. The dive rises into
+ * the poster, and the poster is as bare as the hook, because it IS the
+ * hook: the reel loops.
  *
  * THE LOOP: the arrangement is rendered twice in a row and the second copy
  * kept, so the reverb and delay tails of the end ring on into the start,
@@ -62,12 +62,12 @@ const VOICINGS = {
 const chordAt = (frame) => VOICINGS[CHORDS.filter(([f]) => f <= frame).at(-1)[1]];
 
 /** the band's density along the story: bare hook, the fall, the turn, the
- *  reading, a breath for the skip, the asking held, the proof full, the dive,
- *  the bare poster */
+ *  reading and the graph, the asking held, the proof full, the dive, the
+ *  bare poster */
 const density = (f) =>
-  f < H.drop ? 0.18 : f < H.land ? 0.3 : f < H.gather ? 0.36 : f < H.markStrike ? 0.5 : f < H.phase0 ? 0.42 : f < H.issue ? 0.85 : f < H.askTap ? 0.55 : f < H.proof ? 0.6 : f < H.citeTap ? 1 : f < H.poster ? 0.7 : 0.2;
+  f < H.drop ? 0.18 : f < H.land ? 0.3 : f < H.gather ? 0.36 : f < H.markStrike ? 0.5 : f < H.phase0 ? 0.42 : f < H.askTap ? 0.85 : f < H.proof ? 0.6 : f < H.citeTap ? 1 : f < H.poster ? 0.7 : 0.2;
 const DRUMS = [
-  [H.phase0, H.issue],
+  [H.phase0, H.askTap],
   [H.proof, H.citeTap + 7],
 ];
 const drumsAt = (f) => DRUMS.some(([a, b]) => f >= a && f < b);
@@ -101,8 +101,8 @@ const arrange = (o) => {
       [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5].forEach((on, k) => {
         const fr = f0 + on * BEAT_FRAMES;
         if (fr < H.phase0 - 4 || fr >= H.poster) return;
-        // the skip and the typing breathe: half the figure
-        if ((fr >= H.issue && fr < H.askTap) || (fr >= H.askTap && fr < H.proof)) if (k % 2) return;
+        // the asking breathes: half the figure
+        if (fr >= H.askTap && fr < H.proof && k % 2) return;
         const c = chordAt(fr);
         const step = shape[(k + f0 / BAR_FRAMES) % shape.length];
         const m = c.upper[0] + SCALE[step % 7] + Math.floor(step / 7) * 12 + (on >= 2.5 ? 12 : 0);
@@ -166,19 +166,13 @@ const arrange = (o) => {
   pluck(t(H.connect + 6), 83, 0.06, 0.2, 0.45);
   sub(t(H.connect), 43, 0.22, 0.3);
 
-  // ── (round 7) the problem: the cut to the feed, and the flick past every
-  // other save (air under the voice, the band dropping out)
-  tick(t(H.issue), 0.08, 0.9);
-  whoosh(t(H.issue + 4), 0.75, 0.03, 0.15);
-  sub(t(H.issue), 38, 0.24, 0.35);
-
   // ── (round 6) Ask: the cut in, the question bursting in (a soft click a
   // frame, two characters each), the send; the answer streams on the band
-  // (round 8) "Machina already did": the cut to the Ask screen, a light note
-  // on its reveal; "So ask it anything": the cut to its composer
+  // (round 9) "So ask it anything": the cut from the graph to its composer,
+  // a light note on it, the drums out
   tick(t(H.askTap), 0.09, 1.15);
   pluck(t(H.askTap + 1), 79, 0.05, 0, 0.5);
-  tick(t(H.asking), 0.07, 1.25);
+  sub(t(H.askTap), 43, 0.2, 0.3);
   for (let k = 0; k < CHARS; k += 2) tick(t(H.asking + k * TYPE_FRAMES), 0.02, 1.5 + ((k * 7) % 5) * 0.06);
   tick(t(H.send), 0.11, 1.2);
   sub(t(H.send), 45, 0.2, 0.3);

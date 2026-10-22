@@ -59,9 +59,9 @@ for (let i = 1; i < band.length; i++) if (band[i].at < band[i - 1].to) fail(`cap
 if (CAPTIONS.at(-1).to > TOTAL_FRAMES - 4) fail('the last line is still up at the loop point');
 ok(`timing: ${CAPTIONS.length} lines inside their windows; the band is clear ${TOTAL_FRAMES - CAPTIONS.at(-1).to} frames before the loop`);
 const totalWords = CAPTIONS.reduce((n, c) => n + c.text.split(/\s+/).length, 0);
-// the brief's "about 75"; (owner, rounds 5 to 8) the payoff lines take it
-// to 80, the ceiling
-(totalWords <= 80 ? ok : fail)(`script: ${totalWords} words (about 75: at most 80)`);
+// the brief's "under about 75" (rounds 5 to 8 ran to 80; round 9, the one
+// arc, is back under it)
+(totalWords <= 75 ? ok : fail)(`script: ${totalWords} words (the brief: under about 75)`);
 
 // ── the mix
 const wav = (rel) => {

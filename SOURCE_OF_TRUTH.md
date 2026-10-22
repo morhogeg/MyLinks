@@ -2637,6 +2637,22 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-22 (round 9) — SAVE THIS: one arc (owner: "you show the
+  problem, then the solution, then you say again you'll never watch it:
+  problem, solution, problem again doesn't make sense").** Branch
+  `claude/reel-save-this`. The problem is said once, at the top; everything
+  after "Unless" answers it. "But you'll never rewatch them all." (and its
+  feed flick) and "Machina already did." are cut; the graph ("…and connects
+  it to what you've saved before.") now cuts on the beat straight to Ask's
+  composer on "So ask it anything, and get the answer, with the proof.", so
+  Ask reads as what reading and connecting every save makes possible. Same
+  capture and the same voice takes (no new TTS run); the harmony is now IV
+  under the graph, V on the question, I on the proof. 23.8s, 71 words (the
+  word gate is back to the brief's 75). **Verified:** gates (bans on 252
+  strings including every captured frame, windows, every line 10.7 to
+  17.5dB over the music, −14.04 LUFS, −1.25 dBTP, seam step 0.019 against
+  the score's own 0.119); stills of every beat. **Not verified:**
+  listened to.
 - **2026-10-22 (round 8) — SAVE THIS: the Ask section rebuilt (owner: "no
   connection between 'you'll never watch it again' and 'ask'"; "you say the
   answer and the proof without saying you get it: ask, get, the answer, the

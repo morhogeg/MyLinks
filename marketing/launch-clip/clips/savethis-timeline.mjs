@@ -7,13 +7,13 @@
  * save this video and never watch it again (the hook, readable on frame 0);
  * the save falls down a shaft onto every other save; "unless you save it to
  * Machina" floods them with colour and gathers them into the mark; the REAL
- * app reads it and maps it among the saves before it (its graph). Then the
- * problem ("But you'll never rewatch them all.") and Ask as its payoff: a
- * real question answered from the saves, every source cited (the proof),
- * this reel among them. Its citation opens its card, whose cover is this
- * reel's first frame: the camera dives into it ("This time, you'll watch it
- * again.") and lands ON frame 0, so the reel loops into its own hook
- * without a cut.
+ * app reads it and maps it among the saves before it (its graph), and so
+ * it can answer from them: Ask, a real question answered from the saves,
+ * every source cited (the proof), this reel among them. The problem is said
+ * once, at the top; everything after "Unless" is the answer to it (owner,
+ * round 9). Its citation opens its card, whose cover is this reel's first
+ * frame: the camera dives into it ("This time, you'll watch it again.") and
+ * lands ON frame 0, so the reel loops into its own hook without a cut.
  *
  * Written in OUTPUT frames on a 128.57 BPM grid, 14 frames a beat (the
  * REVISIT quick cut's pace: an organic Reel, not a feature explainer). Every
@@ -55,19 +55,18 @@ export const HITS = {
   done: beat(22), // …and the card, read
   graph: beat(26), // "…by topic,": CUT to the graph, the saves mapped by topic
   connect: beat(28), // "…connects it to": the thumb on its dot; its ties light on "what you've saved before"
-  // (round 7) the problem; (round 8) the link, then Ask, on its words
-  issue: beat(31), // "But you'll never rewatch them all": the feed, flicked
-  askTap: beat(34.5), // "Machina already did": CUT to the Ask screen
-  asking: beat(37.5), // "So ask it anything": CUT to its composer, the question types
-  send: 550, // "and get the answer": sent, the answer streams
-  proof: beat(41.5), // "with the proof": the saves it came from, cited
-  tagline: beat(43), // "Machina. Everything you save, finally useful."
-  citeTap: beat(51), // the thumb opens this reel's citation: its card…
-  poster: beat(53), // …and the dive into its cover lands ON frame 0
+  // (round 9) Ask, the solution's last word, each part on its own word
+  askTap: beat(31), // "So…": CUT from the graph to Ask's composer, on the beat…
+  asking: 437, // …"ask it anything": the question bursts in
+  send: 462, // "and get the answer": sent, the answer streams
+  proof: 494, // "with the proof": the saves it came from, cited
+  tagline: beat(37), // "Machina. Everything you save, finally useful."
+  citeTap: beat(45), // the thumb opens this reel's citation: its card…
+  poster: beat(47), // …and the dive into its cover lands ON frame 0
 };
 
 /** a whole beat, so the score's pulse runs straight through the loop */
-export const TOTAL_FRAMES = beat(57);
+export const TOTAL_FRAMES = beat(51);
 export const TOTAL_SEC = TOTAL_FRAMES / FPS;
 
 /** The cut. One beat of story per scene. */
@@ -109,17 +108,12 @@ export const CAPTIONS = [
   // benefit; round 4: show the graph, not the Related cards list) the app's
   // graph: the thumb taps the new save's dot and its ties to older saves light
   { at: 372, to: 432, text: 'and connects it to\nwhat you’ve saved before.', style: 'Clear and genuinely pleased, flowing on from the line before; a little lift on "connects", landing warmly on "saved before".', pace: PACE },
-  // (owner, round 7: no "weeks later"; the problem in one line, then Ask
-  // as its payoff) over the feed, flicked past every other save…
-  { at: HITS.issue, to: HITS.askTap, text: 'But you’ll never\nrewatch them all.', style: 'Honest and a little wry, a small shrug in the voice; quick and light, no drawn-out words.', pace: PACE },
-  // (owner, round 8: the step from the problem to Ask was missing, and
-  // "the answer, and the proof" never said who gets it) the link: it has
-  // already been through every save; over the Ask screen ("What do you want
-  // to recall? Answers come only from your saves, with sources you can open.")
-  { at: HITS.askTap, to: HITS.asking - 3, text: 'Machina already did.', style: 'Matter-of-fact and pleased, a quiet reveal; one quick breath, the name with a smile.', pace: PACE },
-  // …so ask it: the question types on "ask it anything", the answer streams
-  // on "get the answer", the saves it came from land on "proof"
-  { at: HITS.asking - 1, to: HITS.tagline - 6, text: 'So ask it anything,\nand get the answer,\nwith the proof.', style: 'Confident and simple, one easy sentence in three quick beats; light and brisk, landing softly on "proof".', pace: PACE },
+  // (owner, round 9: problem, solution, then the problem again made no
+  // sense) Ask is the solution's last word, its consequence: because it has
+  // read, understood and connected every save, ask it anything; the
+  // question types on "ask it anything", the answer streams on "get the
+  // answer", the saves it came from land on "proof"
+  { at: HITS.askTap + 2, to: HITS.tagline - 6, text: 'So ask it anything,\nand get the answer,\nwith the proof.', style: 'Confident and simple, one easy sentence in three quick beats; light and brisk, landing softly on "proof".', pace: PACE },
   // the name and the tagline, said once, over the answer and its proof
   // (owner, round 2: the name in the voice); the drawn wordmark wipes in on
   // "Machina"
@@ -144,9 +138,9 @@ export const RISERS = [
 /**
  * Harmony, [from frame, chord], the house vocabulary (C major, the film's
  * voicings): the hook and the fall hang on the minor (the loss), the turn
- * lifts through V to I on the strike, the question sits on vi again and the
- * proof lands home; the dive leaves on IV, which falls back to vi at the top
- * of the loop.
+ * lifts through V to I on the strike, the reading and the graph rest on IV,
+ * the question lifts to V and the proof lands home; the dive leaves on IV,
+ * which falls back to vi at the top of the loop.
  */
 export const CHORDS = [
   [0, 'Am7'],
@@ -154,8 +148,7 @@ export const CHORDS = [
   [HITS.gather, 'G6'],
   [HITS.markStrike, 'Cmaj7'],
   [HITS.done, 'Fmaj7'],
-  [HITS.issue, 'G6'],
-  [HITS.askTap, 'Am7'],
+  [HITS.askTap, 'G6'],
   [HITS.proof, 'Cmaj7'],
   [HITS.citeTap, 'G6'],
   [HITS.poster, 'Fmaj7'],
