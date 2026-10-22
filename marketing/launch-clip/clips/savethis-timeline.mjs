@@ -108,10 +108,11 @@ export const CAPTIONS = [
   // benefit; round 4: show the graph, not the Related cards list) the app's
   // graph: the thumb taps the new save's dot and its ties to older saves light
   { at: 372, to: 432, text: 'and connects it to\nwhat you’ve saved before.', style: 'Clear and genuinely pleased, flowing on from the line before; a little lift on "connects", landing warmly on "saved before".', pace: PACE },
-  { at: 434, to: 514, text: 'Weeks later, buried\nunder everything else,', style: 'Storytelling, quick and a touch dramatic; trailing on into the next line.', pace: PACE },
-  // (owner, round 6: show Ask, not finding) a real question about the
-  // saves; the answer, and the saves it came from cited under it: the proof
-  { at: HITS.askTap, to: HITS.askTap + 44, text: 'ask your saves anything.', style: 'Warm and matter-of-fact, like the simplest thing in the world; quick and light, one breath.', pace: PACE },
+  // (owner, round 7: no "weeks later"; the problem in one line, then Ask
+  // as its payoff) over the feed, flicked past every other save…
+  { at: 434, to: 486, text: 'But you’ll never\nrewatch them all.', style: 'Honest and a little wry, a small shrug in the voice; quick and light, no drawn-out words.', pace: PACE },
+  // …so: Ask, on a real question; the answer, and the saves it came from
+  { at: 490, to: 530, text: 'So ask your saves anything.', style: 'Bright and easy, the turn of the story, the answer to the line before; quick and light, a small lift on "anything".', pace: PACE },
   { at: HITS.send + 15, to: HITS.tagline - 10, text: 'Get the answer,\nand the proof.', style: 'Pleased and sure, two quick beats: "Get the answer," then "and the proof" landing with a small smile; no drawn-out words.', pace: PACE },
   // the name and the tagline, said once, over the answer and its proof
   // (owner, round 2: the name in the voice); the drawn wordmark wipes in on
