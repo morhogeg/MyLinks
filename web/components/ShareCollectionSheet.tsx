@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { getColorStyleByKey } from '@/lib/colors';
 import CoverMosaic from '@/components/CoverMosaic';
-import { publishCollection, unpublishCollection, isShareStale } from '@/lib/collections';
+import { publishCollection, unpublishCollection, isShareStale, shareRefusalMessage } from '@/lib/collections';
 import { shareLink, shareUrlFor, openExternal, copyToClipboard } from '@/lib/share';
 import { useToast } from '@/components/Toast';
 import { useVisualViewport } from '@/lib/useVisualViewport';
@@ -119,8 +119,8 @@ export default function ShareCollectionSheet({
         try {
             await publishCollection(uid, collection, memberLinks);
             toast.success(isPublic ? 'Public page updated' : 'Collection is now live');
-        } catch {
-            toast.error("Couldn't publish the collection. Please try again.");
+        } catch (err) {
+            toast.error(shareRefusalMessage(err) ?? "Couldn't publish the collection. Please try again.");
         } finally {
             setBusy(null);
         }

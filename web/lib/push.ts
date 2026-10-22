@@ -282,14 +282,8 @@ export async function registerPush(): Promise<PushRegisterResult> {
  */
 export async function openNotificationSettings(): Promise<boolean> {
     if (!isNativeApp()) return false;
-    try {
-        const { NativeSettings, IOSSettings } = await import('capacitor-native-settings');
-        await NativeSettings.openIOS({ option: IOSSettings.App });
-        return true;
-    } catch (e) {
-        console.warn('Could not open iOS Settings:', e);
-        return false;
-    }
+    const { openAppSettings } = await import('@/lib/shareConfig');
+    return openAppSettings();
 }
 
 /**

@@ -33,7 +33,7 @@ import re
 import html as _html
 import logging
 from typing import Optional
-from urllib.parse import parse_qs, urlencode, urlparse
+from urllib.parse import parse_qs, quote, urlencode, urlparse
 from datetime import datetime, timezone
 
 from db import get_db
@@ -540,6 +540,25 @@ def _share_card_image(card: dict) -> str:
     return f"{WEB_URL}/icon-512.png"
 
 
+SUPPORT_EMAIL = "support@mymachina.app"
+
+
+def _report_footer(page_url: str) -> str:
+    """The App Review 1.2 line under every public page: a way to report it
+    and the address to reach us. The mailto carries the page's own address
+    so a report always names the page; the address is also printed as text
+    because mailto links do nothing for anyone without a mail app set up.
+    The not-found page (url = the site root) has nothing to report."""
+    if page_url.rstrip("/") == WEB_URL.rstrip("/"):
+        return f'<div class="report">Contact: {SUPPORT_EMAIL}</div>'
+    query = urlencode({
+        "subject": "Report a shared Machina page",
+        "body": f"Page: {page_url}\n\nWhat's wrong with it:\n",
+    }, quote_via=quote)
+    return (f'<div class="report"><a href="mailto:{SUPPORT_EMAIL}?{_esc(query)}">Report this page</a>'
+            f' · Contact: {SUPPORT_EMAIL}</div>')
+
+
 def _share_html_shell(*, title: str, description: str, image: str, url: str, body: str,
                       image_width: Optional[int] = None, image_height: Optional[int] = None,
                       image_type: Optional[str] = None) -> str:
@@ -670,6 +689,8 @@ def _share_html_shell(*, title: str, description: str, image: str, url: str, bod
   .notice {{ margin:18px 0 0; padding:12px 14px; border:1px solid #262629; border-radius:12px;
             background:#161618; color:#a1a1aa; font-size:14px; }}
   .foot {{ margin-top:40px; font-size:13px; color:#71717a; text-align:center; }}
+  .report {{ margin-top:10px; font-size:12px; color:#71717a; text-align:center; }}
+  .report a {{ color:#a1a1aa; }}
   a {{ color:#E9E9F2; }}
 </style>
 </head>
@@ -678,6 +699,7 @@ def _share_html_shell(*, title: str, description: str, image: str, url: str, bod
     <div class="brand"><img src="{_esc(WEB_URL)}/icon-192.png" alt="Machina"><span>Machina</span></div>
     {body}
     <div class="foot">Saved on <a href="{_esc(WEB_URL)}">Machina</a> — Everything you save, finally useful.</div>
+    {_report_footer(url)}
   </div>{_APP_STORE_SWAP_JS if _app_store_id() else ""}
 </body>
 </html>"""
@@ -1379,6 +1401,29 @@ def shared_card_withdrawn(db, share_id: str, snapshot: dict) -> bool:
         return True
 
 
+class ShareRefused(Exception):
+    """A publish refused for what the page would contain or who is
+    publishing it (share_moderation, share_bans). publish_share_http answers
+    422 with this message, and the app shows it as is."""
+
+
+SHARE_BANNED_MESSAGE = ("Public sharing is turned off for this account. Write to "
+                        f"{SUPPORT_EMAIL} if you think this is a mistake.")
+
+
+def share_banned(db, uid: str) -> bool:
+    """True when the operator has stopped `uid` from publishing
+    (tools/takedown_share.py --ban). `share_bans` matches no rule in
+    firestore.rules, so only the Admin SDK can read or write it: an account
+    can't lift its own ban the way it could clear a flag on its user doc."""
+    try:
+        return db.collection("share_bans").document(uid).get().exists
+    except Exception as e:
+        # A failed read must not block every share in the app.
+        logger.warning("share_bans read failed: %s", type(e).__name__)
+        return False
+
+
 def _publish_share_logic(uid: str, share_type: str, share_id: str, payload: dict,
                          collection=None, card=None, update_only: bool = False) -> dict:
     """Write a public share snapshot for `uid` WITHOUT `ownerUid`, plus the
@@ -1414,6 +1459,8 @@ def _publish_share_logic(uid: str, share_type: str, share_id: str, payload: dict
     card_id = _card_share_target(card)
 
     db = get_db()
+    if share_banned(db, uid):
+        raise ShareRefused(SHARE_BANNED_MESSAGE)
     existing_owner = _share_owner_uid(db, share_id, public_coll)
     if existing_owner is not None and existing_owner != uid:
         raise PermissionError("This share id belongs to another account")
@@ -1463,6 +1510,12 @@ def _publish_share_logic(uid: str, share_type: str, share_id: str, payload: dict
     doc.pop("ownerUid", None)  # never persist PII in the world-readable doc
     doc["shareId"] = share_id
     doc["publishedAt"] = now_ms
+
+    # App Review 1.2: judge what the page would show before it goes live.
+    # Fails open on a Gemini outage (see share_moderation).
+    from share_moderation import check_share_content, REFUSAL_MESSAGE
+    if not check_share_content(share_type, doc):
+        raise ShareRefused(REFUSAL_MESSAGE)
 
     # Server-generated only, never a client copy. Not built here: the card
     # page makes it on first view (ensure_card_og_preview), because the app

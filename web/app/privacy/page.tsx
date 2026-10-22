@@ -61,7 +61,7 @@ export default function PrivacyPage() {
       <h1 className="mt-6 text-3xl font-semibold tracking-tight text-text">
         Privacy Policy
       </h1>
-      <p className="mt-2 text-sm text-text-muted">Last updated: October 21, 2026</p>
+      <p className="mt-2 text-sm text-text-muted">Last updated: October 22, 2026</p>
 
       <p className="mt-6 leading-relaxed text-text-secondary">
         Machina (&ldquo;we&rdquo;) is a personal knowledge base: you save
@@ -244,6 +244,12 @@ export default function PrivacyPage() {
             <span className="text-text">The weekly synthesis.</span>{" "}
             The titles, summaries, tags, and categories of what you saved that week.
           </li>
+          <li>
+            <span className="text-text">Publishing a public page.</span>{" "}
+            Before a card, collection, or answer goes public, the text the page will show and its
+            main images are checked by Gemini against our content rules (see{" "}
+            <a href="#sharing" className="text-accent underline underline-offset-2">section 8</a>).
+          </li>
         </ul>
         <p className="mt-4 leading-relaxed text-text-secondary">
           What is{" "}
@@ -326,6 +332,11 @@ export default function PrivacyPage() {
           </li>
         </ul>
         <p className="mt-4 leading-relaxed text-text-secondary">
+          Each of these providers receives only the data listed here, uses it only to provide its
+          service to Machina, and is bound by its own terms to protect it at least as well as this
+          policy does.
+        </p>
+        <p className="mt-4 leading-relaxed text-text-secondary">
           Two small Google services also run on your device rather than on our servers: the web app
           loads reCAPTCHA to tell real browsers from bots, and the in-app link form fetches a site
           favicon from Google for the address you are saving. Both see your IP address and, for
@@ -351,10 +362,18 @@ export default function PrivacyPage() {
       <Section id="sharing" n={8} title="Public share pages">
         <p className="mt-4 leading-relaxed text-text-secondary">
           Sharing is off by default and nothing you save is public unless you choose to publish it.
-          If you explicitly publish a card or a collection as a public Machina page, a snapshot of
-          that content becomes visible to anyone holding the link, until you unpublish or delete it.
-          Deleting your account also removes every share page you published. Copies that other
-          people or link-preview services made before that are outside our control.
+          If you explicitly publish a card, a collection, or an answer from Ask Machina as a public
+          Machina page, a snapshot of that content becomes visible to anyone holding the link, until
+          you unpublish or delete it. Your name and email are never on the page. Deleting your
+          account also removes every share page you published. Copies that other people or
+          link-preview services made before that are outside our control.
+        </p>
+        <p className="mt-4 leading-relaxed text-text-secondary">
+          Before a page goes live, its text and main images are checked automatically, and a page
+          that looks like it breaks the content rules in our Terms is not published. Every public
+          page has a &ldquo;Report this page&rdquo; link. We review reports within 24 hours, remove
+          pages that break the rules, and can stop an account from publishing. We keep a record of
+          that decision, tied to the account, for as long as it applies.
         </p>
       </Section>
 

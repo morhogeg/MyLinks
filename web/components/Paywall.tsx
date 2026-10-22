@@ -314,8 +314,10 @@ export default function Paywall({
     // Cancelling happens in the App Store, never in the app, so that is where
     // the sheet says to go.
     const price = priceOf(period);
+    // Names the subscription too (Apple's list starts with its title): when the
+    // sheet opens from a limit, the headline is the limit, not "Machina Pro".
     const legalLine = [
-        price ? `${isTrial ? 'Billing starts today: ' : ''}${price} ${PERIOD_LABEL[period].per}.` : null,
+        price ? `Machina Pro ${PERIOD_LABEL[period].name}: ${isTrial ? 'billing starts today, ' : ''}${price} ${PERIOD_LABEL[period].per}.` : null,
         'Renews automatically. Cancel anytime in your App Store subscriptions.',
     ].filter(Boolean).join(' ');
     const manageSubscription = () => openExternal(isNativeApp()

@@ -183,3 +183,13 @@ def _direct_transactions(monkeypatch):
     import capture_charge
     monkeypatch.setattr(capture_charge, "run_transaction", lambda db, fn: fn(DirectTransaction()))
     yield
+
+
+@pytest.fixture(autouse=True)
+def _share_moderation_off(monkeypatch):
+    """Publishing calls Gemini to check a public page (share_moderation). The
+    suite is offline, so the check is off unless a test turns it back on —
+    a shell or CI step with GEMINI_API_KEY set must never make share tests
+    reach the network."""
+    monkeypatch.setenv("SHARE_MODERATION", "off")
+    yield
