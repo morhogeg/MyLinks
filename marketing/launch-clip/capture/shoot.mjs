@@ -846,8 +846,9 @@ const takes = {
     await t.thaw();
     await page.keyboard.press('Enter');
     for (let k = 0; k < 80 && !server.chatOpen(); k++) await page.waitForTimeout(25);
+    // (the first chunk is "You saved": chunks end on a word)
     server.advanceChat(6);
-    await until('You saved it');
+    await until('You saved');
     await t.freeze();
     t.mark('answer');
     for (let done = false; !done; ) {
