@@ -108,8 +108,8 @@ export const CAPTIONS = [
   { at: 434, to: 514, text: 'Weeks later, buried\nunder everything else,', style: 'Storytelling, quick and a touch dramatic; trailing on into the next line.', pace: PACE },
   { at: 518, to: 564, text: 'type what you remember.', style: 'Easy and casual, like the simplest thing in the world.', pace: PACE },
   // (owner, round 5: the search showed the result but nobody said it) the
-  // payoff, on the card coming back: found, and the read's "sums it up" kept
-  { at: 566, to: 612, text: 'There it is,\nsummed up.', style: 'The payoff, warm and quietly delighted, like pulling it out of a hat: a smile on "There it is", then "summed up" light and quick; no drawn-out words.', pace: PACE },
+  // payoff, on the card coming back: found, from a half-memory, not its title
+  { at: 556, to: 626, text: 'There it is,\nexactly the one you meant.', style: 'The payoff, warm and quietly delighted: a small reveal on "There it is", then quick and sure, a light lift on "exactly"; no drawn-out words.', pace: PACE },
   // the find: the name and the tagline, said once, over the save it just
   // brought back (owner, round 2: the name in the voice); the drawn wordmark
   // wipes in on "Machina"
