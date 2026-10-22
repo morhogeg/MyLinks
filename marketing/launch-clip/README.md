@@ -714,14 +714,14 @@ tick sounds; the narrator sits 8.1–17.0dB over the music in the speech band
 `MachinaSaveThis` is a 25.7s vertical Reel built for Instagram, not a
 feature explainer. **The idea: the reel saves itself.** It opens by
 predicting that the viewer will save this video and never watch it again.
-The save falls into a well of every other save. "Unless you save it to
-Machina" gathers them into the mark, and the real app reads the reel,
-sums it up, files it by topic, connects it to two earlier saves, buries
-it under three weeks of newer
-saves, and finds it again from
+The save falls into a well of every other save, all grey. "Unless you
+save it to Machina" floods them with the app's category colours and
+gathers them into the mark, and the real app reads the reel, sums it up,
+files it by topic, shows it on its graph tied to two earlier saves,
+buries it under three weeks of newer saves, and finds it again from
 "never watch it again". The found card's cover is the reel's first
 frame, so the camera dives into it and lands ON frame 0: the reel loops
-into its own hook ("See? You're watching it again.").
+into its own hook ("This time, you'll watch it again.").
 
 ```bash
 # today's app (a video branch's own web/ can be weeks old: capture main's)
@@ -745,26 +745,32 @@ npx remotion render src/index.ts MachinaSaveThis out/savethis/master.mp4 --crf=1
 | 0:02.3 | It falls into a well lined with grey, unreadable saves | | | a scale run falling |
 | 0:04.2 | It lands on the heap, in the beat after "there," | Right down there, / with all the others. | "Right down there, with all the others." | thud |
 | 0:04.5 | The camera dives at the heap: hundreds of saves | | | whoosh |
-| 0:05.6 | The heap and the well rush into one point | Unless you save it / to Machina | "Unless you save it to Machina." | riser |
+| 0:05.6 | Colour floods the grey heap on "Unless" (the app's own category colours, a wave out from the point); then the heap and the well rush into one point | Unless you save it / to Machina | "Unless you save it to Machina." | riser |
 | 0:07.0 | The brackets close on it: the mark, on "Machina" | | | impact, shimmer |
 | 0:07.5 | The mark lands on the processing card's own mark as the real app irises open: a share of this reel arriving | | | whoosh |
 | 0:07.9 | The pill, a phase a beat: Fetching the link, Reading the page, Writing the summary, Searching connections, Organizing & tagging | It reads every save, / from any app, | "It reads every save, from any app," | the band; a tick a phase |
 | 0:10.3 | "Saved to Machina"; the card: its cover is this reel's frame 0; its summary lifts on "sums it up", its topic chip on "files it by topic" | understands it, sums it up, / files it by topic, | "understands it, sums it up, files it by topic," | bell |
-| 0:12.4 | The thumb opens it: the sheet, then down to its Related cards (the procrastination talk, Four Thousand Weeks, each with its "why") | and connects it to / what you've saved before. | "and connects it to what you've saved before." | a tick; two linked notes |
+| 0:12.1 | Cut on "topic": the app's graph, the saves mapped by topic (ATTENTION, MEANING, DESIGN…), its layout settling, the new save one of its dots | and connects it to / what you've saved before. | "and connects it to what you've saved before." | a tick |
+| 0:13.1 | The thumb taps its dot: on "what you've saved before" its ties to two older saves (Four Thousand Weeks, the procrastination talk) light up, the rest recedes, and the app's own camera glides in on the three | | | a tick; two linked notes |
 | 0:14.5 | Cut: the whole feed; seven newer saves land on the card, one an 8th, and bury it | THREE WEEKS LATER / Weeks later, buried / under everything else, | "Weeks later, buried under everything else," | the band drops; a thud per save |
 | 0:17.3 | Search your saves, tapped; "never watch it again" types; the feed narrows to one card | type what you remember. | "type what you remember." | a click a character |
 | 0:19.1 | The card lifts: this reel, found; the wordmark wipes in on the spoken name | MACHINA / Everything you save, / finally useful. | "Machina. Everything you save, finally useful." | the band lands, full |
-| 0:22.9 | The thumb taps the cover; the camera dives; the cover opens to the frame | | | whoosh, riser |
-| 0:23.8 | The poster: frame 0 again | See? You're / watching it again. | "See? You're watching it again." | thud, bell |
+| 0:22.9 | The thumb taps the cover; the camera dives; the cover opens to the frame | | | whoosh |
+| 0:23.5 | The poster: frame 0 again (from 0:23.8) | This time, you'll / watch it again. | "This time, you'll watch it again." | thud, bell |
 | 0:25.7 | Loops into 0:00 without a cut | | | |
 
 **What is real and what is not.** Every app pixel is the shipped app on
 `main` (2026-10-21), captured by `capture/shoot.mjs savethisClip`: the
 share-sheet placeholder card, the pill's real phase labels, the card,
 the burial (the seven saves made since, re-inserted oldest first), the
-card's own Related cards (round 2: two saves dated before it, with the
-"why" the graph service writes, `SAVETHIS.related`), and the live search
-narrowing. Scripted, as in every capture: the backend
+app's graph (round 4: the Home view switcher's Graph, then a tap on the
+new save's dot, which lights its ties to two saves dated before it,
+`SAVETHIS.related`, with the app's own focus, labels and camera glide),
+and the live search narrowing. The graph draws to a canvas, so the
+capture reads its dots' positions off the app's own model each frame
+for the reel's camera; the capture build lifts the canvas's 2x
+resolution cap to the device's 4x so a push-in stays sharp (layout and
+drawing unchanged). Scripted, as in every capture: the backend
 (the stage changes, the card's analysis, the search hit). The one card
 written for this reel is the reel's own save (`SAVETHIS` in
 `capture/library.mjs`): what the app would make of this post, with the
@@ -777,7 +783,10 @@ captured, so they are not shown. No recipe cards in this account (owner,
 loop, not on the tagline: the tagline is said once, over the found card
 at 77%, and the last frame is frame 0. And the opening (the trapdoor,
 the well, the heap) is the reel's own motion, bigger than the kit's
-restraint allows, in the same ink-on-paper grade.
+restraint allows, in the same ink-on-paper grade. (Round 4: colour
+enters with Machina, the app's own category colours flooding the heap
+on "Unless" and peaking on the graph; the hook, the poster and the loop
+stay ink on paper.)
 
 **The loop.** The set's drift is periodic over the reel
 (`paperDriftAt`), every layer but the poster is gone by the last frame,

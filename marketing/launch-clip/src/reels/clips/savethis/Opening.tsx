@@ -18,9 +18,11 @@ import { Bookmark, POSTER, PosterArt } from './Poster';
  *           videos, screenshots, links: unreadable, bleaching into the
  *           paper with depth) and lands on the heap at the bottom on the
  *           beat after "there,"; "with all the others" dives down at it.
- *  gather   "Unless you save it to Machina": the well and its heap rush
- *           into the vanishing point, which IS the mark's point; the
- *           brackets close on it on "Machina" (the score's impact).
+ *  gather   "Unless you save it to Machina": colour floods the grey saves
+ *           (the app's own category colours, a wave out from the point, on
+ *           "Unless"), then the well and its heap rush into the vanishing
+ *           point, which IS the mark's point; the brackets close on it on
+ *           "Machina" (the score's impact).
  *  hand-off the mark shrinks and travels onto the processing card's own
  *           mark as the app irises open around it (App.tsx owns the
  *           iris; MARK_TO is where the card's mark sits in frame).
@@ -37,7 +39,34 @@ const camZ = (f: number) =>
   prog(f, HITS.drop + 4, HITS.land, (t) => t) * 500 + prog(f, HITS.land + 8, HITS.gather - 2, EASE_IN_OUT) * 2700;
 
 type Kind = 'post' | 'video' | 'link' | 'shot' | 'mark';
-type Tile = { x: number; y: number; z: number; w: number; h: number; r: number; kind: Kind; tone: number };
+type Tile = { x: number; y: number; z: number; w: number; h: number; r: number; kind: Kind; tone: number; hue: number };
+
+/**
+ * (round 4) The app's category colours (web/lib/colors.ts, its Tailwind
+ * 500s; the slate one left out, it IS the grey). The well is grey, saves
+ * nobody will look at again; colour arrives with Machina: on "Unless" it
+ * floods them in a wave out from the point, and goes into the mark with them.
+ */
+const HUES: [number, number, number][] = [
+  [59, 130, 246], // blue
+  [34, 197, 94], // green
+  [234, 179, 8], // yellow
+  [239, 68, 68], // red
+  [236, 72, 153], // pink
+  [99, 102, 241], // indigo
+  [20, 184, 166], // teal
+  [249, 115, 22], // orange
+  [6, 182, 212], // cyan
+];
+/** the flush starts on "Unless" and crosses the frame in FLUSH_SPREAD */
+const FLUSH_AT = HITS.gather - 1;
+const FLUSH_SPREAD = 9;
+/** grey → a tile's colour, by `c` */
+const tint = (grey: [number, number, number], hue: number, c: number, a: number) => {
+  const h = HUES[hue];
+  return `rgba(${Math.round(mix(grey[0], h[0], c))},${Math.round(mix(grey[1], h[1], c))},${Math.round(mix(grey[2], h[2], c))},${a.toFixed(3)})`;
+};
+const SLATE: [number, number, number] = [52, 64, 84];
 
 /** the well: rings of saves on the walls of a tall box, deeper and deeper */
 const WALL = { x: 760, y: 1180 };
@@ -67,7 +96,17 @@ const tiles: Tile[] = (() => {
       const kind = kinds[Math.floor(random(s + 'k') * kinds.length)];
       const w = kind === 'shot' ? 230 : 300 + random(s + 'w') * 60;
       const h = kind === 'shot' ? 400 : kind === 'mark' ? 300 : 330 + random(s + 'h') * 70;
-      out.push({ x: x * 0.92, y: y * 0.92, z, w, h, r: (random(s + 'r') - 0.5) * 16, kind, tone: random(s + 't') });
+      out.push({
+        x: x * 0.92,
+        y: y * 0.92,
+        z,
+        w,
+        h,
+        r: (random(s + 'r') - 0.5) * 16,
+        kind,
+        tone: random(s + 't'),
+        hue: Math.floor(random(s + 'c') * HUES.length),
+      });
     }
   }
   // the heap at the bottom: every other save, piled up
@@ -86,19 +125,21 @@ const tiles: Tile[] = (() => {
       r: (random(s + 'o') - 0.5) * 120,
       kind,
       tone: random(s + 't'),
+      hue: Math.floor(random(s + 'c') * HUES.length),
     });
   }
   // far first, so the near ones paint over them
   return out.sort((a, b) => b.z - a.z);
 })();
 
-/** one save as the well shows it: generic, grey, unreadable */
-const SaveTile: React.FC<{ t: Tile }> = ({ t }) => {
+/** one save as the well shows it: generic, grey, unreadable; `c` 0..1
+ *  floods it with its colour (round 4) */
+const SaveTile: React.FC<{ t: Tile; c?: number }> = ({ t, c = 0 }) => {
   if (t.kind === 'mark') {
-    return <Bookmark size={t.w} fill={1} color={`rgba(52,60,74,${0.55 + t.tone * 0.3})`} stroke={1.2} shadow={0.6} />;
+    return <Bookmark size={t.w} fill={1} color={tint([52, 60, 74], t.hue, c, mix(0.55 + t.tone * 0.3, 0.95, c))} stroke={1.2} shadow={0.6} />;
   }
-  const bar = (w: string, o = 0.16) => (
-    <div style={{ height: 18, width: w, borderRadius: 9, background: `rgba(52,64,84,${o})`, marginTop: 14 }} />
+  const bar = (w: string, o = 0.16, k = 0) => (
+    <div style={{ height: 18, width: w, borderRadius: 9, background: tint(SLATE, t.hue, c * k, mix(o, 0.5, c * k)), marginTop: 14 }} />
   );
   const media =
     t.kind === 'post' || t.kind === 'video' ? (
@@ -106,7 +147,10 @@ const SaveTile: React.FC<{ t: Tile }> = ({ t }) => {
         style={{
           height: '56%',
           borderRadius: 16,
-          background: `linear-gradient(160deg, rgba(52,64,84,${0.1 + t.tone * 0.08}), rgba(52,64,84,${0.2 + t.tone * 0.1}))`,
+          background:
+            c > 0.001
+              ? `linear-gradient(160deg, ${tint(SLATE, t.hue, c, mix(0.1 + t.tone * 0.08, 0.42, c))}, ${tint(SLATE, t.hue, c, mix(0.2 + t.tone * 0.1, 0.8, c))})`
+              : `linear-gradient(160deg, rgba(52,64,84,${0.1 + t.tone * 0.08}), rgba(52,64,84,${0.2 + t.tone * 0.1}))`,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -132,9 +176,10 @@ const SaveTile: React.FC<{ t: Tile }> = ({ t }) => {
     >
       {media}
       {t.kind === 'link' && (
-        <div style={{ width: 54, height: 54, borderRadius: 14, background: 'rgba(52,64,84,0.12)', marginBottom: 6 }} />
+        <div style={{ width: 54, height: 54, borderRadius: 14, background: tint(SLATE, t.hue, c, mix(0.12, 0.62, c)), marginBottom: 6 }} />
       )}
-      {bar('86%')}
+      {/* the first line takes the colour where there is no picture to */}
+      {bar('86%', 0.16, t.kind === 'post' || t.kind === 'video' ? 0.45 : 1)}
       {bar('64%', 0.11)}
       {t.kind !== 'post' && bar('72%', 0.09)}
     </div>
@@ -221,7 +266,11 @@ export const Opening: React.FC<{ f: number; markTo: MarkTarget; paperDrift: numb
             // depth bleaches them into the well's light (forgotten), and the
             // nearest ones go soft (they are right at the lens)
             const isPile = t.z > PILE_Z - 700;
-            const fog = Math.min(1, Math.max(0, (dz - 900) / 3600)) * (isPile ? 0.42 : 0.88);
+            // (round 4) the colour, a wave out from the point; a save it
+            // reaches stops fading into the well
+            const d0 = Math.hypot(t.x, t.y) * (F / Math.max(90, t.z - camZ(FLUSH_AT)));
+            const c = f < FLUSH_AT ? 0 : prog(f, FLUSH_AT + Math.min(1, d0 / 1100) * FLUSH_SPREAD, FLUSH_AT + Math.min(1, d0 / 1100) * FLUSH_SPREAD + 7, EASE_MODAL);
+            const fog = Math.min(1, Math.max(0, (dz - 900) / 3600)) * (isPile ? 0.42 : 0.88) * (1 - 0.55 * c);
             const near = Math.max(0, 1 - dz / 700);
             return (
               <div
@@ -235,7 +284,7 @@ export const Opening: React.FC<{ f: number; markTo: MarkTarget; paperDrift: numb
                   filter: near > 0.02 ? `blur(${(near * 10).toFixed(1)}px)` : undefined,
                 }}
               >
-                <SaveTile t={t} />
+                <SaveTile t={t} c={c} />
               </div>
             );
           })}

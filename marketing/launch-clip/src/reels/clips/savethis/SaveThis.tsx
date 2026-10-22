@@ -8,6 +8,7 @@ import { BandScrim, Captions, type ReelCaption, type ReelKicker } from '../../ki
 import { CLOCK } from '../../kit/camera';
 import { EASE_IN_OUT, EASE_MODAL, prog } from '../../kit/curves';
 import { Lens, Paper } from '../../kit/Paper';
+import { SET_BG } from '../../../film/effects';
 import { INK } from '../../kit/Type';
 import { App, HANDOVER, MARK_TO } from './App';
 import { Dive } from './Dive';
@@ -53,6 +54,17 @@ export const SaveThis: React.FC<{
         <Tap x={POSTER.bookmark.x} y={POSTER.bookmark.y + 18} t={prog(f, HITS.tapSave - 10, HITS.tapSave + 18, (t) => t)} size={120} />
       </div>
       <BandScrim opacity={scrim} />
+      {/* (round 4) once the app's camera glides in on the lit ties, the
+          paper rises further, over the graph's own header and legend */}
+      {f >= HITS.connect && f < HITS.skip && (
+        <AbsoluteFill
+          style={{
+            pointerEvents: 'none',
+            opacity: prog(f, HITS.connect + 2, HITS.connect + 18, EASE_IN_OUT),
+            background: `linear-gradient(180deg, ${SET_BG} 0px, ${SET_BG} 700px, rgba(238,240,244,0) 930px)`,
+          }}
+        />
+      )}
       <TaglineLockup f={f} show={withCaptions} />
       <Captions
         frame={f}

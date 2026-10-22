@@ -3,7 +3,7 @@ import { AbsoluteFill } from 'remotion';
 import { CAPTIONS, FPS, HITS, TYPE_FRAMES } from '../../../../clips/savethis-timeline.mjs';
 import { AppShot, Lift, Tap } from '../../kit/AppShot';
 import { camAt, camVelocity, type Cam, type Key } from '../../kit/camera';
-import { EASE_GATHER, EASE_IN_OUT, EASE_MODAL, prog } from '../../kit/curves';
+import { EASE_GATHER, EASE_IN_OUT, EASE_MODAL, mix, prog } from '../../kit/curves';
 import { addTakes, at, center, rectOf, takeOf } from '../../kit/takes';
 import TAKES from './takes.json';
 import VO from './savethis-vo.json';
@@ -17,6 +17,10 @@ import VO from './savethis-vo.json';
  *  read    down to the pill, which narrates the real phases a beat apart,
  *          to "Saved to Machina"; up to the card: its cover is this reel's
  *          first frame, its summary what the reel says
+ *  graph   (round 4) CUT to the app's graph, the saves mapped by topic, the
+ *          new one already among them, its layout settling; the thumb taps
+ *          its dot and its ties to two older saves light up on "what you've
+ *          saved before", as the app's camera glides in on them
  *  skip    three weeks later: the card's date goes back, and the saves made
  *          since land on top of it, one an 8th
  *  search  Search your saves, tapped on "type"; "never watch it again"
@@ -37,11 +41,13 @@ const linear = (t: number) => t;
 
 /** the take's 8th-note runs, from its marks */
 const BURY = takeOf(T).marks.buried - takeOf(T).marks.bury0; // 7 saves x 14
-/** the detail's scroll down to its Related cards, in 5pt captured steps */
-const SCROLL = takeOf(T).marks.relatedHold - takeOf(T).marks.related;
-/** the detail sheet is up: the scroll starts */
-export const SCROLL_FROM = S.cardOpen + 14;
 const CHARS = takeOf(T).marks.result - takeOf(T).marks.typing;
+/** (round 4) the take opens the graph this many 60fps frames before the
+ *  thumb taps the new save's dot; the reel joins it so the tap lands on its
+ *  beat, the whole graph played at half speed (one 60fps capture an output
+ *  frame): its layout settling, then the app's camera gliding in */
+const GRAPH_TAP = takeOf(T).marks.graphTap - takeOf(T).marks.graph;
+const GRAPH_JOIN = GRAPH_TAP - (S.connect - S.graph);
 
 /** the saves since land one an 8th, the first just before "buried" */
 export const BURY_FROM = S.bury - 7;
@@ -56,17 +62,13 @@ export const frameAt = (f: number) => {
   if (f < S.phase0) return at(T, 'phase0');
   // five phases, a beat each, at real speed
   if (f < S.done) return at(T, 'phase0', (f - S.phase0) * 2);
-  // read, and "Saved to Machina"
-  if (f < S.cardOpen) return at(T, 'done', Math.min(39, (f - S.done) * 2));
-  // (round 2) the thumb opens it: the app's own sheet, at real speed…
-  if (f < SCROLL_FROM) return at(T, 'open', (f - S.cardOpen) * 2);
-  // …down to its Related cards (the captured step nearest the eased scroll)…
-  if (f < S.related) {
-    const j = Math.round(SCROLL * prog(f, SCROLL_FROM, S.related, EASE_IN_OUT));
-    return j === 0 ? at(T, 'open', (SCROLL_FROM - S.cardOpen) * 2) : at(T, 'related', j - 1);
-  }
-  // …held there until three weeks later
-  if (f < S.skip) return at(T, 'relatedHold', Math.min(29, f - S.related));
+  // read, and "Saved to Machina", held to the cut
+  if (f < S.graph) return at(T, 'done', Math.min(39, (f - S.done) * 2));
+  // (round 4) CUT to the graph as its layout settles…
+  if (f < S.connect) return at(T, 'graph', GRAPH_JOIN + (f - S.graph));
+  // …the tap: its ties light and the app's camera glides in on them, until
+  // three weeks later
+  if (f < S.skip) return at(T, 'graphTap', Math.min(119, f - S.connect));
   // three weeks later: the date goes back (the take's skip, eased over)
   if (f < BURY_FROM) return at(T, 'skip', ((f - S.skip) * 14) / (BURY_FROM - S.skip));
   // the saves since, one an 8th (14 captured frames each, at real speed)
@@ -85,8 +87,6 @@ const PILL = rectOf(T, at(T, 'phase0'), 'pill');
 const FIELD = rectOf(T, at(T, 'home'), 'search');
 export const CARD = rectOf(T, at(T, 'result', 59), 'card');
 export const COVER = rectOf(T, at(T, 'result', 59), 'cover');
-/** the card in the feed when it is opened, and its Related cards once there */
-const OPENED = rectOf(T, at(T, 'done', 39), 'card');
 /** (round 3) the parts of the read the narrator names: its summary, its topic */
 const union = (a: number[], b: number[]): [number, number, number, number] => {
   const x = Math.min(a[0], b[0]);
@@ -102,7 +102,63 @@ const LIST_T = VO.find((v) => v.frame === LIST.at);
 const wordAt = (k: number) => LIST.at + Math.round((LIST_T?.words[k] ?? 0) * FPS);
 export const SUMS_AT = wordAt(2); // "sums"
 export const FILES_AT = wordAt(5); // "files"
-const RELATED = rectOf(T, at(T, 'relatedHold'), 'relatedList');
+
+/**
+ * (round 4) The graph's camera. The app draws its graph to one canvas, so the
+ * capture measures its dots off the app's own model, every frame: the new
+ * save (node0), the two saves it connects to (node1, node2) and the island
+ * they belong to. Before the tap the reel holds the island still as the
+ * layout settles; after it, the three and their titles, as the app's own
+ * camera glides in on them (its push is the move; the reel only keeps them
+ * framed).
+ */
+/** half the width of each lit dot's title, in points (11px type the app
+ *  sets in screen space, so a constant at any zoom; measured on the take) */
+const TITLE_HALF = [80.5, 109.5, 58];
+/** the three and their titles hanging under them, as a box in points */
+const tiesAt = (i: number) => {
+  const c = ['node0', 'node1', 'node2'].map((k) => center(rectOf(T, i, k)));
+  const x0 = Math.min(...c.map((p, k) => p.x - TITLE_HALF[k]));
+  const x1 = Math.max(...c.map((p, k) => p.x + TITLE_HALF[k]));
+  const y0 = Math.min(...c.map((p) => p.y)) - 6;
+  const y1 = Math.max(...c.map((p) => p.y)) + 26;
+  return { x: (x0 + x1) / 2, y: (y0 + y1) / 2, w: x1 - x0, x0, x1 };
+};
+/** low enough that the tab bar stays under the frame's edge and the focus
+ *  panel the app slides up stays below it; the titles clear of the sides
+ *  (and of the feed's buttons down the right) */
+const GRAPH = { zIsland: [3.8, 4.0], fyIsland: 1110, fyTies: 1130, margin: 60 };
+export const graphCam = (f: number): Cam => {
+  const i = frameAt(f);
+  const isl = center(rectOf(T, i, 'island'));
+  const ties = tiesAt(i);
+  const w = prog(f, S.connect, S.connect + 22, EASE_IN_OUT);
+  // a breath wider on the cut (the settling layout's last titles), then in
+  const zIsland = mix(GRAPH.zIsland[0], GRAPH.zIsland[1], prog(f, S.graph, S.connect, EASE_IN_OUT));
+  // as wide as the titles need, never closer than the island's framing
+  const zTies = Math.min(zIsland, (1080 - 2 * GRAPH.margin) / ties.w);
+  const z = mix(zIsland, zTies, w) * (1 + 0.04 * prog(f, S.graph, S.skip, linear));
+  // the titles are up from the frame after the tap: none of them leaves the
+  // frame while the camera travels to them
+  let cx = mix(isl.x - 4, ties.x, w);
+  if (f > S.connect) {
+    const half = (540 - 30) / z;
+    cx = Math.min(Math.max(cx, ties.x1 - half), ties.x0 + half);
+  }
+  return {
+    cx,
+    cy: mix(isl.y, ties.y, w),
+    z,
+    fx: 540,
+    fy: mix(GRAPH.fyIsland, GRAPH.fyTies, w),
+    rx: 0,
+    ry: 0,
+    rz: 0,
+  };
+};
+/** where the thumb comes down: the new save's dot (its ring rides the dot
+ *  as the app glides it up, clear of the panel sliding in below) */
+const dotAt = (i: number) => center(rectOf(T, i, 'node0'));
 
 /** the camera when the app opens: the processing card, its mark in frame */
 const OPEN_CAM: Cam = { cx: 196.5, cy: 330, z: 2.3, fx: 540, fy: 1150, rx: 0, ry: 0, rz: 0 };
@@ -129,13 +185,10 @@ export const appKeys: Key[] = [
   // "Saved to Machina", and up to the card as it is understood: its summary
   // and its topic are named and lifted (round 3)
   { f: S.done + 16, cx: 196.5, cy: 352, z: 2.4, fx: 540, fy: 1190, ease: EASE_IN_OUT },
-  { f: S.cardOpen - 10, z: 2.46, ease: linear },
-  { f: S.cardOpen, cx: 196.5, cy: 330, z: 2.25, fx: 540, fy: 1180, ease: EASE_IN_OUT },
-  // (round 2) it opens; the camera follows the scroll down to the saves it
-  // connects to, and holds on them
-  { f: SCROLL_FROM, z: 2.27, ease: linear },
-  { f: S.related, cx: 196.5, cy: RELATED[1] + RELATED[3] / 2 - 26, z: 2.45, fx: 540, fy: 1190, ease: EASE_IN_OUT },
-  { f: S.skip - 1, z: 2.52, ease: linear },
+  // a slow push on the topic, into the cut
+  { f: S.graph - 1, z: 2.5, ease: linear },
+  // (round 4) S.graph to S.skip: the graph, on its own camera (graphCam)
+  { f: S.skip - 1, cx: 196.5, cy: 330, z: 2.3, fx: 540, fy: 1180, ease: linear },
   // CUT, three weeks later: the card back in the feed, then back to the
   // whole feed, so the saves since are seen landing on it and pushing it under
   { f: S.skip, cx: 196.5, cy: 330, z: 2.3, fx: 540, fy: 1180, ease: linear },
@@ -162,32 +215,33 @@ const lift = (f: number, landed: number, len = 64) =>
 export const App: React.FC<{ f: number }> = ({ f }) => {
   if (f < S.iris - 1 || f >= S.poster) return null;
   const i = frameAt(f);
-  const cam = camAt(appKeys, f);
-  const v = camVelocity(appKeys, f, 1);
+  // the graph's camera rides the app's, so what it shows stays put: no
+  // smear from its own travel
+  const inGraph = f >= S.graph && f < S.skip;
+  const cam = inGraph ? graphCam(f) : camAt(appKeys, f);
+  const v = inGraph ? { x: 0, y: 0 } : camVelocity(appKeys, f, 1);
   // the iris: a circle from the card's mark, open by the time it lands
   const r = prog(f, S.iris - 1, S.iris + 18, EASE_IN_OUT);
   const iris = r < 0.999 ? { x: center(MARK).x, y: center(MARK).y, r: 6 + r * 790 } : null;
   const up = f >= S.found ? lift(f, S.found, S.cardTap - S.found) : 0;
-  // the read's parts, each on the word that names it, gone before the open
-  const upSum = f >= SUMS_AT - 2 && f < S.cardOpen ? lift(f, SUMS_AT - 2, S.cardOpen - SUMS_AT + 2) : 0;
-  const upTopic = f >= FILES_AT - 2 && f < S.cardOpen ? lift(f, FILES_AT - 2, S.cardOpen - FILES_AT + 2) : 0;
-  // the saves it connects to, emphasised on the beat after they land
-  const upRelated = f >= S.related && f < S.skip ? lift(f, S.related + 6, S.skip - S.related - 6) : 0;
+  // the read's parts, each on the word that names it: the summary hands over
+  // to the topic, which stays up into the cut to the topics' map
+  const upSum = f >= SUMS_AT - 2 && f < S.graph ? lift(f, SUMS_AT - 2, S.graph - SUMS_AT + 2) : 0;
+  const upTopic = f >= FILES_AT - 2 && f < S.graph ? prog(f, FILES_AT - 2, FILES_AT + 10, EASE_MODAL) : 0;
   const tapCover = { x: center(COVER).x, y: center(COVER).y };
   return (
     <AbsoluteFill>
       <AppShot take={T} i={i} cam={cam} motion={{ x: v.x, y: v.y }} iris={iris} shadow={r}>
         {/* (round 3) "sums it up": its summary; "files it by topic": its topic */}
-        {f >= SUMS_AT - 4 && f < S.cardOpen && (
+        {f >= SUMS_AT - 4 && f < S.graph && (
           <Lift take={T} i={i} rect={SUMMARY} radius={10} lift={Math.max(upSum, 0.002)} rise={1.5} grow={0.012} ring={0.6 * upSum} />
         )}
-        {f >= FILES_AT - 4 && f < S.cardOpen && (
+        {f >= FILES_AT - 4 && f < S.graph && (
           <Lift take={T} i={i} rect={TOPIC} radius={8} lift={Math.max(upTopic, 0.002)} rise={1.5} grow={0.05} ring={0.7 * upTopic} />
         )}
-        {/* (round 2) the card, opened on "connects" */}
-        <Tap x={OPENED[0] + 180} y={OPENED[1] + 172} t={prog(f, S.cardOpen - 10, S.cardOpen + 18, linear)} />
-        {f >= S.related - 2 && f < S.skip && (
-          <Lift take={T} i={i} rect={RELATED} radius={14} lift={Math.max(upRelated, 0.002)} rise={1.5} grow={0.012} ring={0.6 * upRelated} />
+        {/* (round 4) the thumb on the new save's dot */}
+        {f >= S.connect - 9 && f < S.connect + 12 && (
+          <Tap x={dotAt(i).x} y={dotAt(i).y} t={prog(f, S.connect - 9, S.connect + 12, linear)} />
         )}
         {/* the field, tapped on "type" (the pad lands on the frame the app focuses) */}
         <Tap x={center(FIELD).x - 60} y={center(FIELD).y} t={prog(f, S.fieldTap - 10, S.fieldTap + 18, linear)} />

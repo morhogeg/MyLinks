@@ -593,6 +593,10 @@ const takes = {
   //     the server writes for a shared link), the pill narrates the real
   //     phases, and it resolves into its card, whose cover is the reel's own
   //     frame 0 (public/clips/savethis/cover.jpg);
+  //  1b. (round 4) Home's view switcher to Graph: the graph opens and
+  //     settles with the new save among its dots; a press on its dot lights
+  //     its ties to the two saves before it, and the app's camera glides in
+  //     (back to Card after, unrecorded);
   //  2. three weeks later: it is dated back, and the saves made since land
   //     on top of it one by one, the way the feed receives them;
   //  3. "never watch it again" typed into Search your saves: the feed
@@ -696,36 +700,100 @@ const takes = {
     t.mark('done');
     await roll60(40);
 
-    // 1b. (round 2) the thumb opens it: its own detail view, then down to
-    // its Related cards, the saves it connects to
-    const DETAIL = {
-      ...RECTS,
-      related: ['div', 'Related cards'],
-      relatedList: ['div[class*="grid gap-3"]', CARDS.find((c) => c.id === S.related[0].id).title],
-      detailTitle: ['h2', S.title],
+    // 1b. (round 4) the graph: the library as the app maps it, the new save
+    // already one of its dots; the thumb taps it and its connections to the
+    // saves made before it light up (the app's own ego focus and camera)
+    await page.evaluate(() => {
+      // the graph's model and camera, read off KnowledgeGraph's refs (it
+      // draws to one canvas, so its dots have no DOM to measure): each
+      // node's on-screen circle, in points
+      window.__graphRects = (ids) => {
+        const canvas = document.querySelector('canvas');
+        if (!canvas) return {};
+        const key = Object.keys(canvas).find((k) => k.startsWith('__reactFiber$'));
+        for (let f = canvas[key]; f; f = f.return) {
+          let model = null;
+          let cam = null;
+          for (let h = f.memoizedState; h && typeof h === 'object' && 'next' in h; h = h.next) {
+            const c = h.memoizedState && typeof h.memoizedState === 'object' && 'current' in h.memoizedState ? h.memoizedState.current : null;
+            if (c && Array.isArray(c.nodes) && Array.isArray(c.edges)) model = c;
+            else if (c && typeof c.k === 'number' && typeof c.x === 'number' && typeof c.y === 'number') cam = c;
+          }
+          if (!model || !cam) continue;
+          const b = canvas.getBoundingClientRect();
+          const at = (n) => ({ x: b.x + cam.x + n.x * cam.k, y: b.y + cam.y + n.y * cam.k, r: Math.max(0.5, n.r * cam.k) });
+          const box = (ns) => {
+            const ps = ns.map(at);
+            const x0 = Math.min(...ps.map((p) => p.x - p.r));
+            const y0 = Math.min(...ps.map((p) => p.y - p.r));
+            return { x: x0, y: y0, w: Math.max(...ps.map((p) => p.x + p.r)) - x0, h: Math.max(...ps.map((p) => p.y + p.r)) - y0 };
+          };
+          const out = {};
+          ids.forEach((id, k) => {
+            const n = model.nodes.find((x) => x.id === id);
+            if (n) out[`node${k}`] = box([n]);
+          });
+          // the island the new save belongs to (the nodes its edges reach)
+          const me = model.nodes.findIndex((x) => x.id === ids[0]);
+          if (me >= 0) {
+            const seen = new Set([me]);
+            const stack = [me];
+            while (stack.length) {
+              const i = stack.pop();
+              for (const ei of model.adjacency[i]) {
+                const e = model.edges[ei];
+                const o = e.a === i ? e.b : e.a;
+                if (!seen.has(o)) (seen.add(o), stack.push(o));
+              }
+            }
+            out.island = box([...seen].map((i) => model.nodes[i]));
+          }
+          if (model.nodes.length) out.nodes = box(model.nodes);
+          return out;
+        }
+        return {};
+      };
+    });
+    const GRAPH_IDS = [S.id, ...S.related.map((r) => r.id)];
+    const GRAPH = { ...RECTS, canvas: ['canvas'] };
+    const rollGraph = async (n) => {
+      await t.freeze();
+      for (let k = 0; k < n; k++) {
+        if (k > 0) await t.advance(1000 / 60);
+        else await page.evaluate(() => window.__rec.adopt());
+        await t.snap({ rects: GRAPH, caret: 'hide' });
+        Object.assign(t.frames.at(-1).rects, await page.evaluate((ids) => window.__graphRects(ids), GRAPH_IDS));
+      }
     };
-    await visible(page.locator('main article.surface-card').filter({ hasText: S.title })).click({ position: { x: 180, y: 172 } });
-    t.mark('open');
-    await t.roll(48, { rects: DETAIL, step: 1000 / 60 });
+    const viewTo = async (name) => {
+      await visible(page.locator('button[aria-label="View: card, list, review, graph, notes"]')).click();
+      await page.locator('[role=dialog]').getByText(name, { exact: true }).first().waitFor({ timeout: 10000 });
+      await page.waitForTimeout(500);
+    };
     await t.thaw();
-    await page.waitForTimeout(500);
+    await viewTo('Graph');
     await t.freeze();
-    // (anchored on a reason line: the "Related cards" heading carries an icon,
-    // so it is not a text-only element and tagScroller would fall through to
-    // the page behind the sheet)
-    await tagScroller(S.related[0].reason);
-    t.mark('related');
-    await rollScroll(t, await scrollTargetFor(S.related.at(-1).reason, 700), 5, DETAIL);
-    t.mark('relatedHold');
-    await t.roll(30, { rects: DETAIL, step: 1000 / 60 });
+    await page.locator('[role=dialog]').getByText('Graph', { exact: true }).first().click();
+    t.mark('graph');
+    await rollGraph(44);
+    // the thumb on the new save's dot: ego focus. Pressed as a pointer the
+    // canvas captures (a touch tap's follow-up click lands on whatever slid
+    // in under the finger: the focus panel's "Ask about these")
+    const me = await page.evaluate((ids) => window.__graphRects(ids).node0, GRAPH_IDS);
+    if (!me) throw new Error('savethisClip: the new save is not on the graph');
+    await page.mouse.move(me.x + me.w / 2, me.y + me.h / 2);
+    await page.mouse.down();
+    await page.mouse.up();
+    t.mark('graphTap');
+    await rollGraph(120);
     // back to the feed (not shown: the reel cuts to three weeks later)
     await t.thaw();
+    await page.mouse.move(380, 120);
     await page.keyboard.press('Escape');
+    await page.waitForTimeout(400);
+    await viewTo('Card');
+    await page.locator('[role=dialog]').getByText('Card', { exact: true }).first().click();
     await page.waitForTimeout(900);
-    if (await page.locator('[role=dialog]').count()) {
-      await page.locator('[role=dialog] button[aria-label="Close"]').first().click().catch(() => {});
-      await page.waitForTimeout(900);
-    }
     await visible(page.getByPlaceholder('Search your saves')).waitFor({ timeout: 10000 });
     await page.evaluate(() => document.scrollingElement.scrollTo({ top: 0, behavior: 'instant' }));
     await page.waitForTimeout(300);

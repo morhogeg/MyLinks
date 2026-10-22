@@ -11,6 +11,8 @@
  *
  * So every component, style, animation and piece of copy in a capture is the
  * app's own; only the backend is a stand-in. `web/` itself is never modified.
+ * One resolution cap is lifted in the copy (step 1b): the graph's canvas
+ * resolution, so it is as sharp as the rest of a DPR 4 capture.
  * Run `npm ci` in web/ once first (its node_modules are hard-linked, not
  * reinstalled).
  */
@@ -40,6 +42,18 @@ for (const name of fs.readdirSync(web)) {
   if (SKIP.has(name) || name.endsWith('.tsbuildinfo')) continue;
   fs.rmSync(path.join(app, name), { recursive: true, force: true });
   fs.cpSync(path.join(web, name), path.join(app, name), { recursive: true });
+}
+
+// 1b. the graph canvas at the capture's resolution. KnowledgeGraph sizes its
+// canvas at min(2, devicePixelRatio), a battery cap for phones; under a DPR 4
+// screenshot that 2x canvas goes soft wherever the reel's camera pushes into
+// the graph. Same layout, same drawing in CSS pixels: only the cap moves.
+{
+  const kg = path.join(app, 'components', 'KnowledgeGraph.tsx');
+  const cap = 'Math.min(2, window.devicePixelRatio || 1)';
+  const src = fs.readFileSync(kg, 'utf8');
+  if (!src.includes(cap)) throw new Error('build-app: the graph canvas DPR cap changed; update step 1b');
+  fs.writeFileSync(kg, src.replaceAll(cap, 'Math.min(4, window.devicePixelRatio || 1)'));
 }
 
 // 2. dependencies: hard links into web/node_modules (instant, no extra disk)

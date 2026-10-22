@@ -2637,6 +2637,30 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-22 (round 4) — SAVE THIS: the real graph, colour, and a clearer
+  last line (owner: "show our beautiful graph instead of just the related
+  cards"; "it's a bit black and white"; "not sure about 'See? You're
+  watching it again'").** Branch `claude/reel-save-this`. (1) "and connects
+  it to what you've saved before." now plays over the app's real graph: a cut
+  on "topic," to Home's Graph view settling (the saves mapped by topic), then
+  a press on the new save's dot lights its ties to Four Thousand Weeks and the
+  procrastination talk on "what you've saved before", with the app's own
+  focus and camera glide. The capture reads the dots' positions off
+  KnowledgeGraph's model each frame (its refs, via the canvas's React fiber)
+  for the reel's camera, and the capture build lifts the canvas's 2x DPR cap
+  to the device's 4x (layout and drawing unchanged). Found on the way: a
+  touch tap's follow-up click lands on the focus panel's "Ask about these",
+  which slides in under the finger, so the take presses the dot with a mouse
+  pointer the canvas captures. (2) Colour arrives with Machina: on "Unless"
+  the grey heap floods with the app's category colours (web/lib/colors.ts),
+  a wave out from the point, before it rushes into the mark; the graph is the
+  colour peak; hook, poster and loop stay ink on paper. (3) The last line is
+  "This time, you'll watch it again." (1.45s take), the hook's "never watch
+  it again" answered as a promise, landing on the poster ~0.9s before the
+  loop. 25.7s, 70 words. **Verified:** gates (bans on 183 strings including
+  every captured frame, windows, every line 11.5 to 17.8dB over the music,
+  −14.02 LUFS, −1.25 dBTP, seam step 0.005 against the score's own 0.113);
+  stills of every beat; the encode's last frame against frame 0 at 46.5dB PSNR (consecutive frames: 42.4dB). **Not verified:** listened to.
 - **2026-10-22 (round 3) — SAVE THIS names what the read is (owner: "it only
   says reads it; say it's analyzed, understood, categorized").** Branch
   `claude/reel-save-this`. New line between "It reads every save, from any

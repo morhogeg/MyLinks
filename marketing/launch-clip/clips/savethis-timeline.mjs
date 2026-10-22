@@ -6,10 +6,11 @@
  * ONE IDEA: the reel saves itself. It opens by predicting the viewer will
  * save this video and never watch it again (the hook, readable on frame 0);
  * the save falls down a shaft onto every other save; "unless you save it to
- * Machina" gathers them into the mark; the REAL app reads it, buries it
+ * Machina" floods them with colour and gathers them into the mark; the REAL
+ * app reads it, maps it among the saves before it (its graph), buries it
  * under weeks of newer saves, and a search in the viewer's own words brings
  * it back. Its cover is this reel's first frame: the camera dives into it
- * ("See? You're watching it again.") and lands ON frame 0, so the reel
+ * ("This time, you'll watch it again.") and lands ON frame 0, so the reel
  * loops into its own hook without a cut.
  *
  * Written in OUTPUT frames on a 128.57 BPM grid, 14 frames a beat (the
@@ -49,8 +50,8 @@ export const HITS = {
   iris: beat(16), // the point opens into the app
   phase0: beat(17), // the real pipeline, a phase a beat…
   done: beat(22), // …and the card, read
-  cardOpen: beat(26.5), // the thumb opens it: "and connects it…"
-  related: beat(29), // …its Related cards, the saves it connects to
+  graph: beat(26), // "…by topic,": CUT to the graph, the saves mapped by topic
+  connect: beat(28), // "…connects it to": the thumb on its dot; its ties light on "what you've saved before"
   skip: beat(31), // three weeks later
   bury: beat(33), // newer saves land on top of it, from "buried"
   fieldTap: beat(37), // "type what you remember": the search field
@@ -101,7 +102,8 @@ export const CAPTIONS = [
   // finished card, each named part lifting on its word
   { at: 304, to: 370, text: 'understands it, sums it up,\nfiles it by topic,', style: 'Brisk and pleased, rattling off the list with a smile; light, no drawn-out words, the sentence carries on.', pace: PACE },
   // (owner, round 2: "remembers what's in it" was not a strong enough
-  // benefit) the card opens on the saves it connects to
+  // benefit; round 4: show the graph, not the Related cards list) the app's
+  // graph: the thumb taps the new save's dot and its ties to older saves light
   { at: 372, to: 432, text: 'and connects it to\nwhat you’ve saved before.', style: 'Clear and genuinely pleased, flowing on from the line before; a little lift on "connects", landing warmly on "saved before".', pace: PACE },
   { at: 434, to: 514, text: 'Weeks later, buried\nunder everything else,', style: 'Storytelling, quick and a touch dramatic; trailing on into the next line.', pace: PACE },
   { at: 518, to: 564, text: 'type what you remember.', style: 'Easy and casual, like the simplest thing in the world.', pace: PACE },
@@ -113,7 +115,7 @@ export const CAPTIONS = [
   // landing on frame 0 as the reel starts again under this line. (owner,
   // round 4: "See? You're watching it again." read as a riddle) The hook's
   // "never watch it again", answered as a promise
-  { at: 692, to: 764, text: 'This time, you’ll\nwatch it again.', duck: 0.4, style: 'Warm and sure, a small smile in the voice: a promise, not a punchline. Light and quick, a short breath after "This time", landing softly on "again".', pace: PACE },
+  { at: 704, to: 764, text: 'This time, you’ll\nwatch it again.', duck: 0.4, style: 'Warm and sure, a small smile in the voice: a promise, not a punchline. Light and quick, a short breath after "This time", landing softly on "again".', pace: PACE },
 ];
 
 /** a small letterspaced label above the line, with it (the kit's Kicker) */
