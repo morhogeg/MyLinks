@@ -2704,10 +2704,20 @@ exact-match, capped.
   into `machinareviewer` on your phone until review ends** (the app's local
   cache re-uploads consent). The "wait for the test subscription to stop
   renewing (~24 Oct)" condition was moot: it transferred to the owner's
-  account on 19 Oct. Only gate left before review: `as-submit`. Found, not
-  fixed: `rebuild_connections` callable 401s on cold instances (97 of 206
-  calls since 10-08) because the Admin SDK is initialized lazily inside
-  handlers and the callable wrapper verifies the token first.
+  account on 19 Oct. Only gate left before review: `as-submit`.
+  **Also fixed (owner's go): callables 401'd on cold instances.**
+  `rebuild_connections` failed 97 of 206 calls since 10-08 with "The default
+  Firebase app does not exist": an `@https_fn.on_call` wrapper verifies the
+  ID token BEFORE our body runs, and the Admin SDK was only initialized
+  lazily inside handlers (`ensure_app()` in `get_db`/`_verify_bearer`, which
+  covered `on_request` endpoints but never callables). `main.py` now calls
+  `ensure_app()` at import. Silent to users (the graph backfill just retried
+  later), so older cards were missing "See also" links. Same latent bug in
+  every callable: `get_share_config`, `claim_workspace`, `delete_account`,
+  `send_digest_now`, `search_links` (native uses the HTTP twins for most).
+  New `tests/test_app_init_at_import.py` (fresh interpreter) fails on the old
+  code with the production error and passes now; pytest 1,942 passed.
+  Deployed scoped to the six callables.
 - **2026-10-22 — `www.mymachina.app` FIXED; mail is on Google Workspace
   (console only, no code).** Vercel showed `www` as "Invalid Configuration"
   because the 2026-08-06 cutover only created `CNAME @`, so `www` didn't exist

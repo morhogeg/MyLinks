@@ -42,6 +42,15 @@ options.set_global_options(max_instances=20)
 
 # Internal modules
 from db import get_db, ensure_app
+
+# Initialize the default Firebase app at import, not lazily in a handler.
+# An @https_fn.on_call wrapper verifies the caller's ID token BEFORE our
+# function body runs, so on a cold instance nothing had initialized the app
+# yet and every first callable request 401'd with "The default Firebase app
+# does not exist" (rebuild_connections: 97 of 206 calls, 2026-10-08..22).
+# initialize_app() fetches no credentials until first use, so this is safe
+# during deploy-time function discovery.
+ensure_app()
 from url_key import url_key
 from log_safe import mask_uid
 from models import LinkStatus, UNANALYZED_STATUSES
