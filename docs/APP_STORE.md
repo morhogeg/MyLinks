@@ -336,18 +336,35 @@ the double "reads" in paragraph two became "reads … and pulls the text from"
 "connections" is also the word the See-also bullet already uses); and the
 UNDERSTAND bullet gained the serial comma the rest of the document uses.
 
-**Age rating questionnaire (revised 2026-10-22 for Apple's 2025 questionnaire
-and the Sept 2026 social-media question):** content questions (violence,
-sexual content, profanity, horror, gambling/contests, drugs, medical) **None /
-No**. Capabilities: unrestricted web access **No** (Machina renders extracted
-article text and opens links in Safari), messaging/chat **No**, advertising
-**No**, user-generated content **Yes** (anyone can publish a card, collection or
-Ask answer as a public web page, which is why those pages carry a Report link
-and a pre-publish check), social-media capability **No** (no feed or discovery
-of other people's content). Accept the calculated rating; the owner decided
-2026-10-22 not to rate the app 18+. Open question, owner's call: Google's
-Gemini terms (both the Developer API and Vertex AI) bar apps "likely to be
-accessed by individuals under the age of 18", while Terms §2 says 13+.
+**Age rating (decided 2026-10-22, owner: keep Terms at 13+, rate 13+).**
+Answer Apple's questionnaire honestly, then override to 13+:
+
+1. App Store Connect → Apps → Machina → sidebar **General → App Information**
+   → Age Ratings → **Edit** (first time: **Set Up Age Ratings**).
+2. In-app controls and capabilities: tick none of parental controls, age
+   assurance (Machina has no age check), messaging and chat, unrestricted web
+   access (articles show as extracted text, links open in Safari), social
+   media (no feed or discovery of other people's content). User-generated
+   content: Apple defines it as "broad distribution of content created by
+   users as a component of the app's intended user experience". Machina's
+   share pages are link-only and `noindex`, so No is defensible; Yes is also
+   honest and doesn't raise the rating. Owner's call.
+3. Content questions (violence, sexual content, profanity, horror, gambling
+   and contests, drugs, medical or wellness): **None / No**. The calculated
+   rating will be **4+**.
+4. Under **Age Categories and Override**, choose **Override to Higher Age
+   Rating** → **13+** → Save. Why it's required: Apple's help page says "If
+   your app has a EULA with minimum age requirements that exceed the rating
+   that Apple calculated, you must override to a rating that adheres to the
+   requirements", and Terms §2 says users must be 13 or older. The App Store
+   shows 13+; the content descriptions still reflect the questionnaire
+   answers.
+
+**Accepted exposure:** Google's Gemini API Additional Terms bar apps "likely to
+be accessed by individuals under the age of 18". The owner accepted this for
+launch rather than rating the app 18+. Vertex AI's Service Specific Terms
+§20(d) carry the same clause (checked 2026-10-22), so switching to Vertex
+does not remove it.
 
 ## 3. App Review notes (paste into "Notes" on the version page)
 
