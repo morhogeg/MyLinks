@@ -44,5 +44,15 @@
       "Mark Manson"
     ],
     "videoDurationMinutes": 13
+  },
+  "clips": {
+    "3:05-3:50": {
+      "model": null,
+      "text": "error: ModuleNotFoundError: No module named 'google'"
+    },
+    "0:00-0:40": {
+      "model": null,
+      "text": "error: ModuleNotFoundError: No module named 'google'"
+    }
   }
 }
