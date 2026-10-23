@@ -853,8 +853,10 @@ since its "…anything, and…" break is only 60ms.)
 (2026-10-22). **The idea: the answer was in your saves all along.** Frame 0
 is a dare, "Find the book Sam told you to read.", over a field of this
 account's real saves hung in 3D, every one a card the shipped app rendered.
-The card it means, a screenshot of Sam's text ("Read Piranesi, and go in
-blind"), is in that frame, in plain sight among four decoy books. The camera
+The card it means, a screenshot of Sam's text ("Read Atomic Habits, start
+small"), is in that frame, in plain sight among decoy books everyone knows
+(round 2, owner: a book everyone knows; Project Hail Mary and Dune lead the
+eye). The camera
 searches the field (past the beach you swore you'd visit, the talk you'll
 finish later, the coffee trick you'll never try), stops dead on "Give up?",
 and "Or just ask Machina" gathers the whole field into the mark, which is
@@ -862,7 +864,9 @@ Ask's own mark: the cut lands on the real Ask screen at the same size and
 place. The half-remembered question is typed and sent; on the send the field
 comes back at speed, a tunnel of every save ("It's read every single one."),
 and brakes onto the needle at 68% ("Even that screenshot."). The camera dives
-into it and lands inside the real answer, which cites it. The sign-off is the
+into it as the voice names it ("Atomic Habits.") and lands inside the real
+answer, which cites it ("Sam said start with the two-minute rule."). The
+sign-off is the
 tagline; then "P.S. It was in the first frame." folds the lockup back into
 its point and the field flies out of it to exactly frame 0, where the loop
 picks up and the viewer can now find it. The rewatch is the point.
@@ -897,19 +901,19 @@ node scripts/needle-stills.mjs         # review stills → out/needle-stills/
 
 | Time | Picture | On screen | Voice | Sound |
 |---|---|---|---|---|
-| 0:00 | The dare over the field (also the cover): 13 placed saves, decoy books leading the eye, the needle lower left, smaller, turned, its corner under "Thinking, Fast and Slow" | Find the book / Sam told you / to read. | "Find the book Sam told you to read." | a chord stab and a kick (where the loop lands) |
+| 0:00 | The dare over the field (also the cover): 13 placed saves, famous decoy books leading the eye (Project Hail Mary, Dune), the needle lower left, smaller, turned, its corner under "Thinking, Fast and Slow" | Find the book / Sam told you / to read. | "Find the book Sam told you to read." | a chord stab and a kick (where the loop lands) |
 | 0:01.6 | A slow push while the eye scans | | | a rising keys figure |
 | 0:02.5 | The camera starts into the field | It's in your saves / somewhere. | "It's in your saves somewhere." | hats in, half-time kick |
 | 0:04.5 | A slalom through the haystack: each named save swings into the middle, sharp, pops with the ink ring as it is said, and anything nearer steps out of its way | Past the beach / you swore you'd visit, · the talk you'll / finish later, · the coffee trick / you'll never try. | the list, quicker each time | four on the floor, 16th hats, a whoosh between saves |
 | 0:10.0 | The camera stops dead (a damped slam) in the middle of it all | Give up? | "Give up?" | the band stops; a thud |
 | 0:10.8 | Every card in view rushes into one point; the brackets snap shut around it; the point strikes on "Machina" (beat 24) | Or just ask / Machina. | "Or just… ask Machina." | a riser into the brand's impact, a shimmer |
-| 0:12.2 | Match cut: the mark pulls back to exactly Ask's mark and the real Ask screen irises open around it: "What do you want to recall? Answers come only from your 53 saves, with sources you can open." | | | a whoosh |
+| 0:12.2 | Match cut: the mark pulls back to exactly Ask's mark and the real Ask screen irises open around it: "What do you want to recall? Answers come only from your 52 saves, with sources you can open." | | | a whoosh |
 | 0:13.5 | Down to the composer; the question types; the thumb sends it | What was the book Sam told me to read? (the app) | | soft key ticks; a rim roll and a riser |
 | 0:15.0 | CUT to the tunnel at full speed: every save streaming past, a banking roll, real motion blur | It's read every / single one. | "It's read every single one." | THE DROP: kick every beat, 8th-note bass |
 | 0:16.7 | Braking; the tunnel thins; one card ahead turns to face the camera | Even that screenshot. | "Even that screenshot." | the drums fall away, a falling keys line, a swell |
-| 0:19.0 | **The needle**: Sam's screenshot, square to the camera, a punch-in, the ink ring, three rings out across the field, the rest receding | | | impact, sub, a bell (home on I) |
+| 0:19.0 | **The needle**: Sam's screenshot, "Read Atomic Habits, start small", square to the camera, a punch-in, the ink ring, three rings out across the field, the rest receding | Atomic Habits. | "Atomic Habits." (just after the hit) | impact, sub, a bell (home on I) |
 | 0:19.5 | The camera dives into the card… | | | a whoosh |
-| 0:20.0 | …and lands inside the real answer on its one source (the same title), pulling back to the question, the answer and the citation | Piranesi. / Sam said go in blind. | "Piranesi. Sam said go in blind." | warm keys; a ping as the citation lifts |
+| 0:20.0 | …and lands inside the real answer on its one source (the same title), pulling back to the question, the answer and the citation, which lifts with its ink ring | Sam said start with / the two-minute rule. | "Sam said start with the two-minute rule." | the band clears for the advice; warm keys after it |
 | 0:22.5 | The app dissolves into paper; the app's own launch mark draws in, the wordmark on "Machina", the tagline word by word | MACHINA / Everything you save, finally useful. | "Machina. Everything you save, finally useful." | the brand's impact, lighter; a bell |
 | 0:25.9 | The lockup folds into its point; the field bursts back out of it to frame 0, the needle last | P.S. It was in / the first frame. | "P.S. It was in the first frame." | the dare's figure on vi; a whoosh |
 | 0:28.0 | The loop: frame 0, identical field, the dare back on screen | | | the stab lands again |
@@ -924,10 +928,11 @@ streamed answer, its citation) is `needleClip`, one continuous use of the
 app. Scripted, as in every capture: the backend's answer, every claim in it
 taken from the card itself (its title, summary and note). The account is
 the house demo account minus its two recipes (no cooking: owner,
-2026-10-02) plus 31 more real saves (`NEEDLE.extra` in
+2026-10-02), Piranesi and the two James Clear saves (round 2: one Sam book,
+and no near-twins of the needle), plus 32 more real saves (`NEEDLE.extra` in
 `capture/library.mjs`: published titles, summaries true to the source,
-invented Instagram handles, no third-party images, several decoy books), and
-Sam's screenshot dated back to June. The iOS share sheet is not shown.
+invented Instagram handles, no third-party images, several decoy books,
+and the needle itself, dated June). The iOS share sheet is not shown.
 
 **The field (`src/reels/clips/needle/field.ts`, `Field.tsx`).** A pinhole
 camera in world pixels (focal 1100): a card at depth d is drawn 1100/d its
@@ -948,20 +953,21 @@ ones gather at the vanishing point; the needle waits at its end.
 2026-09-23), Sulafat, per-line direction in the timeline (a friend daring
 you, grinning at your pile of saves, then letting you in on the trick),
 voiced on GitHub by `narration-tts.yml` with the repo's `GEMINI_API_KEY`
-secret (run 57), resampled to 44.1kHz and de-essed. 64 words. The cut is
-timed to the takes: "Machina" lands on beat 24, where the brackets strike.
+secret (runs 57 and 59), resampled to 44.1kHz and de-essed. 67 words. The
+cut is timed to the takes: "Machina" lands on beat 24, where the brackets
+strike, and "Atomic Habits." four frames after the needle's hit.
 
 **Measured, not listened to.** `node audio/needle-verify.mjs`: brand bans on
-341 strings (captions, the question and answer, the added saves, every
+340 strings (captions, the question and answer, the added saves, every
 captured frame), every line inside its window, the type inside the feeds'
-safe area, every line 10 to 24dB over the music in the speech band, −14.02
-LUFS, −1.25 dBTP, the loop's audio seam inside the score's own steps. The
+safe area, every line 11 to 24dB over the music in the speech band, −14.04
+LUFS, −1.12 dBTP, the loop's audio seam inside the score's own steps. The
 score's energy curve, per beat: the stop on "Give up?" at −29 to −36dB, the
 strike −12dB, the build into the drop −30 → −20dB, the drop −8dB, the needle
-−10dB. The encode: 840 frames, 28.000s, H.264 High yuv420p BT.709, AAC-LC
-48kHz 320k, 20.9MB; every frame pair scanned (no one-frame flash; the six
-range seams move like their neighbours); frame 839 against frame 0 under the
-type: 35.3dB PSNR. Nobody has listened to it on speakers.
+−10dB. The encode (round 2): 840 frames, 28.000s, H.264 High yuv420p BT.709,
+AAC-LC 48kHz 320k, 20.6MB; every frame pair scanned (no one-frame flash; the
+six range seams move like their neighbours); frame 839 against frame 0 under
+the type: 35.2dB PSNR. Nobody has listened to it on speakers.
 
 ## Motion language
 

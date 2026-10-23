@@ -2637,6 +2637,27 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-23 — FIND THE BOOK round 2: Sam's book is Atomic Habits (owner:
+  "maybe a more known book? Atomic Habits?", picked from three options).**
+  Branch `claude/reel-find-the-book`. The needle is now a screenshot of Sam's
+  text, "Read Atomic Habits, start small" (summary true to the book: tiny
+  habits compound; obvious, attractive, easy, satisfying; note: "Sam says
+  start with the two-minute rule"); Piranesi leaves the field (one Sam book
+  only) and so do the two James Clear saves (the "systems" post is a line
+  from the book, the 2-minute-rule article its chapter: near-twins of the
+  needle); Dune joins Project Hail Mary as a famous frame-0 decoy. Re-captured
+  from the real app (52 saves; Ask says "your 52 saves"). The payoff is now
+  two lines, re-voiced with Gemini TTS (run 59): "Atomic Habits." four frames
+  after the needle's hit (the take carries over the dive into the answer),
+  then "Sam said start with the two-minute rule." over the real answer; the
+  music clears out from under the advice (the citation's ping is seen, not
+  heard; the keys wait for the line), and the sign-off mark's first ticks
+  wait for the paper (they read as grey blocks on the app's text). 67 words,
+  28.0s. **Verified:** gates (every line 11 to 24dB over the music; −14.04
+  LUFS, −1.12 dBTP); stills of every changed beat; the encode (840 frames,
+  28.000s, H.264 High yuv420p BT.709, AAC 48kHz, 20.6MB), every frame pair
+  scanned (no one-frame flash), frame 839 against frame 0 at 35.2dB PSNR.
+  **Not verified:** listened to on speakers; the owner's review of round 2.
 - **2026-10-22 — FIND THE BOOK, a new organic Reel (the needle reel), on
   branch `claude/reel-find-the-book` (built on `claude/reel-save-this`'s kit;
   the capture is today's `main`).** Owner brief: one finished, upload-ready
