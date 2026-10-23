@@ -107,7 +107,10 @@ export const CAPTIONS = [
   { at: 182, to: 272, text: 'You even saved a video\non procrastination.', style: 'Delighted, catching a friend out, quick, a laugh building toward "procrastination" and landing on it with a grin.', pace: PACE },
   { at: 276, to: 338, text: 'Relax.\nMachina watched it.', duck: 0.4, style: '"Relax." warm and reassuring, then straight on, conspiratorial and pleased, the name with a smile; quick and light, no drawn-out words.', pace: PACE },
   { at: 352, to: 408, text: 'Every Sunday,\nit writes up your week,', style: 'Warm and inviting, like describing a lovely little ritual; quick, flowing straight on, the sentence is not finished.', pace: PACE },
-  { at: 446, to: 494, text: 'and pulls out\nwhat to actually do.', style: 'The same sentence continuing, bright and confident, landing softly on "do" with a smile; quick.', pace: PACE },
+  // (round 5, owner: "To do items are actually added automatically immediately
+  // with an added card, not once a week") the to-dos are not part of the
+  // Sunday write-up: each save's "Do this" line comes with its card
+  { at: 410, to: 494, text: 'and the moment you save,\nit pulls out what to actually do.', style: 'The same sentence continuing, bright and confident: "the moment you save" quick and easy, as if it is nothing, then landing softly on "do" with a smile; quick.', pace: PACE },
   { at: 548, to: 604, text: 'Even the\nprocrastination one.', style: 'A delighted, teasing callback with a laugh in the voice, quick and light; landing on "one" with a grin.', pace: PACE },
   // the sign-off: FIND THE BOOK's take, word for word (the same key, so the
   // same voice and the same read: the house sign-off)
