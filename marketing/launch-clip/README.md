@@ -1153,17 +1153,17 @@ in the script; all 42 list items are saves in the account, titled as saved;
 the five picked are the five "Do this" lines, in Revisit's order; the
 video's title, channel, 11:45, key moments and "Do this" line match YouTube
 and Machina's analysis; every line inside its window; the type inside the
-feeds' safe area; every line 11.8 to 22.6dB over the music in the speech
-band; −14.01 LUFS, −1.27 dBTP; the loop's audio seam inside the score's own
+feeds' safe area; every line 11.8 to 22.5dB over the music in the speech
+band; −14.00 LUFS, −1.25 dBTP; the loop's audio seam inside the score's own
 steps. The score's energy per half second: the spin −16 to −17dB, the stop
 −30 to −35dB, the breath before the payoff −21 to −26dB, the ticks −13dB.
 The encode: 840 frames, 28.000s, H.264 High 4.1 yuv420p BT.709 limited
 range, AAC-LC 48kHz 320k, 23.6MB, −13.9 LUFS and −1.3 dBTP after the AAC
 encode; every frame pair scanned (no one-frame flash; the seven range seams
-move like their neighbours; the largest steps are the spin, the synthesis
-unfolding and the landing sheet); frame 839 against frame 0: 42.3dB PSNR
-(62.6dB in the stills; the rest is the encoder). Nobody has listened to it
-on speakers.
+move like their neighbours; the largest steps are the ratchet and the spin,
+the synthesis unfolding and the pull-back to the tab); (round 2) the last
+frame is the logo and the tagline, and the loop is a cut on the downbeat from
+it to the hook. Nobody has listened to it on speakers.
 
 **Rendering note.** A sheet in motion (the tear, the landing) has its own
 shutter: up to eight poses averaged, then ONE blur over the average. A blur

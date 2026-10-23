@@ -2637,6 +2637,22 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-23 — TICK IT OFF round 2: the reel ends on the logo (owner:
+  "The final frame is the to do list again - it should be the Machina logo
+  and tagline").** Branch `claude/reel-revisit`. The lockup (the app's own
+  mark, the wordmark, "Everything you save, finally useful.") now holds to
+  the last frame on a slow push; the fresh sheet that landed as frame 0 is
+  gone, and the loop cuts on the beat from the logo back to the hook (as SAVE
+  THIS round 13). The score's last bar leans to vi with a bell over the cut,
+  in place of the sheet's whoosh and pat. Also: the set's paper and the
+  sign-off's paper carry the kit's dither (the longer static hold showed
+  8-bit gradient banding). Re-rendered from frame 240 on. **Verified:** gates
+  (every line 11.8 to 22.5dB over the music, −14.00 LUFS, −1.25 dBTP, the
+  loop's audio seam); the encode (840 frames, 28.000s, H.264 High yuv420p
+  BT.709, AAC 48kHz 320k, 23.6MB, −13.9 LUFS and −1.3 dBTP after AAC), every
+  frame pair scanned (no one-frame flash, the range seams clean), the last
+  frame is the logo and the tagline. **Not verified:** listened to on
+  speakers; the Instagram app; the owner's review of round 2.
 - **2026-10-23 — TICK IT OFF, a new organic Reel about Revisit (owner:
   "another video, but a different idea and way of showing the apps abilities
   … focus on the revisit aspects - the weekly synthesis, the to do items etc.
