@@ -901,19 +901,19 @@ node scripts/needle-stills.mjs         # review stills → out/needle-stills/
 
 | Time | Picture | On screen | Voice | Sound |
 |---|---|---|---|---|
-| 0:00 | The dare over the field (also the cover): 13 placed saves, famous decoy books leading the eye (Project Hail Mary, Dune), the needle lower left, smaller, turned, its corner under "Thinking, Fast and Slow" | Find the book / Sam told you / to read. | "Find the book Sam told you to read." | a chord stab and a kick (where the loop lands) |
-| 0:01.6 | A slow push while the eye scans | | | a rising keys figure |
+| 0:00 | The dare over the field (also the cover): 13 placed saves, famous decoy books leading the eye (Project Hail Mary, Dune), the needle lower left, smaller, turned, its corner under "Thinking, Fast and Slow"; under the type an ink timer runs out over 2s | BET YOU CAN'T / find the book / Sam told you / to read. | "Bet you can't find the book Sam told you to read." | a chord stab and a kick (where the loop lands); the timer ticks on each beat |
+| 0:02.0 | The timer runs out; a slow push while the eye scans | | | a rising keys figure |
 | 0:02.5 | The camera starts into the field | It's in your saves / somewhere. | "It's in your saves somewhere." | hats in, half-time kick |
 | 0:04.5 | A slalom through the haystack: each named save swings into the middle, sharp, pops with the ink ring as it is said, and anything nearer steps out of its way | Past the beach / you swore you'd visit, · the talk you'll / finish later, · the coffee trick / you'll never try. | the list, quicker each time | four on the floor, 16th hats, a whoosh between saves |
-| 0:10.0 | The camera stops dead (a damped slam) in the middle of it all | Give up? | "Give up?" | the band stops; a thud |
+| 0:10.0 | The camera stops dead (a damped slam) in the middle of the pile: a heap of saves fills the frame edge to edge, the nearest cut off by it | Give up? | "Give up?" | the band stops; a thud |
 | 0:10.8 | Every card in view rushes into one point; the brackets snap shut around it; the point strikes on "Machina" (beat 24) | Or just ask / Machina. | "Or just… ask Machina." | a riser into the brand's impact, a shimmer |
 | 0:12.2 | Match cut: the mark pulls back to exactly Ask's mark and the real Ask screen irises open around it: "What do you want to recall? Answers come only from your 52 saves, with sources you can open." | | | a whoosh |
 | 0:13.5 | Down to the composer; the question types; the thumb sends it | What was the book Sam told me to read? (the app) | | soft key ticks; a rim roll and a riser |
-| 0:15.0 | CUT to the tunnel at full speed: every save streaming past, a banking roll, real motion blur | It's read every / single one. | "It's read every single one." | THE DROP: kick every beat, 8th-note bass |
+| 0:15.0 | CUT to the tunnel at full speed: every save streaming past, a banking roll, real motion blur | It already read / every single one. | "It already read every single one." | THE DROP: kick every beat, 8th-note bass |
 | 0:16.7 | Braking; the tunnel thins; one card ahead turns to face the camera | Even that screenshot. | "Even that screenshot." | the drums fall away, a falling keys line, a swell |
 | 0:19.0 | **The needle**: Sam's screenshot, "Read Atomic Habits, start small", square to the camera, a punch-in, the ink ring, three rings out across the field, the rest receding | Atomic Habits. | "Atomic Habits." (just after the hit) | impact, sub, a bell (home on I) |
 | 0:19.5 | The camera dives into the card… | | | a whoosh |
-| 0:20.0 | …and lands inside the real answer on its one source (the same title), pulling back to the question, the answer and the citation, which lifts with its ink ring | Sam said start with / the two-minute rule. | "Sam said start with the two-minute rule." | the band clears for the advice; warm keys after it |
+| 0:20.0 | …and lands inside the real answer on its one source (the same title), pulling back to the question, the answer and the citation, which lifts with its ink ring | No more "wait, / what was it called?" | "No more 'wait, what was it called?'" | the band clears for the line; warm keys after it |
 | 0:22.5 | The app dissolves into paper; the app's own launch mark draws in, the wordmark on "Machina", the tagline word by word | MACHINA / Everything you save, finally useful. | "Machina. Everything you save, finally useful." | the brand's impact, lighter; a bell |
 | 0:25.9 | The lockup folds into its point; the field bursts back out of it to frame 0, the needle last | P.S. It was in / the first frame. | "P.S. It was in the first frame." | the dare's figure on vi; a whoosh |
 | 0:28.0 | The loop: frame 0, identical field, the dare back on screen | | | the stab lands again |
@@ -968,6 +968,17 @@ strike −12dB, the build into the drop −30 → −20dB, the drop −8dB, the 
 AAC-LC 48kHz 320k, 20.6MB; every frame pair scanned (no one-frame flash; the
 six range seams move like their neighbours); frame 839 against frame 0 under
 the type: 35.2dB PSNR. Nobody has listened to it on speakers.
+
+**Round 4 (owner, on round 3).** The dare reads as a dare: a BET YOU CAN'T
+kicker over the big type and an ink timer under it that runs out on the push
+(`Needle.tsx` `DARE`; the score ticks on its beats). "Give up?" stops in the
+middle of the pile: `field.ts` `STOP` is on the field's axis past the coffee,
+and the heap, art-directed from it (the nearest cut off by the frame, the
+middle ones overlapping, the far ones in the gaps, none twice), fills the
+frame, with a deeper focus while it holds. The tunnel's line says "already"
+(each save is read when it is saved; Ask then searches them all), and Sam's
+advice gives way to the everyday pain it ends: "No more 'wait, what was it
+called?'" 71 words (the video's 72).
 
 **The video needle (round 3).** Owner: a YouTube video as the needle, "a
 Mark Manson video", shown beside the book. Same cut, camera and score; the

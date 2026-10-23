@@ -2637,6 +2637,20 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-23 — FIND THE BOOK round 4: the dare reads as a dare; "Give
+  up?" in the middle of the pile (owner notes on round 3, both versions).**
+  Branch `claude/reel-find-the-book`. The first line now opens on a kicker,
+  BET YOU CAN'T, over the big type ("Bet you can't find the book / video Sam
+  told you to read / watch."), with an ink timer under it that runs out on
+  the camera's push (ticks on the beats). The dead stop was at the side of
+  the pile (half the frame empty): it now sits on the field's axis, and a
+  heap of the field's own saves, art-directed from the stop, fills the
+  frame edge to edge. Script, agreed line by line with the owner: "It
+  already read every single one." (it reads each save when saved; Ask then
+  searches them all), and Sam's advice gives way to "No more 'wait, what was
+  it called?'" over the real answer. Re-voiced (runs 22–23), both versions
+  re-scored and re-mixed; gates pass (71/72 words, every line 10 to 24dB
+  over the music, −14.05/−14.01 LUFS, −1.20 dBTP).
 - **2026-10-23 — FIND THE BOOK round 3: a YouTube version beside the book
   (owner: "replace a screenshot as the main thing with a YouTube video? …
   a Mark Manson video", both versions to compare).** Branch
