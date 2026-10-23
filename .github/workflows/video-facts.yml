@@ -1,0 +1,67 @@
+# Look up real YouTube videos for the marketing capture's demo saves
+# (marketing/launch-clip/capture/video-facts.py): list a channel's uploads,
+# check a video's title, channel and length, and run it through Machina's own
+# video analysis (functions/ai_service.py) with the repo's GEMINI_API_KEY
+# secret (never printed).
+#
+# Cloud sessions reach neither YouTube nor Google's API, so, as with the
+# narration workflow, push is the control channel: a push that changes
+# marketing/launch-clip/capture/video-request.json runs it on that branch, and
+# the results (capture/video-facts/*.json) are committed back to the same
+# branch. A GITHUB_TOKEN push does not trigger workflows, so it cannot loop.
+
+name: Video facts (YouTube)
+
+on:
+  push:
+    paths:
+      - "marketing/launch-clip/capture/video-request.json"
+  workflow_dispatch:
+
+concurrency:
+  group: video-facts-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  facts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: marketing/launch-clip
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      # the functions' own pins, only when something is to be analyzed
+      - name: Install
+        run: |
+          pip install yt-dlp
+          if python3 -c "import json,sys; sys.exit(0 if json.load(open('capture/video-request.json')).get('analyze') else 1)"; then
+            pip install -r ../../functions/requirements.txt
+          fi
+
+      - name: Look up
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python3 capture/video-facts.py
+
+      # also after a failed lookup: what was found is kept
+      - name: Commit the facts
+        if: always()
+        run: |
+          git add capture/video-facts
+          if git diff --cached --quiet; then echo "no new facts"; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Video facts ($(git rev-parse --short HEAD))"
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

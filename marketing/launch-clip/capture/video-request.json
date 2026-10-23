@@ -1,0 +1,11 @@
+{
+  "_": "Look up real YouTube videos on GitHub (.github/workflows/video-facts.yml, capture/video-facts.py). Edit, commit, push: results land in capture/video-facts/. `channels`: channel video tabs to list; `videos`: watch URLs to check (title, channel, length, chapters); `analyze`: watch URLs to run through Machina's own video analysis (costs Gemini quota). Bump `run` to re-run with no other change.",
+  "run": 1,
+  "channels": [
+    "https://www.youtube.com/@iammarkmanson/videos"
+  ],
+  "videos": [
+    "https://www.youtube.com/watch?v=7oJGvyVU65Y"
+  ],
+  "analyze": []
+}
