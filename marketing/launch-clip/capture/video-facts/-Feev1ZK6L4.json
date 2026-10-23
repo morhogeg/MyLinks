@@ -46,5 +46,15 @@
       "Jiwon"
     ],
     "videoDurationMinutes": 12
+  },
+  "clips": {
+    "0:00-0:45": {
+      "model": "gemini-3.5-flash-lite",
+      "text": "Every problem of inaction is ultimately a problem of emotion. You procrastinate not because you don't know what to do, but because you don't feel like doing it. You eat garbage and stay up all night because you don't care in that moment that it's bad for you. The trick then is to master manipulating your own emotions. And it turns out it's actually not that hard to do this. You can trick your mind into wanting to do things that are good for you. It's like you train the subconscious the same way you train a dog to stop shitting on the carpet. By the end of this video, you'll have the tools necessary to start attacking your life's biggest goals. Now, a quick note. This video will be best if you have a major goal in mind as you watch. So take a second and think of a major action"
+    },
+    "10:00-11:45": {
+      "model": "gemini-3.5-flash-lite",
+      "text": "Jiwan didn't sell all of her goods. In fact, she didn't even start looking for pop-up shop locations before our time together ended. The Jiwan from a couple months ago would have considered this a failure. But this failure has helped her learn about her business and herself. It helped her establish the connections with artists that she's going to need, and perhaps most importantly, it helped her get started. She accomplished more in a month than she did the entire 11 months beforehand. That's why the last step to taking action is to recognize that failure moves us forward. I have failed, like I told you, I was going to sell everything very confidently. And I didn't. And, of course, it sucked. But I I was surprised that what I learned. I took the lesson as a learning more than like, oh, my gosh, I failed. I can't do the thing I said I would. And this is why I always tell people, the point of your goals are not actually your goals. I mean, sure, it's cool to lose 20 pounds, or take an extra vacation, or buy a house. These are good things to work towards. Don't get me wrong. But don't mix it up. It's not the thing you're chasing that makes you feel good. It's the chasing itself. It's taking action. It's the movement between point A and point B. If you could go back and speak to Jiwan from before all this, what would you tell her? I would say, just go for it, just do it. It's not that big of a deal. It's really not. And just by doing anything, you learn something."
+    }
   }
 }
