@@ -2637,6 +2637,42 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-23 — TICK IT OFF round 6: the benefit, said outright and in
+  order (owner: "it should be clear to the user that Machina creates an
+  action item or to do from each card, and then we have the weekly
+  synthesis"; round 5's to-do line "sounds very sped up and not natural").**
+  Branch `claude/reel-revisit`.
+  - **The story is re-ordered.** Card, then "For every save you can act on,
+    it writes you a to-do.", then "Even the procrastination one." with the
+    ticks, then "And every Sunday, it writes up your week." with this week's
+    synthesis, tapped open in Revisit right under "All done.". Before, the
+    synthesis came first, on Home, and the to-dos got half a sentence.
+  - **"Every save you can act on", on purpose.** The analysis writes a to-do
+    only when a save supports a concrete action (functions/ai_service.py,
+    "include only when genuine"), so "every save" would overclaim; the
+    picture shows 5 of 42.
+  - **Natural pace.** The two lines were voiced at an easy pace via narration
+    run 24: about 5 and 4 syllables a second, against round 5's 7, which had
+    been directed "quick" twice.
+  - **Capture.** The Home synthesis expansion and the scroll-to-top are
+    dropped; the synthesis is opened in Revisit.
+  - **Score.** Re-ordered; the bell after "Machina watched it." is gone, and
+    the "All done" bells are shortened, so the explaining lines stay clear.
+  - The ticks now start at 60%, where they were at 68%; the synthesis runs
+    70–83%. The Instagram caption follows the new line.
+
+  53 words. Re-rendered whole.
+
+  **Verified:**
+  - gates: every line 12.7 to 23.2 dB over the music, −14.02 LUFS,
+    −1.28 dBTP;
+  - the encode: 870 frames, 29.000 s, 21.3 MB, −13.9 LUFS and −1.2 dBTP after
+    AAC;
+  - no one-frame flash, stall, jump or jitter run; the move down to the
+    synthesis and its reveal are smooth (largest frame-to-frame speed change
+    2.2).
+
+  **Not verified:** listened to on speakers or a phone.
 - **2026-10-23 — TICK IT OFF round 5: the to-dos come with each save, a
   gap closed, "You" restored (owner: "To do items are actually added
   automatically immediately with an added card, not once a week"; "a weird

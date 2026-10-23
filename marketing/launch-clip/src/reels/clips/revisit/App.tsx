@@ -3,7 +3,7 @@ import { AbsoluteFill, Img } from 'remotion';
 import { HITS } from '../../../../clips/revisit-timeline.mjs';
 import { AppShot, SCREEN_RADIUS, Tap } from '../../kit/AppShot';
 import type { Cam } from '../../kit/camera';
-import { EASE_IN_OUT, EASE_MODAL, prog } from '../../kit/curves';
+import { EASE_IN_OUT, prog } from '../../kit/curves';
 import { addTakes, frameSrc, rectOf, takeOf, type Rect } from '../../kit/takes';
 import { camShift, smoothCam, type SKey } from './smooth';
 import TAKES from './takes.json';
@@ -14,21 +14,19 @@ import TAKES from './takes.json';
  *
  *  card    under the torn-off sheet: Home, the video's card on top of the
  *          feed, summed up by the app ("Machina watched it.")
- *  recap   up to this week's synthesis, tapped open in place (the app opens
- *          it in one frame; the reel unrolls the open page down over the
- *          closed one from the tap, round 4); its first paragraph names the
- *          video and "the smallest step you can take today", which is
- *          underlined in ink
  *  list    (under the landing sheet) the Revisit tab, scrolled to "Do this":
- *          five lines, five saves; the pull-out lands the ink rows on them
- *          and each line is written in (Revisit.tsx `PullOut`)
- *  tick    the video's line ticked, the rest an 8th apart, at HALF SPEED
+ *          five to-dos from five saves; the pull-out lands the ink rows on
+ *          them and each to-do is written in (Revisit.tsx `PullOut`)
+ *  tick    the video's to-do ticked, the rest an 8th apart, at HALF SPEED
  *          (round 4: rolled at 120fps; at the app's speed each row's 280ms
  *          fold was two frames and the list snapped up five times); the rows
  *          fold away to "All done. New tasks arrive with your saves."
- *  wide    back out to the tab's top: the review row, the reminder that came
- *          due, "All done.", this week's synthesis (the frame after the Undo
- *          toasts timed out)
+ *  week    (round 6: the synthesis comes after the to-dos, where it used to
+ *          come before them, on Home) right under "All done.", once the Undo
+ *          toasts have timed out: this week's synthesis, tapped open in place
+ *          (the app opens it in one frame; the reel unrolls the open page down
+ *          over the closed one from the tap); its first paragraph names the
+ *          video and "the smallest step you can take today", underlined in ink
  */
 
 addTakes(TAKES);
@@ -42,32 +40,25 @@ const linear = (t: number) => t;
 const REVEAL = 16;
 const UNROLL = (t: number) => 1 - Math.pow(1 - t, 2.2);
 
+/**
+ * The tab once the Undo toasts have timed out (`rest`), at the same scroll:
+ * cross-dissolved in over REST_AT − 6 … REST_AT, while the toasts are still
+ * off the foot of the frame, before the week's synthesis is opened.
+ */
+const REST_AT = HITS.allDone + 12;
+
 /** the take's frame for an output frame */
 export const frameAt = (f: number) => {
-  // (the open page is drawn over the closed one while it unrolls: `Reveal`)
-  if (f < HITS.tapRecap + REVEAL) return M.home;
-  if (f < HITS.land + 12) return M.read;
+  if (f < HITS.land + 13) return M.home;
   if (f < HITS.tick) return M.list;
   // the ticks at half speed: the 120fps roll, two of its frames an output
   // frame (the page does not move under them: round 3's Brews below "Do
   // this" keep it from clamping)
   if (f < REST_AT) return Math.min(M.after - 1, M.tick + Math.round((f - HITS.tick) * 2));
-  if (f < UP_AT) return M.rest;
-  return Math.floor(upPos(f));
+  // (the open page is drawn over the closed one while it unrolls: `Reveal`)
+  if (f < HITS.weekTap + REVEAL) return M.rest;
+  return M.weekRead;
 };
-/**
- * (round 3) The wide: the same tab, at the same scroll, once the Undo toasts
- * have timed out (`rest`, cross-dissolved in over REST_AT − 5 … REST_AT,
- * while the toasts are still off the bottom of the frame), then scrolled
- * back to its top by the app itself (the take's `up` roll, 2pt a frame, eased
- * here) as the camera pulls back.
- */
-const REST_AT = HITS.wide + 4;
-const UP_AT = HITS.wide + 9;
-const UP_END = HITS.lockup - 6;
-/** where the scroll-up is, in take frames, fractional: the frame after is
- *  laid over by the fraction (round 4: whole frames stepped the slow ends) */
-export const upPos = (f: number) => M.up + prog(f, UP_AT, UP_END, EASE_IN_OUT) * (M.clean - M.up);
 
 /** the list frame's anchors (points) */
 const R = (k: string, i = M.list) => rectOf(T, i, k);
@@ -76,11 +67,12 @@ export const LIST = {
   rows: [0, 1, 2, 3, 4].map((k) => ({ row: R(`row${k}`), task: R(`task${k}`), card: R(`card${k}`), tick: R(`tick${k}`) })),
 };
 const CARD = rectOf(T, M.home, 'videoCard');
-const BANNER = rectOf(T, M.home, 'banner');
-const PARA = rectOf(T, M.read, 'para1');
+/** the week's synthesis in Revisit, closed (`rest`) and open (`weekRead`) */
+const BANNER = rectOf(T, M.rest, 'banner');
+const PARA = rectOf(T, M.weekRead, 'para1');
 const PHRASE: Rect[] = [0, 1, 2].map((k) => {
   try {
-    return rectOf(T, M.read, `phrase#${k}`);
+    return rectOf(T, M.weekRead, `phrase#${k}`);
   } catch {
     return null;
   }
@@ -95,33 +87,29 @@ export const CARD_TITLE_Y = 783;
  * before it and into the next, the zoom never stops between the moves it
  * links, and nothing starts with a jolt (the kit's per-segment EASE_MODAL left
  * at 2.25 times its average speed: the push in to the video's line jumped 2.5%
- * of zoom in its first frame, and the camera stopped dead at the synthesis
- * before tearing off again).
+ * of zoom in its first frame).
  */
 export const appKeys: SKey[] = [
-  // the tear reveals the video's card, its title where the ink one was; a slow push
+  // the tear reveals the video's card, its title where the ink one was; a
+  // slow push until the landing sheet covers it
   { f: HITS.tear, cx: 196.5, cy: CARD_CY, z: 2.6, fx: 540, fy: 1050 },
-  { f: HITS.glide, cy: CARD_CY - 8, z: 2.7 },
-  // up to this week's synthesis, on "Sunday", framed with the room under it
-  // where its page will open (the banner clear of the caption's band); the
-  // tap; on in to the paragraph as the page unrolls. One way all along: the
-  // camera used to rise to the banner and come back down, stopping dead on
-  // the tap to turn round
-  { f: HITS.tapRecap - 1, cy: PARA[1] + PARA[3] / 2 - 8.5, z: 2.78, fy: 1010 },
-  { f: HITS.read + 6, cy: PARA[1] + PARA[3] / 2 - 18, z: 3.0, fy: 1000 },
-  { f: HITS.land + 12, z: 3.08 },
+  { f: HITS.land + 12, cy: CARD_CY - 8, z: 2.72 },
   // (under the landed sheet) the cut to Revisit: "Do this", the whole list
   { f: HITS.land + 13, cx: 196.5, cy: 368, z: 2.0, fx: 540, fy: 1050 },
   { f: HITS.push2, z: 2.02 },
-  // in to the video's line
+  // in to the video's to-do
   { f: HITS.push2 + 34, cy: LIST.rows[0].row[1] + 70, z: 2.9, fy: 1000 },
   { f: HITS.tick, z: 2.96 },
   // over the list as it ticks off and folds toward its header, onto "All done."
   { f: HITS.allDone + 4, cy: LIST.doHead[1] + 70, z: 2.8, fy: 980 },
-  // back out to the tab's top (the review row, the reminder, "All done.",
-  // this week's synthesis), and on out through the dissolve
-  { f: HITS.lockup - 4, cy: 362, z: 2.2, fy: 1050 },
-  { f: HITS.lockup + 4, z: 2.12 },
+  // (round 6) on down to this week's synthesis, right under it, framed with
+  // the room below where its page will open (the banner clear of the
+  // caption's band); the tap; on in to the paragraph as the page unrolls
+  { f: HITS.weekTap - 1, cy: BANNER[1] + 137, z: 2.85, fy: 1000 },
+  { f: HITS.weekRead, cy: PARA[1] + PARA[3] / 2 - 18, z: 3.0 },
+  // a slow push on the page, and on out through the dissolve
+  { f: HITS.lockup - 14, z: 3.07 },
+  { f: HITS.lockup + 4, z: 2.94 },
 ];
 const CUTS = [HITS.land + 13];
 
@@ -149,11 +137,11 @@ const Wipe: React.FC<{ rect: Rect; t: number }> = ({ rect, t }) => {
 export const rowAt = (r: number) => HITS.rewrite + 6 * r;
 
 /**
- * The synthesis, opening (round 4): the app opens it in a single frame (the
- * card under it gone, an empty page, the text fading in), which read as a
- * cut. The open page (`read`) is unrolled down over the closed one instead,
- * from the banner's top edge, a soft edge leading; above the edge the two
- * frames are the same pixels.
+ * The synthesis, opening (round 4): the app opens it in a single frame (what
+ * was under it pushed away, an empty page, the text fading in), which read as
+ * a cut. The open page (`weekRead`) is unrolled down over the closed one
+ * (`rest`) instead, from the banner's top edge, a soft edge leading; above the
+ * edge the two frames are the same pixels.
  */
 const Reveal: React.FC<{ t: number; cam: Cam; motion: { x: number; y: number } }> = ({ t, cam, motion }) => {
   if (t <= 0) return null;
@@ -185,7 +173,7 @@ const Reveal: React.FC<{ t: number; cam: Cam; motion: { x: number; y: number } }
           </filter>
         </svg>
       )}
-      <Img src={frameSrc(T, M.read)} style={{ width: '100%', height: '100%', display: 'block', filter: blur ? 'url(#revisit-reveal-mb)' : undefined }} />
+      <Img src={frameSrc(T, M.weekRead)} style={{ width: '100%', height: '100%', display: 'block', filter: blur ? 'url(#revisit-reveal-mb)' : undefined }} />
     </div>
   );
 };
@@ -195,8 +183,8 @@ export const App: React.FC<{ f: number }> = ({ f }) => {
   const i = frameAt(f);
   const cam = camFor(f);
   const v = f >= HITS.tear + 1 ? camShift(camFor, f, CUTS) : { x: 0, y: 0 };
-  const inHome = f < HITS.land + 13;
   const inList = f >= HITS.land + 13 && f < HITS.tick;
+  const inWeek = f >= HITS.weekTap - 4;
   // the underline under "the smallest step you can take today"
   const ul = prog(f, HITS.underline, HITS.underline + 14, EASE_IN_OUT);
   const total = PHRASE.reduce((s, r) => s + r[2], 0);
@@ -205,16 +193,14 @@ export const App: React.FC<{ f: number }> = ({ f }) => {
   const gone = prog(f, HITS.lockup - 14, HITS.lockup + 1, EASE_IN_OUT);
   // the swap to the tab after the toasts timed out: a short cross-dissolve
   const clean = prog(f, REST_AT - 6, REST_AT, EASE_IN_OUT);
-  // the scroll back up: the frame after laid over by the fraction
-  const up = f >= UP_AT ? upPos(f) - i : 0;
   return (
     <AbsoluteFill>
       <AppShot take={T} i={i} cam={cam} motion={{ x: v.x, y: v.y }} blur={6 * gone}>
-        {/* the synthesis unrolling open from the tap */}
-        {inHome && f < HITS.tapRecap + REVEAL && <Reveal t={prog(f, HITS.tapRecap, HITS.tapRecap + REVEAL, UNROLL)} cam={cam} motion={v} />}
-        {/* the thumb opens this week's synthesis */}
-        {inHome && <Tap x={BANNER[0] + BANNER[2] / 2} y={BANNER[1] + BANNER[3] / 2} t={prog(f, HITS.tapRecap - 4, HITS.tapRecap + 8, linear)} size={40} />}
-        {inHome && ul > 0 && (
+        {/* this week's synthesis unrolling open from the tap */}
+        {inWeek && f < HITS.weekTap + REVEAL && <Reveal t={prog(f, HITS.weekTap, HITS.weekTap + REVEAL, UNROLL)} cam={cam} motion={v} />}
+        {/* the thumb opens it */}
+        {inWeek && f < HITS.weekTap + 12 && <Tap x={BANNER[0] + BANNER[2] / 2} y={BANNER[1] + BANNER[3] / 2} t={prog(f, HITS.weekTap - 4, HITS.weekTap + 8, linear)} size={40} />}
+        {inWeek && ul > 0 && (
           <>
             {PHRASE.map((r, k) => {
               const before = PHRASE.slice(0, k).reduce((s, q) => s + q[2], 0);
@@ -307,11 +293,6 @@ export const App: React.FC<{ f: number }> = ({ f }) => {
       {clean > 0 && f < REST_AT && (
         <AbsoluteFill style={{ opacity: clean }}>
           <AppShot take={T} i={M.rest} cam={cam} motion={{ x: v.x, y: v.y }} />
-        </AbsoluteFill>
-      )}
-      {up > 0.01 && i < M.clean && (
-        <AbsoluteFill style={{ opacity: up }}>
-          <AppShot take={T} i={i + 1} cam={cam} motion={{ x: v.x, y: v.y }} blur={6 * gone} shadow={0} edge={0} />
         </AbsoluteFill>
       )}
     </AbsoluteFill>

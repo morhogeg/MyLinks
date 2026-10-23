@@ -11,15 +11,17 @@
  * one that gives the game away: you even saved a video on procrastination
  * (Mark Manson's, real, on his own channel). "Relax. Machina watched it.": the
  * sheet tears off the pad and under it is the real app, that save's card,
- * summed up. Every Sunday it writes up your week (the real synthesis, tapped
- * open), and the moment you save, it pulls out what to actually do (round 5:
- * a save's "Do this" line comes with its card, not with the Sunday write-up):
- * the ink list comes back, folds down to the five saves that call for an
- * action and lands on the real "Do this" list, where each "Watch …" is
- * rewritten as the thing to do. The payoff (68%, at half speed): "Even the
- * procrastination one." The video's line is ticked,
+ * summed up. (Round 6, owner: make it clear that Machina writes a to-do from
+ * each card, and then there is the weekly synthesis.) "For every save you can
+ * act on, it writes you a to-do.": the ink list comes back, the five saves
+ * you can act on light up and land on the real "Do this" list, where each
+ * "Watch …" is rewritten as its to-do. The payoff (60%, at half speed): "Even
+ * the procrastination one." The video's to-do is ticked,
  * the rest follow on the beat, and the real list folds away to "All done.
- * New tasks arrive with your saves." The tagline, held on the logo to the
+ * New tasks arrive with your saves." Then the week: "And every Sunday, it
+ * writes up your week.", this week's synthesis tapped open right under "All
+ * done.", its first paragraph on that video and "the smallest step you can
+ * take today", underlined in ink. The tagline, held on the logo to the
  * last frame (round 2, owner: the final frame is the logo and the tagline);
  * the loop cuts on the beat from the logo back to the hook.
  *
@@ -63,18 +65,17 @@ export const HITS = {
   stop: 241, // …and stops dead on "procrastination": Manson's video (the ink ring) (round 5: the take's whole "You" back, the word 5 frames later)
   tear: 288, // after "Relax.": the sheet tears off the pad
   card: 300, // under it, the real app: that video's card, summed up ("Machina watched it.")
-  glide: 336, // up to this week's synthesis, waiting above the card
-  tapRecap: 360, // "Every Sunday…": tapped open (the app's own unfolding)
-  read: 381, // its first paragraph: the video, the smallest step
-  underline: 388, // "the smallest step you can take today", underlined in ink (as "…your week," ends)
-  land: 406, // "and the moment you save,": a sheet lands, every save on it, small
-  pick: 443, // "it pulls out…": the five that call for an action light up, a 16th apart
-  fly: 455, // "…what to actually do": they fly out of the list onto the real "Do this" rows
-  rewrite: 486, // each "Watch …" becomes the thing to do, a row every 6 frames
-  push2: 512, // in to the video's line
-  tick: 592, // "…one.": the video's line ticked; the rest follow an 8th apart, at half speed
-  allDone: 674, // the rows have folded away (from tick + 39, an 8th apart): "All done. New tasks arrive with your saves."
-  wide: 682, // back out to the whole Revisit tab
+  // (round 6) the to-dos straight after the card, then the ticks, then the week
+  land: 337, // "For every save you can act on,": a sheet lands, every save on it, small
+  pick: 378, // "…act on": the five you can act on light up, a 16th apart
+  fly: 390, // "it writes you a to-do": they fly out of the list onto the real "Do this" rows
+  rewrite: 414, // each "Watch …" becomes its to-do, a row every 6 frames (as "to-do" is said)
+  push2: 440, // in to the video's to-do
+  tick: 520, // "…one.": the video's to-do ticked; the rest follow an 8th apart, at half speed
+  allDone: 602, // the rows have folded away (from tick + 39, an 8th apart): "All done. New tasks arrive with your saves."
+  weekTap: 650, // "And every Sunday, it writes up your week.": this week's synthesis, under "All done.", tapped open
+  weekRead: 676, // its first paragraph: the video, the smallest step
+  underline: 680, // "the smallest step you can take today", underlined in ink
   lockup: 722, // the app dissolves into paper; "Machina. Everything you save, finally useful."
   loopLead: 840, // the last bar leans back to vi, into the loop's downbeat (the cut to frame 0)
 };
@@ -82,9 +83,10 @@ export const HITS = {
 /** The cut. */
 export const SCENES = [
   { id: 'list', from: 0, dur: HITS.card - 0 }, // the hook, the list, the spin, the stop, the tear
-  { id: 'home', from: HITS.card, dur: HITS.land + 12 - HITS.card }, // the card, the synthesis
-  { id: 'pull', from: HITS.land, dur: HITS.push2 - HITS.land }, // the list pulled down to five, rewritten
-  { id: 'tick', from: HITS.push2, dur: HITS.lockup - HITS.push2 }, // the ticks, all done, the tab
+  { id: 'card', from: HITS.card, dur: HITS.land + 12 - HITS.card }, // the card, summed up
+  { id: 'todo', from: HITS.land, dur: HITS.push2 - HITS.land }, // the saves you can act on, each written as its to-do
+  { id: 'tick', from: HITS.push2, dur: HITS.allDone + 8 - HITS.push2 }, // the ticks, all done
+  { id: 'week', from: HITS.allDone + 8, dur: HITS.lockup - HITS.allDone - 8 }, // this week's synthesis, opened in Revisit
   { id: 'end', from: HITS.lockup, dur: TOTAL_FRAMES - HITS.lockup }, // the sign-off, held to the last frame
 ];
 
@@ -121,10 +123,10 @@ export const CAPTIONS = [
   // you can act on. Voiced at a natural pace (round 5's line was directed
   // "quick" twice and came out rushed)
   { at: 343, to: 440, text: 'For every save you can act on,\nit writes you a to-do.', style: 'Clear and warm, explaining the trick to a friend at an easy, natural pace, never rushed: a small breath after "act on", then "it writes you a to-do" with a smile, landing on "to-do".', pace: NATURAL },
-  { at: 548, to: 604, text: 'Even the\nprocrastination one.', style: 'A delighted, teasing callback with a laugh in the voice, quick and light; landing on "one" with a grin.', pace: PACE },
+  { at: 476, to: 532, text: 'Even the\nprocrastination one.', style: 'A delighted, teasing callback with a laugh in the voice, quick and light; landing on "one" with a grin.', pace: PACE },
   // (round 6) and then the week: this week's synthesis, opened in Revisit
   // right under "All done."
-  { at: 628, to: 700, text: 'And every Sunday,\nit writes up your week.', style: 'Warm and inviting, like describing a lovely little ritual: an easy, natural pace, a light lift on "Sunday", the sentence finished and settled on "week".', pace: NATURAL },
+  { at: 612, to: 690, text: 'And every Sunday,\nit writes up your week.', style: 'Warm and inviting, like describing a lovely little ritual: an easy, natural pace, a light lift on "Sunday", the sentence finished and settled on "week".', pace: NATURAL },
   // the sign-off: FIND THE BOOK's take, word for word (the same key, so the
   // same voice and the same read: the house sign-off)
   { at: 726, to: 828, place: 'scene', text: 'Machina.\nEverything you save, finally useful.', duck: 0.4, style: 'A confident, warm sign-off; the name with a smile, then the tagline sincere but brisk, no drawn-out words.', pace: PACE },
@@ -136,27 +138,28 @@ export const KICKERS = [];
 /** Risers END on the reveal they lead into. [from, to] in frames. */
 export const RISERS = [
   [HITS.spin, HITS.stop], // the slot spinning up, cut dead on "procrastination"
-  [HITS.land, HITS.fly], // the list coming back, into the pick
+  [HITS.land, HITS.fly], // the list coming back, into the flight
 ];
 
 /**
  * Harmony, [from frame, chord] (the house vocabulary, C major): the hook and
  * the "later"s hang on vi and IV; the spin climbs on V and stops on nothing;
- * the tear opens on I (the real app); Sunday's page rests on IV; the pull-out
- * lifts through V; the ticks land home on I, step by step; the sign-off rests
- * IV → I under the logo, and the last bar leans to vi, the chord the loop
- * opens on.
+ * the tear opens on I (the real app); the to-dos lift through V; the ticks
+ * land home on I, step by step; Sunday's page rests on IV, then vi (round 6:
+ * the week comes after the ticks); the sign-off rests IV → I under the logo,
+ * and the last bar leans to vi, the chord the loop opens on.
  */
 export const CHORDS = [
   [0, 'Am7'],
   [HITS.step2, 'Fmaj7'],
   [HITS.spin, 'G6'],
   [HITS.card - 4, 'Cmaj7'],
-  [HITS.tapRecap, 'Fmaj7'],
   [HITS.land, 'G6'],
   [HITS.rewrite, 'Cmaj7'],
   [HITS.push2 + 30, 'Fmaj7'],
   [HITS.tick, 'Cmaj7'],
+  [HITS.allDone + 8, 'Fmaj7'],
+  [HITS.weekRead, 'Am7'],
   [HITS.lockup, 'Fmaj7'],
   [HITS.lockup + 30, 'Cmaj7'],
   [HITS.loopLead, 'Am7'],

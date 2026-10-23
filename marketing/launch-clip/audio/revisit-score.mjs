@@ -15,16 +15,17 @@
  *  - "…procrastination.": the reel stops dead and so does the band: a clunk,
  *    then the comic beat in near silence;
  *  - "Relax.": the paper rips; under it the real app on I, warm;
- *  - "Every Sunday…": a light groove, a tap, the page unfolding, a pen
- *    stroke under the smallest step;
- *  - the pull-out: a sheet lands, five plucks for five picks (a 16th
- *    apart), a whoosh as they fly, a pen stroke for each rewritten line;
- *  - the breath before the payoff, then THE TICKS (68%, at half speed):
+ *  - "For every save you can act on…": a sheet lands, four on the floor,
+ *    five plucks for five picks (a 16th apart), a whoosh as they fly, a pen
+ *    stroke for each to-do written in;
+ *  - the breath before the payoff, then THE TICKS (60%, at half speed):
  *    five rising pings on 8ths, home on I, the band in full; the rows fold
  *    away an 8th apart, a soft brush of paper each;
- *  - "All done.": a bell; the tab; the sign-off rests IV → I under the
- *    logo, which holds to the last frame (round 2); the last bar leans to
- *    vi, a bell ringing over the cut back into the loop's downbeat.
+ *  - "All done.": a bell; (round 6) "And every Sunday…": a light groove on
+ *    IV, a tap, the page unrolling, a pen stroke under the smallest step;
+ *    the sign-off rests IV → I under the logo, which holds to the last frame
+ *    (round 2); the last bar leans to vi, a bell ringing over the cut back
+ *    into the loop's downbeat.
  *
  * THE LOOP: rendered twice in a row and the second copy kept, so every tail
  * rings on into frame 0 as it will when a feed plays it again. No fades.
@@ -153,12 +154,11 @@ const energy = (f) =>
   : f < H.spin ? 0.45
   : f < H.stop ? 0.6 + 0.4 * ((f - H.spin) / (H.stop - H.spin))
   : f < H.card - 4 ? 0
-  : f < H.tapRecap ? 0.4
-  : f < H.land ? 0.5
+  : f < H.land ? 0.4
   : f < H.push2 ? 0.65
   : f < H.tick ? 0.35
   : f < H.allDone ? 1
-  : f < H.lockup ? 0.55
+  : f < H.lockup ? 0.5
   : f < H.loopLead ? 0.4
   : 0.3;
 
@@ -166,7 +166,6 @@ const energy = (f) =>
 const groove = (f) => {
   if (f >= H.step1 && f < H.spin) return 'half';
   if (f >= H.spin && f < H.stop) return 'four';
-  if (f >= H.card + 30 && f < H.land) return 'half';
   if (f >= H.land && f < H.push2 + 20) return 'four';
   if (f >= H.tick && f < H.allDone + 15) return 'drop';
   if (f >= H.allDone + 15 && f < H.lockup) return 'half';
@@ -285,12 +284,8 @@ const arrange = (o) => {
   rip(t(H.tear), 0.4, 0.16);
   whoosh(t(H.tear + 4), 0.4, 0.05, -0.2);
   sub(t(H.card - 4), 48, 0.3, 0.8);
-  bell(t(afterVoice(H.card + 6)), 84, 0.06, 0.1, 2.2);
-
-  // ── "Every Sunday…": the tap, the page unfolding, the pen under the step
-  tick(t(H.tapRecap), 0.1, 1.05);
-  whoosh(t(H.tapRecap + 1), 0.6, 0.03, 0.1);
-  scratch(t(H.underline), 0.46, 0.035, 0.05);
+  // (round 6: no bell after "Machina watched it." any more; it rang on into
+  // "For every save you can act on…", the line that explains the app)
 
   // ── the pull-out: a sheet lands; five picks; the flight; five rewrites
   pat(t(H.land + 10), 0.12);
@@ -318,9 +313,15 @@ const arrange = (o) => {
   // the rows folding away (round 4: half speed, from tick + 39, an 8th apart)
   whoosh(t(H.tick + 36), (H.allDone - H.tick - 36) / FPS + 0.2, 0.03, 0);
   for (let r = 0; r < 5; r++) fold(t(H.tick + 39 + 7.5 * r), 0.03, -0.2 + 0.1 * r);
-  // "All done."
-  bell(t(H.allDone), 91, 0.08, 0, 2.6);
-  bell(t(H.allDone) + 0.04, 84, 0.06, -0.2, 2.6);
+  // "All done." (round 6: rung shorter, out of the way of "And every Sunday…")
+  bell(t(H.allDone), 91, 0.08, 0, 1.5);
+  bell(t(H.allDone) + 0.04, 84, 0.06, -0.2, 1.5);
+
+  // ── (round 6) "And every Sunday…": the tap, the page unrolling, the pen
+  // under the smallest step
+  tick(t(H.weekTap), 0.1, 1.05);
+  whoosh(t(H.weekTap + 1), 0.6, voiced(H.weekTap + 1, 18) ? 0.012 : 0.03, 0.1);
+  scratch(t(H.underline), 0.46, 0.035, 0.05);
 
   // ── the sign-off: the mark's point strikes on "Machina" (lighter than the payoff)
   impact(t(H.lockup + 5), 0.2);

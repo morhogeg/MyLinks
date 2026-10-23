@@ -22,14 +22,15 @@ import VO from './revisit-vo.json';
  * saves; "Watch later. Read later. Try later." ratchets it on; it spins like
  * a slot reel and stops on Mark Manson's video on procrastination; "Relax.
  * Machina watched it.": the sheet tears off and under it is the real app,
- * that save's card, summed up; this week's synthesis, tapped open; the list
- * comes back on a new sheet and the five saves that call for an action are
- * pulled out of it onto the real "Do this" rows, each "Watch …" rewritten as
- * the thing to do; "Even the procrastination one.": the video's line is
- * ticked, the rest follow on the beat (at half speed, round 4), the list
- * folds away to "All done.";
- * the tab; the sign-off, held on the logo and the tagline to the last frame
- * (round 2); the loop cuts from the logo back to the hook.
+ * that save's card, summed up; "For every save you can act on, it writes you
+ * a to-do.": the list comes back on a new sheet and the five saves you can act
+ * on are pulled out of it onto the real "Do this" rows, each "Watch …"
+ * rewritten as its to-do; "Even the procrastination one.": the video's to-do
+ * is ticked, the rest follow on the beat (at half speed, round 4), the list
+ * folds away to "All done."; "And every Sunday, it writes up your week.":
+ * this week's synthesis, tapped open right under it (round 6: the to-dos
+ * first, then the week); the sign-off, held on the logo and the tagline to
+ * the last frame (round 2); the loop cuts from the logo back to the hook.
  * Every app pixel is the shipped app (capture/shoot.mjs `revisitClip`); the
  * ink list, the sheets and the camera are this reel's, in the house grade.
  */
@@ -426,10 +427,10 @@ const PullOut: React.FC<{ f: number }> = ({ f }) => {
  * The paper over the frame's foot while the list ticks off: fixed (round 3:
  * it followed the gap between the list and the app's Undo toasts, and jumped
  * each time a toast stacked up), low enough to leave the list alone, and
- * gone once the wide shot's toast-free frames take over.
+ * gone once the toast-free frames (`rest`) take over, before the week opens.
  */
 const FOOT = { clear: 1480, solid: 1640 };
-const footAt = (f: number) => (f < HITS.tick + 10 || f >= HITS.lockup ? 0 : 1 - prog(f, HITS.wide + 4, HITS.wide + 16, EASE_IN_OUT));
+const footAt = (f: number) => (f < HITS.tick + 10 || f >= HITS.lockup ? 0 : 1 - prog(f, HITS.allDone + 12, HITS.allDone + 24, EASE_IN_OUT));
 
 export const Revisit: React.FC<{ withAudio?: boolean; withCaptions?: boolean }> = ({ withAudio = true, withCaptions = true }) => {
   const f = useCurrentFrame();

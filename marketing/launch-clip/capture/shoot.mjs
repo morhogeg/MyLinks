@@ -1213,15 +1213,8 @@ const takes = {
     const roll120 = (n, every) => t.roll(n, { rects: RV, step: 1000 / 120, every });
     t.mark('home');
     await t.snap({ rects: RV });
-    // this week's synthesis, tapped open on Home
-    await t.freeze();
-    await visible(page.locator(RV.banner[0]).filter({ hasText: 'This week in Machina' })).click();
-    t.mark('expand');
-    await roll60(40);
-    await t.thaw();
-    await page.waitForTimeout(400);
-    t.mark('read');
-    await t.snap({ rects: RV });
+    // (round 6: this week's synthesis is no longer opened on Home; the reel
+    // opens it in Revisit, under "All done.", as its last beat)
     // the Revisit tab: its sections deal in (the app's staggered entrance)
     await t.freeze();
     await tab('Revisit').click();
@@ -1259,21 +1252,21 @@ const takes = {
     await page.waitForTimeout(600);
     t.mark('after');
     await t.snap({ rects: RV });
-    // the same tab once the five Undo toasts have timed out (8s each), then
-    // scrolled back to its top: the reel's last wide shot of Revisit (the
-    // review row, the reminder, "All done.", this week's synthesis)
+    // the same tab once the five Undo toasts have timed out (8s each)
     await page.waitForTimeout(9000);
     // the same scroll as `after`, the toasts gone (the reel dissolves to it)
     t.mark('rest');
     await t.snap({ rects: RV });
+    // (round 6) "And every Sunday, it writes up your week.": this week's
+    // synthesis, right under "All done.", tapped open in place
     await t.freeze();
-    await tagScroller('Do this');
-    t.mark('up');
-    // 2pt a frame: the reel eases this scroll, and coarser steps stuttered
-    await rollScroll(t, 0, 2, RV);
-    t.mark('clean');
-    await t.snap({ rects: RV });
+    await visible(page.locator(RV.banner[0]).filter({ hasText: 'This week in Machina' })).click();
+    t.mark('weekOpen');
+    await roll60(24);
     await t.thaw();
+    await page.waitForTimeout(400);
+    t.mark('weekRead');
+    await t.snap({ rects: RV });
     return t.save();
   },
 
