@@ -131,8 +131,8 @@ const VIDEO_LINES = {
   525: { text: 'Watched the videos, too.', style: 'A delighted, quick aside with a small laugh in the voice, as if it is a little ridiculous how thorough it is.' },
   // the name, as the book's is named, so Sam's tip (the longer line) can
   // start just after the camera lands in the answer
-  [HITS.found + 4]: { to: 605, text: 'Mark Manson.', style: 'The reveal, recognizing it: "Mark Manson" said clearly, with a delighted, satisfied smile, like spotting a friend across a crowded room; quick and light, one breath.' },
-  613: { at: 607, text: 'Sam’s cheat code?\nSkip the side quests.', style: 'Quick and warm, passing on a friend\'s tip with a grin: the question and the tip in one breath, barely a beat between them, landing softly on "quests"; no drawn-out words.' },
+  [HITS.found + 4]: { at: HITS.found + 2, to: 601, text: 'Mark Manson.', style: 'The reveal, recognizing it: "Mark Manson" said clearly, with a delighted, satisfied smile, like spotting a friend across a crowded room; quick and light, one breath.' },
+  613: { at: 602, text: 'Sam’s cheat code?\nSkip the side quests.', style: 'Quick and warm, passing on a friend\'s tip with a grin: the question and the tip in one breath, barely a beat between them, landing softly on "quests"; no drawn-out words.' },
 };
 export const VIDEO_CAPTIONS = CAPTIONS.map((c) => (VIDEO_LINES[c.at] ? { ...c, ...VIDEO_LINES[c.at] } : c));
 

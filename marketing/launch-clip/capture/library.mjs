@@ -719,10 +719,56 @@ export const NEEDLE = {
     // the needle: a screenshot of Sam's text, as the app files it (its note
     // is the advice Sam added; Weekend plans is where it was collected)
     { id: 'atomichabits', url: 'capture://screenshot/atomic-habits.png', title: 'Read Atomic Habits, start small', summary: 'Sam’s pick: James Clear on how tiny habits, repeated every day, compound into remarkable results. Make them obvious, attractive, easy and satisfying.', category: 'Books', tags: ['habits', 'from-sam'], concepts: ['habits', 'recommendation'], sourceType: 'image', sourceName: 'Screenshot', readTime: 1, age: 142, note: 'Sam says start with the two-minute rule.', collections: ['weekend'] },
+    // ((round 3) the video's account, `NEEDLE_VIDEO` below, swaps this card
+    // for Sam's YouTube pick)
     // a decoy everyone knows, on frame 0 beside Project Hail Mary
     { id: 'dune', url: 'https://www.instagram.com/slowshelf/', title: 'Dune', summary: 'Frank Herbert’s desert-planet epic of politics, prophecy and the spice everyone wants. Book one of six.', category: 'Books', tags: ['sci-fi', 'classics'], concepts: ['fiction', 'space'], sourceType: 'web', sourceName: '@slowshelf', readTime: 2, age: 61 },
     { id: 'spirited', url: 'https://www.ghibli.jp/', title: 'Spirited Away', summary: 'Hayao Miyazaki’s story of a girl who works in a bathhouse for spirits to save her parents. It won the Oscar for Best Animated Feature.', category: 'Film', tags: ['animation', 'ghibli'], concepts: ['film', 'stories'], sourceType: 'web', sourceName: 'Studio Ghibli', readTime: 2, age: 141 },
   ],
+};
+
+/**
+ * (round 3, owner: a YouTube version, a Mark Manson video) FIND THE BOOK's
+ * other needle: the same account, with Sam's pick a YouTube save instead of
+ * the screenshot. The video is real, on Mark Manson's own channel: title,
+ * channel and length checked against YouTube, and the card's summary, length
+ * and key moments are Machina's own analysis of it (the call a Pro save
+ * makes: capture/video-facts/Nxy6SIM11sA.json; its title kept as YouTube
+ * has it). Sam's note names the tip; the answer finds its minute.
+ */
+const CHEATCODES = {
+  id: 'cheatcodes',
+  url: 'https://www.youtube.com/watch?v=Nxy6SIM11sA',
+  title: 'Life is a Video Game, Here Are the Cheat Codes',
+  summary: 'Mark Manson on life as an infinite game: failures build character, so pick a main quest and say no to the side quests.',
+  category: 'Productivity',
+  tags: ['goal-setting', 'from-sam'],
+  concepts: ['purpose', 'recommendation'],
+  sourceType: 'youtube',
+  sourceName: 'YouTube',
+  youtubeChannel: 'Mark Manson',
+  // 12:39, as the analysis rounds it (videoDurationMinutes)
+  readTime: 13,
+  age: 142,
+  note: 'Sam says the first cheat code is the one.',
+  collections: ['weekend'],
+  // the analysis' key moments (the Ask context reads them: functions/ai_service.py)
+  highlights: ['0:54 - Defines life as an infinite game', '1:57 - Explains that character is built through failures', '3:16 - Introduces the first cheat code: skip the side quests', '8:00 - Discusses the importance of boundaries', '11:28 - Explains the charity cheat code'],
+};
+
+export const NEEDLE_VIDEO = {
+  ...NEEDLE,
+  needle: 'cheatcodes',
+  ask: {
+    question: 'What was the video Sam told me to watch?',
+    // every claim is on the card: its title and channel, its note, its key
+    // moment (the minute, bold as the model sets what matters; the reel
+    // pings it: `minute`)
+    answer: 'It’s Mark Manson’s “Life is a Video Game, Here Are the Cheat Codes”. Sam’s note says the first cheat code is the one: skip the side quests, at **3:16**.',
+    sources: ['cheatcodes'],
+    minute: '3:16',
+  },
+  extra: [...NEEDLE.extra.filter((c) => c.id !== 'atomichabits'), CHEATCODES],
 };
 
 /** The card the Save beat captures (it is also the first Ask source). */

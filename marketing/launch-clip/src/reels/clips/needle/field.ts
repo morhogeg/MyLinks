@@ -1,6 +1,6 @@
 import { Easing } from 'remotion';
 import { HITS } from '../../../../clips/needle-timeline.mjs';
-import META from './cards.json';
+import { NEEDLE } from './variant';
 
 /**
  * The field: the demo account's saves, every one a card the REAL app
@@ -32,7 +32,7 @@ export type CardInfo = {
   img: [number, number];
   box: [number, number, number, number];
 };
-export const CARDS = (META as unknown as { cards: CardInfo[] }).cards;
+export const CARDS = (NEEDLE.cards as { cards: CardInfo[] }).cards;
 export const CARD: Record<string, CardInfo> = Object.fromEntries(CARDS.map((c) => [c.id, c]));
 
 /** a card's image (margins and shadow included) in world px, and its rect in it */
@@ -67,8 +67,8 @@ const fromScreen = (sx: number, sy: number, sw: number, cam: Cam = { x: 0, y: 0,
 
 // ─────────────────────────────────────────────────────────── layout A
 
-/** the needle: Sam's screenshot (capture/library.mjs `NEEDLE.needle`) */
-export const NEEDLE_ID = 'atomichabits';
+/** the needle: Sam's screenshot, or (round 3) Sam's YouTube pick (capture/library.mjs `NEEDLE.needle`) */
+export const NEEDLE_ID = NEEDLE.needleId;
 
 /**
  * Frame 0, art-directed: [id, screen x, screen y, rect width px, rx, ry, rz].
@@ -76,7 +76,7 @@ export const NEEDLE_ID = 'atomichabits';
  * looking for; (round 2) every book around it is one people know, so the
  * hunt is a hunt: Project Hail Mary and Dune lead the eye.
  */
-const FIRST_FRAME: [string, number, number, number, number, number, number][] = [
+const BOOK_FIRST_FRAME: [string, number, number, number, number, number, number][] = [
   // the decoys lead the eye: two famous novels, one of them nearest
   ['hailmary', 700, 902, 520, 2, -12, 4],
   ['dune', 214, 826, 420, 3, 12, -6],
@@ -94,6 +94,30 @@ const FIRST_FRAME: [string, number, number, number, number, number, number][] = 
   ['sinek', 706, 1196, 282, 1, -5, -4],
   ['seljalandsfoss', 986, 1716, 330, 2, -12, -4],
 ];
+
+/**
+ * (round 3) The video's frame 0: the same slots, the needle in the book's,
+ * and the decoys are videos people know (the TED talk, The Egg), with the
+ * one trap a fan walks into: Mark Manson's other save, an ARTICLE, over the
+ * needle's corner where Thinking, Fast and Slow was.
+ */
+const VIDEO_FIRST_FRAME: typeof BOOK_FIRST_FRAME = [
+  ['robinson', 700, 902, 520, 2, -12, 4],
+  ['egg', 214, 826, 420, 3, 12, -6],
+  ['tailend', 878, 1452, 556, -2, -9, 3],
+  [NEEDLE_ID, 300, 1252, 432, -4, 16, -7],
+  ['question', 528, 1428, 468, -2, -10, 5],
+  ['walker', 470, 752, 300, 0, -7, 4],
+  ['webb', 1046, 1186, 330, 1, -16, -3],
+  ['mulafossur', 128, 1606, 468, -3, 12, 5],
+  ['entropy', 934, 690, 262, 0, 6, -2],
+  ['freesolo', 150, 1074, 262, 2, -8, 3],
+  ['pantheon', 646, 636, 220, -1, -10, 2],
+  ['sinek', 706, 1196, 282, 1, -5, -4],
+  ['seljalandsfoss', 986, 1716, 330, 2, -12, -4],
+];
+
+const FIRST_FRAME = NEEDLE.name === 'video' ? VIDEO_FIRST_FRAME : BOOK_FIRST_FRAME;
 
 /** the three the narrator names, each read as the camera passes it */
 export const NAMED: Record<'goloritze' | 'jobs' | 'coffee', { x: number; y: number; z: number; rx: number; ry: number; rz: number }> = {

@@ -1,13 +1,13 @@
 import React from 'react';
 import { AbsoluteFill } from 'remotion';
-import { CAPTIONS, FPS, HITS, TOTAL_FRAMES } from '../../../../clips/needle-timeline.mjs';
+import { FPS, HITS, TOTAL_FRAMES } from '../../../../clips/needle-timeline.mjs';
 import { sans } from '../../../fonts';
 import { AnimatedMark, CitationGlyph, Wordmark } from '../../../ui/Brand';
 import { EASE_IN_OUT, EASE_MODAL, EASE_SPRING, prog } from '../../kit/curves';
 import { INK } from '../../kit/Type';
 import { MATCH_INK_PX } from './App';
 import { BURST_Y, GATHER_Y } from './field';
-import VO from './needle-vo.json';
+import { NEEDLE } from './variant';
 
 /**
  * The brand in FIND THE BOOK, all of it the shipped identity (ui/Brand.tsx:
@@ -66,8 +66,8 @@ const MARK_W = 300;
 const MARK_H = (MARK_W * 416) / 576;
 const LOCK = { markY: BURST_Y, nameTop: BURST_Y + 165, nameW: 440, lineTop: BURST_Y + 261, size: 50 };
 const PUSH = 0.03;
-const TAG = CAPTIONS.find((c) => c.at === HITS.lockup)!;
-const TAG_T = VO.find((v) => v.frame === TAG.at);
+const TAG = NEEDLE.captions.find((c) => c.at === HITS.lockup)!;
+const TAG_T = NEEDLE.vo.find((v) => v.frame === TAG.at);
 /** the launch, a touch quicker than the app's 39 frames; its point strikes at 0.56 */
 export const MARK_DRAW = { frames: 32 };
 /** the fold on "P.S.": the line and the name go into the mark, the brackets open */

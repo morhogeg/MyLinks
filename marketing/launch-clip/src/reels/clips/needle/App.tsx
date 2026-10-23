@@ -7,11 +7,12 @@ import { EASE_IN_OUT, EASE_MODAL, prog } from '../../kit/curves';
 import { addTakes, at, rectOf, takeOf } from '../../kit/takes';
 import { GATHER_Y } from './field';
 import TAKES from './takes.json';
+import { NEEDLE } from './variant';
 
 /**
  * The real app in FIND THE BOOK (take `clips/needle/app`, capture/shoot.mjs
- * `needleClip`, today's web/ on main): Ask, on the same account the field is
- * made of.
+ * `needleClip`, today's web/ on main; the video's is `clips/needle/video`):
+ * Ask, on the same account the field is made of.
  *
  *  ask     the gathered mark IS Ask's mark: the cut lands on it, same size,
  *          same place, and the screen irises open around it as the camera
@@ -21,12 +22,13 @@ import TAKES from './takes.json';
  *          character an output frame; the thumb sends it (the cut)
  *  answer  the dive out of the needle lands INSIDE the answer, on its one
  *          source (Sam's screenshot, the same card), and pulls back to the
- *          question, the answer and the citation, which is pinged
+ *          question, the answer and the citation, which is pinged (the
+ *          video's ping is the answer's key moment, the minute: 3:16)
  */
 
 addTakes(TAKES);
 
-export const T = 'clips/needle/app';
+export const T = NEEDLE.take;
 const linear = (t: number) => t;
 
 /** the app's mark, settled (its own entry is over by here), in points */
@@ -42,6 +44,9 @@ const TYPED = takeOf(T).marks.typed - takeOf(T).marks.typing;
 const COMPOSER_Y = 791; // the composer's bottom line, where the text sits (points)
 const SEND = rectOf(T, at(T, 'typed'), 'send');
 const CITE = rectOf(T, at(T, 'sources', 40), 'cite1');
+/** what is pinged: the citation (a chip), or the video's minute (bold text in the answer) */
+const PING = rectOf(T, at(T, 'sources', 40), NEEDLE.ping);
+const PING_R = NEEDLE.ping === 'cite1' ? 12 : 6;
 
 /** the take's frame for an output frame */
 export const frameAt = (f: number) => {
@@ -94,9 +99,9 @@ export const App: React.FC<{ f: number }> = ({ f }) => {
       <AppShot take={T} i={i} cam={cam} motion={{ x: v.x, y: v.y }} iris={iris} shadow={inAsk ? r : 1} opacity={1 - gone}>
         {inAnswer && (
           <>
-            <Ping rect={CITE} t={prog(f, HITS.ping, HITS.ping + 16, linear)} radius={12} reach={16} width={2.2} alpha={0.55} dy={-1.5 * up} />
-            <Ping rect={CITE} t={prog(f, HITS.ping + 4, HITS.ping + 26, linear)} radius={12} reach={28} width={1.5} alpha={0.3} dy={-1.5 * up} />
-            <Lift take={T} i={i} rect={CITE} radius={12} lift={Math.max(up, 0.002)} rise={1.5 + 1.5 * p} grow={0.02 + 0.03 * p} ring={0.6 * up + 0.35 * p} />
+            <Ping rect={PING} t={prog(f, HITS.ping, HITS.ping + 16, linear)} radius={PING_R} reach={16} width={2.2} alpha={0.55} dy={-1.5 * up} />
+            <Ping rect={PING} t={prog(f, HITS.ping + 4, HITS.ping + 26, linear)} radius={PING_R} reach={28} width={1.5} alpha={0.3} dy={-1.5 * up} />
+            <Lift take={T} i={i} rect={PING} radius={PING_R} lift={Math.max(up, 0.002)} rise={1.5 + 1.5 * p} grow={0.02 + 0.03 * p} ring={0.6 * up + 0.35 * p} />
           </>
         )}
         {/* the thumb sends it */}

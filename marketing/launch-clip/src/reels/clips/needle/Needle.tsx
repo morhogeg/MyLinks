@@ -1,6 +1,6 @@
 import React from 'react';
 import { AbsoluteFill, Audio, staticFile, useCurrentFrame } from 'remotion';
-import { CAPTIONS, FPS, HITS, TOTAL_FRAMES } from '../../../../clips/needle-timeline.mjs';
+import { FPS, HITS, TOTAL_FRAMES } from '../../../../clips/needle-timeline.mjs';
 import { sans } from '../../../fonts';
 import { clearOf } from '../../kit/Captions';
 import { CLOCK } from '../../kit/camera';
@@ -11,7 +11,7 @@ import { App } from './App';
 import { EndCard, GatherMark, signOffPaper } from './Brand';
 import { FIELD_BG, MotionField, type FieldState } from './Field';
 import { BURST, FOCAL, FRAME, READS, cameraA, cameraB, fieldA, fieldB, fieldBurst, focusA, focusB, geom, targetAt, TARGET, WARP } from './field';
-import VO from './needle-vo.json';
+import { NEEDLE } from './variant';
 
 /**
  * FIND THE BOOK: the needle reel. 28s, 1080 × 1920, loops.
@@ -27,6 +27,8 @@ import VO from './needle-vo.json';
  */
 
 const TONE = '#F8F9FB';
+const CAPTIONS = NEEDLE.captions;
+const VO = NEEDLE.vo;
 const linear = (t: number) => t;
 
 /** how many shutter samples a frame needs: more the faster things move */
@@ -184,7 +186,7 @@ export const Needle: React.FC<{ withAudio?: boolean; withCaptions?: boolean }> =
   const paper = signOffPaper(f);
   return (
     <AbsoluteFill style={{ fontFamily: sans, background: FIELD_BG }}>
-      {withAudio && <Audio src={staticFile('clips/needle/score-vo.wav')} />}
+      {withAudio && <Audio src={staticFile(NEEDLE.audio)} />}
       {/* the field: the dare, the search, the gather */}
       {f < HITS.ask && <MotionField frame={f} samples={samplesA(f)} at={stateA} />}
       {/* the tunnel, onto the needle, and the dive */}

@@ -13,16 +13,22 @@
  *  - the mix at the feeds' −14 LUFS (±0.5), true peak ≤ −1 dBTP;
  *  - the loop: the P.S. still up on the last frame, and the step across the
  *    audio seam no bigger than the score's own.
+ *
+ * `node audio/needle-verify.mjs video` gates the video needle (round 3).
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { CAPTIONS, FPS, HEIGHT, TOTAL_FRAMES } from '../clips/needle-timeline.mjs';
-import { NEEDLE } from '../capture/library.mjs';
+import { FPS, HEIGHT, NEEDLES, TOTAL_FRAMES } from '../clips/needle-timeline.mjs';
+import { NEEDLE as BOOK, NEEDLE_VIDEO } from '../capture/library.mjs';
 import { lufs, powerDb, speechBand, truePeak } from './loudness.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(here, '..');
+const VIDEO = process.argv[2] === 'video';
+const { captions: CAPTIONS } = NEEDLES[VIDEO ? 'video' : 'book'];
+const NEEDLE = VIDEO ? NEEDLE_VIDEO : BOOK;
+const VO_DIR = path.join(root, 'out', 'vo', VIDEO ? 'needle-video' : 'needle');
 let failed = false;
 const fail = (m) => {
   console.error(`✗ ${m}`);
@@ -48,7 +54,7 @@ const strings = [
     ...c.tags.map((t) => [`${c.id} tag`, t]),
   ]),
 ];
-const cards = JSON.parse(fs.readFileSync(path.join(root, 'src', 'reels', 'clips', 'needle', 'cards.json'), 'utf8'));
+const cards = JSON.parse(fs.readFileSync(path.join(root, 'src', 'reels', 'clips', 'needle', VIDEO ? 'cards-video.json' : 'cards.json'), 'utf8'));
 for (const c of cards.cards) strings.push([`field card`, c.title]);
 const takes = JSON.parse(fs.readFileSync(path.join(root, 'src', 'reels', 'clips', 'needle', 'takes.json'), 'utf8'));
 for (const [name, take] of Object.entries(takes)) for (const t of take.texts) strings.push([`${name} frame text`, t]);
@@ -60,7 +66,7 @@ const cooking = cards.cards.filter((c) => /recipe|cook/i.test(c.category));
 (cooking.length ? fail : ok)(`no cooking in the field${cooking.length ? `: ${cooking.map((c) => c.id).join(', ')}` : ''}`);
 
 // ── timing
-const manifest = JSON.parse(fs.readFileSync(path.join(root, 'out', 'vo', 'needle', 'manifest.json'), 'utf8'));
+const manifest = JSON.parse(fs.readFileSync(path.join(VO_DIR, 'manifest.json'), 'utf8'));
 for (const c of CAPTIONS) {
   const m = manifest.find((x) => x.frame === c.at);
   if (!m) fail(`no voice for "${c.text}"`);
@@ -97,9 +103,9 @@ const wav = (rel) => {
   }
   return { SR: b.readUInt32LE(24), n, L, R };
 };
-const score = wav('public/clips/needle/score.wav');
-const mix = wav('public/clips/needle/score-vo.wav');
-const gain = JSON.parse(fs.readFileSync(path.join(root, 'out', 'vo', 'needle', 'mix.json'), 'utf8')).gain;
+const score = wav(VIDEO ? 'public/clips/needle/score-video.wav' : 'public/clips/needle/score.wav');
+const mix = wav(VIDEO ? 'public/clips/needle/score-video-vo.wav' : 'public/clips/needle/score-vo.wav');
+const gain = JSON.parse(fs.readFileSync(path.join(VO_DIR, 'mix.json'), 'utf8')).gain;
 const lines = manifest.map((line) => {
   const duck = CAPTIONS.find((c) => c.at === line.frame)?.duck ?? 0.55;
   const s0 = Math.round(line.start * mix.SR);

@@ -24,23 +24,27 @@
  *
  *   node audio/needle-score.mjs   →   public/clips/needle/score.wav
  *   (then `node audio/mix-vo.mjs needle` for the narrated, mastered mix)
+ *   node audio/needle-score.mjs video   →   …/score-video.wav (round 3: the
+ *   same score, kept clear of the video's own lines; mix `needle-video`)
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BAR_FRAMES, BEAT, BEAT_FRAMES, CAPTIONS, CHORDS, FPS, HITS, RISERS, TOTAL_FRAMES, TOTAL_SEC } from '../clips/needle-timeline.mjs';
+import { BAR_FRAMES, BEAT, BEAT_FRAMES, CHORDS, FPS, HITS, NEEDLES, RISERS, TOTAL_FRAMES, TOTAL_SEC } from '../clips/needle-timeline.mjs';
 import { SR, createSynth } from './synth.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(here, '..');
+const VIDEO = process.argv[2] === 'video';
+const { captions: CAPTIONS } = NEEDLES[VIDEO ? 'video' : 'book'];
 
 const S = createSynth({ seconds: TOTAL_SEC * 2, beat: BEAT });
 const { pad, sub, pulse, keys, bell, kick, hat, rim, shaker, clap, riser, whoosh, impact, tick, shimmer, pluck, ping } = S;
 const H = HITS;
 
 // ── where the narrator is speaking, in frames (the voice manifest)
-const MANIFEST = JSON.parse(fs.readFileSync(path.join(root, 'out', 'vo', 'needle', 'manifest.json'), 'utf8'));
+const MANIFEST = JSON.parse(fs.readFileSync(path.join(root, 'out', 'vo', VIDEO ? 'needle-video' : 'needle', 'manifest.json'), 'utf8'));
 const spoken = CAPTIONS.map((c) => {
   const m = MANIFEST.find((x) => x.frame === c.at);
   return [c.at, c.at + Math.round((m?.spoken ?? 0) * FPS)];
@@ -294,7 +298,7 @@ for (let i = 0; i < N1; i++) {
   out.writeInt16LE(Math.round(Math.max(-1, Math.min(1, l)) * 32767), 44 + i * 4);
   out.writeInt16LE(Math.round(Math.max(-1, Math.min(1, r)) * 32767), 44 + i * 4 + 2);
 }
-const dest = path.join(root, 'public', 'clips', 'needle', 'score.wav');
+const dest = path.join(root, 'public', 'clips', 'needle', VIDEO ? 'score-video.wav' : 'score.wav');
 fs.mkdirSync(path.dirname(dest), { recursive: true });
 fs.writeFileSync(dest, out);
 console.log(`wrote ${path.relative(root, dest)} (${TOTAL_SEC.toFixed(2)}s, the second of two copies: loops clean)`);

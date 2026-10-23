@@ -2,6 +2,7 @@ import React from 'react';
 import { AbsoluteFill, Img, staticFile } from 'remotion';
 import { Dither } from '../../kit/Paper';
 import { FOCAL, FRAME, geom, type Cam, type Inst } from './field';
+import { NEEDLE } from './variant';
 
 /**
  * The field, drawn: every card is the app's own rendering of a save (a PNG
@@ -50,7 +51,7 @@ export type FieldState = {
   fog?: [number, number];
 };
 
-const src = (id: string, big: boolean) => staticFile(`reel/app/clips/needle/${big ? 'cards' : 'cards-sm'}/${id}.png`);
+const src = (id: string, big: boolean) => staticFile(`reel/app/clips/needle/${NEEDLE.cardsDir}${big ? '' : '-sm'}/${id}.png`);
 
 export const FieldView: React.FC<FieldState & { background?: boolean }> = ({
   cam,

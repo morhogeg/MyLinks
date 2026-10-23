@@ -3,8 +3,10 @@
  *
  *   node scripts/needle-stills.mjs            # the review set (every beat)
  *   node scripts/needle-stills.mjs 0 90 570   # just these frames
+ *   NEEDLE=video node scripts/needle-stills.mjs   # (round 3) the video's
  *
- * Writes out/needle-stills/fNNNN.png. Bundles once, renders every frame.
+ * Writes out/needle-stills/fNNNN.png (the video's: out/needle-stills-video/).
+ * Bundles once, renders every frame.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -15,7 +17,9 @@ import { HITS, TOTAL_FRAMES } from '../clips/needle-timeline.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(here, '..');
-const out = path.join(root, 'out', 'needle-stills');
+const VIDEO = process.env.NEEDLE === 'video';
+const inputProps = VIDEO ? { needle: 'video' } : {};
+const out = path.join(root, 'out', VIDEO ? 'needle-stills-video' : 'needle-stills');
 fs.mkdirSync(out, { recursive: true });
 const BROWSER = '/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell';
 
@@ -30,13 +34,14 @@ const frames = process.argv.slice(2).map(Number).filter((n) => !Number.isNaN(n))
 const list = frames.length ? frames : REVIEW;
 
 const serveUrl = await bundle({ entryPoint: path.join(root, 'src', 'index.ts') });
-const composition = await selectComposition({ serveUrl, id: process.env.COMP ?? 'MachinaNeedleSilent', browserExecutable: BROWSER });
+const composition = await selectComposition({ serveUrl, id: process.env.COMP ?? 'MachinaNeedleSilent', inputProps, browserExecutable: BROWSER });
 for (const frame of list) {
   const t0 = Date.now();
   await renderStill({
     serveUrl,
     composition,
     frame,
+    inputProps,
     output: path.join(out, `f${String(frame).padStart(4, '0')}.png`),
     browserExecutable: BROWSER,
     chromiumOptions: { gl: 'angle-egl' },
