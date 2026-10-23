@@ -39,8 +39,12 @@ export const BAR = BAR_FRAMES / FPS; // 2s
 /** Beat (quarter note, may be fractional) → frame. */
 export const beat = (n) => Math.round(n * BEAT_FRAMES);
 
-/** a whole number of bars, so the score's pulse runs straight through the loop */
-export const TOTAL_FRAMES = beat(56);
+/**
+ * a whole number of beats, so the score's pulse runs straight through the
+ * loop (round 4: 58, two more than before, for the payoff played at half
+ * speed; the last bar under the logo is a half bar, as it always was)
+ */
+export const TOTAL_FRAMES = beat(58);
 export const TOTAL_SEC = TOTAL_FRAMES / FPS;
 
 /**
@@ -66,11 +70,11 @@ export const HITS = {
   fly: 464, // and fly out of the list onto the real "Do this" rows
   rewrite: 486, // each "Watch …" becomes the thing to do, a row every 6 frames
   push2: 512, // in to the video's line
-  tick: 592, // "…one.": the video's line ticked; the rest follow an 8th apart
-  allDone: 650, // the rows fold away: "All done. New tasks arrive with your saves."
-  wide: 656, // back out to the whole Revisit tab
-  lockup: 692, // the app dissolves into paper; "Machina. Everything you save, finally useful."
-  loopLead: 810, // the last bar leans back to vi, into the loop's downbeat (the cut to frame 0)
+  tick: 592, // "…one.": the video's line ticked; the rest follow an 8th apart, at half speed
+  allDone: 674, // the rows have folded away (from tick + 39, an 8th apart): "All done. New tasks arrive with your saves."
+  wide: 682, // back out to the whole Revisit tab
+  lockup: 722, // the app dissolves into paper; "Machina. Everything you save, finally useful."
+  loopLead: 840, // the last bar leans back to vi, into the loop's downbeat (the cut to frame 0)
 };
 
 /** The cut. */
@@ -107,7 +111,7 @@ export const CAPTIONS = [
   { at: 548, to: 604, text: 'Even the\nprocrastination one.', style: 'A delighted, teasing callback with a laugh in the voice, quick and light; landing on "one" with a grin.', pace: PACE },
   // the sign-off: FIND THE BOOK's take, word for word (the same key, so the
   // same voice and the same read: the house sign-off)
-  { at: 696, to: 798, place: 'scene', text: 'Machina.\nEverything you save, finally useful.', duck: 0.4, style: 'A confident, warm sign-off; the name with a smile, then the tagline sincere but brisk, no drawn-out words.', pace: PACE },
+  { at: 726, to: 828, place: 'scene', text: 'Machina.\nEverything you save, finally useful.', duck: 0.4, style: 'A confident, warm sign-off; the name with a smile, then the tagline sincere but brisk, no drawn-out words.', pace: PACE },
 ];
 
 /** no chapter words in this one */

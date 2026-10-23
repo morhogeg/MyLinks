@@ -159,6 +159,13 @@ export const InkRow: React.FC<{
  * The list on its sheet: every item at its place, scrolled by `scroll` px and
  * zoomed by `z` about (zx, zy). `dim` sets an item's opacity by index (the
  * stop sets the others back), `ring` its emphasis.
+ *
+ * (round 4) The rows are laid out once, at full size and on whole pixels, and
+ * the scroll and the zoom are ONE transform on a composited layer: Chromium
+ * moves that layer by fractions of a pixel. Laid out per frame (the type
+ * resized for the zoom, each row's top set to the scroll), the text snapped
+ * to whole pixels and shimmered through every slow push, about half a pixel
+ * either way.
  */
 export const InkList: React.FC<{
   scroll: number;
@@ -172,34 +179,47 @@ export const InkList: React.FC<{
   skip?: (k: number) => boolean;
   dividers?: number;
 }> = ({ scroll, top = L.top0, z = 1, zx = 540, zy = 960, dim, ring, skip, dividers = 1 }) => {
-  // frame y of the list's own y (0 = the first item's top), through the zoom
+  // frame y of a list y (0 = the first item's top), through the transform
   const Y = (ly: number) => zy + (top + ly - scroll - zy) * z;
-  const X = (lx: number) => zx + (lx - zx) * z;
   return (
-    <AbsoluteFill style={{ pointerEvents: 'none' }}>
-      {ITEMS.map((it, k) => {
-        const y = Y(TOPS[k]);
-        const h = heightOf(it) * z;
-        if (y > 1920 + 40 || y + h < -40 || skip?.(k)) return null;
-        const o = dim ? dim(k) : 1;
-        return (
-          <React.Fragment key={it.id}>
-            {dividers > 0 && k > 0 && (
-              <div
-                style={{
-                  position: 'absolute',
-                  left: X(L.textX),
-                  width: (1080 - 64 - L.textX) * z,
-                  top: Math.round(y - (L.gap / 2) * z),
-                  height: Math.max(1, 1.5 * z),
-                  background: `rgba(17,24,39,${(0.06 * dividers * Math.min(o, dim ? dim(k - 1) : 1)).toFixed(3)})`,
-                }}
-              />
-            )}
-            <InkRow it={it} g={listGeo(y, z, X(0))} opacity={o} ring={ring ? ring(k) : 0} />
-          </React.Fragment>
-        );
-      })}
+    <AbsoluteFill style={{ pointerEvents: 'none', overflow: 'hidden' }}>
+      <div
+        style={{
+          position: 'absolute',
+          left: 0,
+          top: 0,
+          width: 1080,
+          height: 1920,
+          transformOrigin: `${zx}px ${zy}px`,
+          transform: `scale(${z.toFixed(5)}) translateY(${(-scroll).toFixed(3)}px)`,
+          willChange: 'transform',
+        }}
+      >
+        {ITEMS.map((it, k) => {
+          const y = Y(TOPS[k]);
+          const h = heightOf(it) * z;
+          if (y > 1920 + 60 || y + h < -60 || skip?.(k)) return null;
+          const o = dim ? dim(k) : 1;
+          const ly = top + TOPS[k];
+          return (
+            <React.Fragment key={it.id}>
+              {dividers > 0 && k > 0 && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: L.textX,
+                    width: 1080 - 64 - L.textX,
+                    top: ly - L.gap / 2,
+                    height: 1.5,
+                    background: `rgba(17,24,39,${(0.06 * dividers * Math.min(o, dim ? dim(k - 1) : 1)).toFixed(3)})`,
+                  }}
+                />
+              )}
+              <InkRow it={it} g={listGeo(ly)} opacity={o} ring={ring ? ring(k) : 0} />
+            </React.Fragment>
+          );
+        })}
+      </div>
     </AbsoluteFill>
   );
 };

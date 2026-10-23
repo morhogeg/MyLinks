@@ -35,7 +35,9 @@ export const EndCard: React.FC<{ f: number; show: boolean }> = ({ f, show }) => 
   const push = 1 + 0.03 * prog(f, from, TOTAL_FRAMES - 1, (t) => t);
   const words = TAG.text.split('\n')[1].split(' ');
   return (
-    <AbsoluteFill style={{ pointerEvents: 'none', transform: `scale(${push})`, transformOrigin: `540px ${MARK_Y}px` }}>
+    // (round 4) the slow push on a composited layer: Chromium moves it by
+    // fractions of a pixel, where re-laid-out type stepped whole pixels
+    <AbsoluteFill style={{ pointerEvents: 'none', transform: `scale(${push.toFixed(5)})`, transformOrigin: `540px ${MARK_Y}px`, willChange: 'transform' }}>
       <div
         style={{
           position: 'absolute',
@@ -44,8 +46,9 @@ export const EndCard: React.FC<{ f: number; show: boolean }> = ({ f, show }) => 
           width: MARK_W,
           height: MARK_H,
           color: INK,
-          // its first ticks only once the paper has covered the app
-          opacity: prog(f, HITS.lockup - 2, HITS.lockup + 3, (t) => t * t * (3 - 2 * t)),
+          // (round 4) in over the last of the app's dissolve, so no frame
+          // is bare paper between the two (it waited for the paper)
+          opacity: prog(f, HITS.lockup - 8, HITS.lockup + 2, (t) => t * t * (3 - 2 * t)),
           filter: 'drop-shadow(0 10px 30px rgba(24,32,48,0.16))',
         }}
       >
@@ -107,7 +110,7 @@ export const EndCard: React.FC<{ f: number; show: boolean }> = ({ f, show }) => 
   );
 };
 
-/** the paper the sign-off sits on, over the app's dissolve */
-export const signOffPaper = (f: number) => (f < HITS.lockup - 12 ? 0 : prog(f, HITS.lockup - 12, HITS.lockup - 1, EASE_IN_OUT));
+/** the paper the sign-off sits on, over the app's dissolve (App.tsx: the tab defocusing as it recedes) */
+export const signOffPaper = (f: number) => (f < HITS.lockup - 14 ? 0 : prog(f, HITS.lockup - 14, HITS.lockup + 1, EASE_IN_OUT));
 
 export { MARK_Y };

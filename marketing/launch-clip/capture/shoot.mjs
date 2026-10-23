@@ -1210,6 +1210,7 @@ const takes = {
     };
     const t = new Take(dev, OUT, 'clips/revisit/app');
     const roll60 = (n, every) => t.roll(n, { rects: RV, step: 1000 / 60, every });
+    const roll120 = (n, every) => t.roll(n, { rects: RV, step: 1000 / 120, every });
     t.mark('home');
     await t.snap({ rects: RV });
     // this week's synthesis, tapped open on Home
@@ -1240,10 +1241,15 @@ const takes = {
     // (the mouse off the foot of the screen: a toast under the pointer holds
     // itself open, and the wide shot waits for all five to time out)
     await page.mouse.move(200, 40);
-    // the ticks, an 8th note (250ms, 15 frames at 60fps) apart
+    // the ticks, for the reel's half-speed payoff (round 4: at the app's own
+    // speed a row's 280ms fold is two frames at 30fps, and the list snapped
+    // up five times): rolled at 120fps, a click every 15 frames (125ms of the
+    // app's time), so at half speed they land an 8th note (7.5 output frames)
+    // apart and each fold plays over about 17 output frames; 210 frames run
+    // past the last fold to "All done."
     await t.freeze();
     t.mark('tick');
-    await roll60(150, async (k) => {
+    await roll120(210, async (k) => {
       if (k % 15 === 0 && k / 15 < ids.length) {
         // (the tab renders a second, hidden copy for desktop: the visible one)
         await visible(page.locator(RV[`tick${k / 15}`][0])).dispatchEvent('click');

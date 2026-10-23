@@ -98,54 +98,44 @@ export const LIST_H = TOPS[TOPS.length - 1] + heightOf(ITEMS[ITEMS.length - 1]);
  *  card's title once the sheet tears off (App.tsx `CARD_TITLE_Y`) */
 export const STOP_Y = 783;
 
-// the app's spring (--ease-spring), cubic-bezier(0.34, 1.56, 0.64, 1), solved
-// exactly as the kit's (Remotion's Easing.bezier: Newton, then bisection)
-const bezier = (x1, y1, x2, y2) => {
-  const A = (a1, a2) => 1 - 3 * a2 + 3 * a1;
-  const B = (a1, a2) => 3 * a2 - 6 * a1;
-  const C = (a1) => 3 * a1;
-  const calc = (t, a1, a2) => ((A(a1, a2) * t + B(a1, a2)) * t + C(a1)) * t;
-  const slope = (t, a1, a2) => 3 * A(a1, a2) * t * t + 2 * B(a1, a2) * t + C(a1);
-  const N = 11;
-  const step = 1 / (N - 1);
-  const samples = new Float32Array(N);
-  for (let i = 0; i < N; i++) samples[i] = calc(i * step, x1, x2);
-  const tForX = (x) => {
-    let start = 0;
-    let cur = 1;
-    for (; cur !== N - 1 && samples[cur] <= x; ++cur) start += step;
-    --cur;
-    const dist = (x - samples[cur]) / (samples[cur + 1] - samples[cur]);
-    let t = start + dist * step;
-    const s0 = slope(t, x1, x2);
-    if (s0 >= 0.001) {
-      for (let i = 0; i < 4; i++) {
-        const s = slope(t, x1, x2);
-        if (s === 0) return t;
-        t -= (calc(t, x1, x2) - x) / s;
-      }
-      return t;
-    }
-    if (s0 === 0) return t;
-    let a = start;
-    let b = start + step;
-    let i = 0;
-    let cx;
-    do {
-      t = a + (b - a) / 2;
-      cx = calc(t, x1, x2) - x;
-      if (cx > 0) b = t;
-      else a = t;
-    } while (Math.abs(cx) > 1e-7 && ++i < 10);
-    return t;
-  };
-  return (x) => {
-    const c = Math.min(1, Math.max(0, x));
-    if (c === 0 || c === 1) return c;
-    return calc(tForX(c), y1, y2);
-  };
+/**
+ * (round 4) A ratchet step: a damped spring answering a step, from rest. It
+ * starts at zero speed and settles in about 18 frames, a 1.5% overshoot on
+ * the way. (Round 1 used the app's own --ease-spring curve, which leaves at four
+ * and a half times its average speed: the list jumped 50 to 80px in the
+ * step's first frame.)
+ */
+const ZETA = 0.8;
+const OMEGA = 0.32; // rad per frame
+const springStep = (u) => {
+  if (u <= 0) return 0;
+  const wd = OMEGA * Math.sqrt(1 - ZETA * ZETA);
+  return 1 - Math.exp(-ZETA * OMEGA * u) * (Math.cos(wd * u) + ((ZETA * OMEGA) / wd) * Math.sin(wd * u));
 };
-const SPRING = bezier(0.34, 1.56, 0.64, 1);
+
+/**
+ * (round 4) The slot spin as ONE speed curve, v ∝ u^1.8 (1 − u)^1.3 over the
+ * spin: up from rest, a peak just past the middle, a firm, smooth brake to
+ * zero on the stop. (It was u² into ease-out-back: the speeds met at the
+ * hand-over but the push flipped to a brake in a frame, and the overshoot
+ * crept back a pixel at a time.)
+ */
+const SPIN = (() => {
+  const N = 2000;
+  const cum = new Float64Array(N + 1);
+  for (let i = 1; i <= N; i++) {
+    const u = (i - 0.5) / N;
+    cum[i] = cum[i - 1] + Math.pow(u, 1.8) * Math.pow(1 - u, 1.3);
+  }
+  for (let i = 0; i <= N; i++) cum[i] /= cum[N];
+  return (u) => {
+    if (u <= 0) return 0;
+    if (u >= 1) return 1;
+    const x = u * N;
+    const i = Math.floor(x);
+    return cum[i] + (cum[i + 1] - cum[i]) * (x - i);
+  };
+})();
 
 const S_STOP = (() => {
   const mid = TOPS[VIDEO] + ((ITEMS[VIDEO].br ? 2 : 1) * L.lineH) / 2;
@@ -158,40 +148,21 @@ const STEPS = [
   [HITS.step3, 6],
 ];
 
-const easeOutBack = (u, c1 = 0.55) => {
-  const c3 = c1 + 1;
-  return 1 + c3 * Math.pow(u - 1, 3) + c1 * Math.pow(u - 1, 2);
-};
-
 /**
  * The list's scroll (px it has moved up) at frame t, fractional for the
- * shutter: still for the hook; three ratchet steps on the voice's verbs (the
- * app's spring); then the slot spin, accelerating (ease-in) into a fast
- * middle and braking with a small overshoot (ease-out-back), velocities
- * matched where the two meet, landing exactly on the video at HITS.stop.
+ * shutter: still for the hook; three ratchet steps on the voice's verbs;
+ * then the slot spin, landing exactly on the video at HITS.stop.
  */
 export const scrollAt = (t) => {
+  if (t >= HITS.stop) return S_STOP;
   let s = 0;
+  let prev = 0;
   for (const [f, n] of STEPS) {
-    const to = TOPS[n];
-    const from = s;
-    if (t <= f) break;
-    s = from + (to - from) * SPRING(Math.min(1, (t - f) / 11));
+    s += (TOPS[n] - prev) * springStep(t - f);
+    prev = TOPS[n];
   }
   if (t <= HITS.spin) return s;
-  const S0 = TOPS[STEPS[STEPS.length - 1][1]];
-  const D = S_STOP - S0;
-  // accelerate over A frames (u²), brake over B frames (ease-out-back, whose
-  // start velocity is c1 + 3): equal speed at the hand-over
-  const A = 52;
-  const B = HITS.stop - HITS.spin - A;
-  const vb = 0.55 + 3;
-  const D2 = D / (1 + (vb * A) / (2 * B));
-  const D1 = D - D2;
-  const u = t - HITS.spin;
-  if (u <= A) return S0 + D1 * (u / A) ** 2;
-  if (u <= A + B) return S0 + D1 + D2 * easeOutBack((u - A) / B);
-  return S_STOP;
+  return s + (S_STOP - prev) * SPIN((t - HITS.spin) / (HITS.stop - HITS.spin));
 };
 
 /** px per frame the list is moving at t (for the shutter's sample count) */

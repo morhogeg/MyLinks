@@ -12,10 +12,11 @@ import { EndCard, signOffPaper } from './Brand';
 import { InkList, InkRow, SHEET, SHEET_BG, listGeo, type RowGeo } from './Ink';
 import { ACTS, ITEMS, L, LIST_H, STOP_Y, TOPS, VIDEO, heightOf, linesOf, scrollAt, speedAt, type Item } from './list';
 import { Sheet, landAt, tearAt, type SheetPose } from './Sheet';
+import { pchip } from './smooth';
 import VO from './revisit-vo.json';
 
 /**
- * TICK IT OFF: the revisit reel. 28s, 1080 × 1920, loops.
+ * TICK IT OFF: the revisit reel. 29s, 1080 × 1920, loops.
  *
  * "Your saves are a to-do list." over an ink list of this account's real
  * saves; "Watch later. Read later. Try later." ratchets it on; it spins like
@@ -25,7 +26,8 @@ import VO from './revisit-vo.json';
  * comes back on a new sheet and the five saves that call for an action are
  * pulled out of it onto the real "Do this" rows, each "Watch …" rewritten as
  * the thing to do; "Even the procrastination one.": the video's line is
- * ticked, the rest follow on the beat, the list folds away to "All done.";
+ * ticked, the rest follow on the beat (at half speed, round 4), the list
+ * folds away to "All done.";
  * the tab; the sign-off, held on the logo and the tagline to the last frame
  * (round 2); the loop cuts from the logo back to the hook.
  * Every app pixel is the shipped app (capture/shoot.mjs `revisitClip`); the
@@ -34,7 +36,6 @@ import VO from './revisit-vo.json';
 
 const SET_BG = 'linear-gradient(180deg, #F8F9FB 0%, #F1F3F6 58%, #ECEEF2 100%)';
 const TONE = '#F8F9FB';
-const linear = (t: number) => t;
 type VoLine = { frame: number; words: number[] };
 const LINES = VO as VoLine[];
 
@@ -68,13 +69,14 @@ const HookType: React.FC<{ out?: number }> = ({ out = 0 }) => (
 
 // ─────────────────────────────────────────────────────────── act one: the list
 
-/** the push on frame 0's hold, about the list's middle; then, once the spin
- *  has stopped, a slow push in on the video */
-const zoomAt = (t: number) => {
-  const hook = 1 + 0.022 * prog(t, 0, HITS.hookOut, linear) * (1 - prog(t, HITS.hookOut, HITS.hookOut + 16, EASE_IN_OUT));
-  const stop = 1 + 0.045 * prog(t, HITS.stop + 8, HITS.tear + 12, EASE_IN_OUT);
-  return { z: hook * stop, zy: t < HITS.spin ? 1100 : STOP_Y };
-};
+/**
+ * (round 4) One slow push in from frame 0 to past the tear, about the line
+ * the video stops on, gathering pace once it has stopped. (It pushed in on
+ * the hook, eased back out as the list moved off, and pushed in again at the
+ * stop; its centre jumped from the list's middle to that line at the spin.)
+ */
+const ZOOM = pchip([0, HITS.spin, HITS.stop, HITS.tear + 30], [0, Math.log(1.022), Math.log(1.03), Math.log(1.085)]);
+const zoomAt = (t: number) => ({ z: Math.exp(ZOOM(t)), zy: STOP_Y });
 
 /** after the stop: the others step back, the video stays in ink */
 const dimAt = (t: number) => (k: number) => (k === VIDEO ? 1 : 1 - 0.8 * prog(t, HITS.stop - 2, HITS.stop + 8, EASE_MODAL));
@@ -91,16 +93,30 @@ const ListAt: React.FC<{ t: number }> = ({ t }) => {
   );
 };
 
+/** a gaussian along x and y (px): an SVG filter for `filter: url(#id)` */
+const Smear: React.FC<{ id: string; sx: number; sy: number }> = ({ id, sx, sy }) => (
+  <svg width="0" height="0" style={{ position: 'absolute' }}>
+    <filter id={id} x="-5%" y="-5%" width="110%" height="110%" colorInterpolationFilters="sRGB">
+      <feGaussianBlur stdDeviation={`${sx.toFixed(2)} ${sy.toFixed(2)}`} />
+    </filter>
+  </svg>
+);
+
 /**
- * Motion blur is real: during the spin the list is drawn at up to nine
- * moments inside a 180° shutter and averaged (sample k laid over the first k
- * at 1/k, exactly their mean); a still frame is drawn once.
+ * Motion blur is real: while the list moves it is drawn at moments inside a
+ * 180° shutter and averaged (sample k laid over the first k at 1/k, exactly
+ * their mean); a still frame is drawn once. (Round 4: samples at most 3px
+ * apart, up to 14, melted together by a blur along the move about the size
+ * of the gap: nine copies up to 11px apart read as stripes.)
  */
 const MotionList: React.FC<{ f: number }> = ({ f }) => {
-  const n = Math.min(9, Math.max(1, Math.round(speedAt(f) / 10)));
+  const travel = speedAt(f) * 0.5;
+  const n = Math.min(14, Math.max(1, Math.ceil(travel / 3)));
   if (n === 1) return <ListAt t={f} />;
+  const gap = travel / (n - 1);
   return (
-    <AbsoluteFill>
+    <AbsoluteFill style={{ filter: gap > 0.8 ? 'url(#revisit-list-smear)' : undefined }}>
+      {gap > 0.8 && <Smear id="revisit-list-smear" sx={0} sy={0.6 * gap} />}
       {Array.from({ length: n }, (_, k) => (
         <AbsoluteFill key={k} style={{ opacity: 1 / (k + 1) }}>
           <ListAt t={f + (k / (n - 1) - 0.5) * 0.5} />
@@ -189,25 +205,32 @@ const PadSheet: React.FC<{ f: number; pose: SheetPose; captions: boolean }> = ({
 );
 
 /**
- * A sheet in motion, with its own shutter: drawn at up to eight moments
- * inside a 180° shutter and averaged (each sample opaque paper, sample k
- * laid over the first k at 1/k), the average softened by about the distance
- * between samples so the copies melt into one smear; at rest, drawn once.
+ * A sheet in motion, with its own shutter: drawn at moments inside a 180°
+ * shutter and averaged (each sample opaque paper, sample k laid over the
+ * first k at 1/k); at rest, drawn once. (Round 4: up to 14 samples, melted
+ * together by one blur ALONG the move, not around it: eight copies under a
+ * round blur still read as copies, and softened the sheet's edge sideways.
+ * A blur per sample cost minutes a frame in the software compositor.)
  */
 const MotionSheet: React.FC<{ f: number; at: (t: number) => SheetPose; draw: (pose: SheetPose) => React.ReactNode }> = ({ f, at, draw }) => {
   const pose = at(f);
   if (pose.gone) return null;
   const a = at(f - 0.25);
   const b = at(f + 0.25);
-  // the shutter's travel, in px, at the frame's middle (the turn moves it too)
-  const travel = Math.hypot(b.x - a.x, b.y - a.y) + Math.abs(b.rot - a.rot) * (Math.PI / 180) * 1100;
-  const n = Math.min(8, Math.max(1, Math.round(travel / 16)));
+  // the shutter's travel, in px, at the frame's middle (the turn about the
+  // binding's corner moves it down too)
+  const turn = Math.abs(b.rot - a.rot) * (Math.PI / 180) * 1100;
+  const tx = Math.abs(b.x - a.x);
+  const ty = Math.abs(b.y - a.y) + turn;
+  const travel = Math.hypot(tx, ty);
+  const n = Math.min(14, Math.max(1, Math.ceil(travel / 5)));
   if (n === 1) return <>{draw(pose)}</>;
-  // one blur over the averaged samples (a blur per sample cost minutes a
-  // frame in the render's software compositor)
-  const soft = n < 3 ? 0 : Math.min(9, travel / n / 2.5);
+  const sx = (0.5 * tx) / (n - 1);
+  const sy = (0.5 * ty) / (n - 1);
+  const soft = sx > 0.5 || sy > 0.5;
   return (
-    <AbsoluteFill style={{ filter: soft > 0.6 ? `blur(${soft.toFixed(1)}px)` : undefined }}>
+    <AbsoluteFill style={{ filter: soft ? 'url(#revisit-sheet-smear)' : undefined }}>
+      {soft && <Smear id="revisit-sheet-smear" sx={sx} sy={sy} />}
       {Array.from({ length: n }, (_, k) => {
         const p = at(f + (k / (n - 1) - 0.5) * 0.5);
         return (
@@ -368,7 +391,7 @@ const Rewrite: React.FC<{ f: number; it: Item; r: number }> = ({ f, it, r }) => 
 
 const PullOut: React.FC<{ f: number }> = ({ f }) => {
   if (f < HITS.land || f > rowAt(4) + 16) return null;
-  const pose = landAt(f, HITS.land, 12);
+  const pose = landAt(f, HITS.land);
   // the sheet and the saves left on it give way to the real list
   const away = prog(f, HITS.fly, HITS.rewrite - 6, EASE_IN_OUT);
   const picked = (k: number) => PICKS.some((p) => p.k === k);
@@ -377,15 +400,9 @@ const PullOut: React.FC<{ f: number }> = ({ f }) => {
     <AbsoluteFill style={{ pointerEvents: 'none' }}>
       {away < 1 && (
         <AbsoluteFill style={{ opacity: 1 - away }}>
-          <MotionSheet
-            f={f}
-            at={(t) => landAt(t, HITS.land, 12)}
-            draw={(p) => (
-              <Sheet pose={p}>
-                {ITEMS.map((it, k) => (picked(k) && f >= pickAt(k) ? null : <InkRow key={it.id} it={it} g={pullGeo(k)} opacity={picked(k) ? 1 : dim} />))}
-              </Sheet>
-            )}
-          />
+          <Sheet pose={pose}>
+            {ITEMS.map((it, k) => (picked(k) && f >= pickAt(k) ? null : <InkRow key={it.id} it={it} g={pullGeo(k)} opacity={picked(k) ? 1 : dim} />))}
+          </Sheet>
         </AbsoluteFill>
       )}
       {/* the five, picked out (a 16th apart) and flown onto their rows */}

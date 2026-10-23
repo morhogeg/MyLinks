@@ -19,8 +19,9 @@
  *    stroke under the smallest step;
  *  - the pull-out: a sheet lands, five plucks for five picks (a 16th
  *    apart), a whoosh as they fly, a pen stroke for each rewritten line;
- *  - the breath before the payoff, then THE TICKS (75%): five rising pings
- *    on 8ths, home on I, the band in full;
+ *  - the breath before the payoff, then THE TICKS (68%, at half speed):
+ *    five rising pings on 8ths, home on I, the band in full; the rows fold
+ *    away an 8th apart, a soft brush of paper each;
  *  - "All done.": a bell; the tab; the sign-off rests IV → I under the
  *    logo, which holds to the last frame (round 2); the last bar leans to
  *    vi, a bell ringing over the cut back into the loop's downbeat.
@@ -125,6 +126,24 @@ const scratch = (startSec, lenSec = 0.16, level = 0.05, panPos = 0.1) => {
       return h(z) * grain * Math.sin(Math.PI * x) * level * 2;
     },
     { pan: panPos, send: 0.2 },
+  );
+};
+
+/** a row folding away: a soft brush of paper and a low, short thup */
+const fold = (startSec, level = 0.03, panPos = 0) => {
+  let z = 0;
+  const h = hp(500);
+  render(
+    startSec,
+    0.22,
+    (t) => {
+      const a = 1 - Math.exp((-2 * Math.PI * 2600) / SR);
+      z += a * (rnd() - z);
+      const brush = h(z) * Math.min(1, t / 0.012) * Math.exp(-t * 16);
+      const thup = Math.sin(2 * Math.PI * (110 - 40 * Math.min(1, t * 8)) * t) * Math.exp(-t * 30);
+      return (brush * 1.6 + thup * 0.5) * level;
+    },
+    { pan: panPos, send: 0.22 },
   );
 };
 
@@ -288,8 +307,9 @@ const arrange = (o) => {
     tick(t(fr), 0.07, 1.2);
   });
   shimmer(t(H.tick + 38), [84, 88, 91, 96], 0.04);
-  // the rows folding away
-  whoosh(t(H.tick + 18), 1.4, 0.03, 0);
+  // the rows folding away (round 4: half speed, from tick + 39, an 8th apart)
+  whoosh(t(H.tick + 36), (H.allDone - H.tick - 36) / FPS + 0.2, 0.03, 0);
+  for (let r = 0; r < 5; r++) fold(t(H.tick + 39 + 7.5 * r), 0.03, -0.2 + 0.1 * r);
   // "All done."
   bell(t(H.allDone), 91, 0.08, 0, 2.6);
   bell(t(H.allDone) + 0.04, 84, 0.06, -0.2, 2.6);

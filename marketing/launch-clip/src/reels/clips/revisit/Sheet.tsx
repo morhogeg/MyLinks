@@ -1,6 +1,6 @@
 import React from 'react';
 import { AbsoluteFill } from 'remotion';
-import { EASE_FLING, EASE_IN_OUT, EASE_MODAL, prog } from '../../kit/curves';
+import { EASE_IN_OUT, EASE_MODAL, prog } from '../../kit/curves';
 import { Dither } from '../../kit/Paper';
 import { SHEET_BG } from './Ink';
 
@@ -15,30 +15,61 @@ import { SHEET_BG } from './Ink';
  * casts) around its children.
  */
 
-export type SheetPose = { x: number; y: number; rot: number; lift: number; torn: number; gone: boolean };
+export type SheetPose = {
+  x: number;
+  y: number;
+  rot: number;
+  lift: number;
+  torn: number;
+  gone: boolean;
+  /** (round 4) the landing comes down onto the pad toward the camera */
+  scale?: number;
+  alpha?: number;
+};
 
 const REST: SheetPose = { x: 0, y: 0, rot: 0, lift: 0, torn: 0, gone: false };
 
-/** the tear: 4 frames of lift and rip, then 14 of being thrown down-left */
+/**
+ * The tear (round 4): 6 frames of rip along the binding, the sheet sagging
+ * off its last corner as it goes, then 13 of being pulled down and away,
+ * picking up speed from rest the whole way (it used to be thrown at full
+ * speed in its first frame and was gone in five).
+ */
 export const tearAt = (f: number, from: number): SheetPose => {
   if (f < from) return REST;
-  const rip = prog(f, from, from + 5, EASE_IN_OUT);
-  const t = prog(f, from + 3, from + 17, EASE_FLING);
+  const rip = prog(f, from, from + 6, EASE_IN_OUT);
+  const u = Math.min(1, Math.max(0, (f - from - 4) / 13));
   return {
-    x: -260 * t - 30 * rip,
-    y: 2300 * t * t + 40 * t + 18 * rip,
-    rot: -4 * rip - 18 * t,
-    lift: Math.min(1, rip * 1.2),
+    x: -14 * rip - 300 * Math.pow(u, 2.2),
+    y: 10 * rip + 2250 * u * u,
+    rot: -1.6 * rip - 17 * Math.pow(u, 1.6),
+    lift: Math.min(1, rip * 1.3),
     torn: rip,
     gone: f >= from + 17,
   };
 };
 
-/** the landing: from above the frame to flat, a little turn settling out */
-export const landAt = (f: number, from: number, len = 12): SheetPose => {
-  if (f < from) return { ...REST, y: -2100, gone: true };
+/**
+ * The landing (round 4): a sheet dropped onto the pad from above, toward the
+ * camera: it comes in a little large and out of the dark of its own shadow,
+ * and settles flat (it used to slam down from above the frame, 2000px in
+ * four frames).
+ */
+export const landAt = (f: number, from: number, len = 14): SheetPose => {
+  if (f < from) return { ...REST, gone: true };
   const t = prog(f, from, from + len, EASE_MODAL);
-  return { x: 0, y: -2050 * (1 - t), rot: -3.5 * (1 - t), lift: 1 - prog(f, from + len - 4, from + len + 6, EASE_IN_OUT), torn: 0, gone: false };
+  return {
+    x: 0,
+    y: -70 * (1 - t),
+    rot: -2.2 * (1 - t),
+    lift: 1 - prog(f, from + len - 6, from + len + 4, EASE_IN_OUT),
+    torn: 0,
+    gone: false,
+    scale: 1 + 0.1 * (1 - t),
+    // in over six frames, eased both ends: quicker read as a pop (60% in
+    // its first frame), slower as two pages stacked
+    alpha: prog(f, from, from + 6, EASE_IN_OUT),
+  };
 };
 
 /** a torn edge: a ragged line across the sheet's top, a few px deep */
@@ -52,12 +83,15 @@ const TORN = (() => {
 
 export const Sheet: React.FC<{ pose: SheetPose; children?: React.ReactNode; background?: string }> = ({ pose, children, background = SHEET_BG }) => {
   if (pose.gone) return null;
-  const { x, y, rot, lift, torn } = pose;
+  const { x, y, rot, lift, torn, scale = 1, alpha = 1 } = pose;
   return (
     <AbsoluteFill
       style={{
-        transform: `translate(${x.toFixed(2)}px, ${y.toFixed(2)}px) rotate(${rot.toFixed(3)}deg)`,
-        transformOrigin: '1080px 0px',
+        // (a landing sheet scales about the frame's middle; the tear turns on
+        // the binding's corner)
+        transform: `translate(${x.toFixed(2)}px, ${y.toFixed(2)}px) rotate(${rot.toFixed(3)}deg)${scale !== 1 ? ` scale(${scale.toFixed(5)})` : ''}`,
+        transformOrigin: scale !== 1 ? '540px 960px' : '1080px 0px',
+        opacity: alpha < 1 ? alpha : undefined,
       }}
     >
       {/* the shadow it casts on what is under it */}

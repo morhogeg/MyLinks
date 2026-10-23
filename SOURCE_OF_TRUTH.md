@@ -2637,6 +2637,52 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-23 — TICK IT OFF round 4: the polish (owner: "it needs a full
+  round of refinements and polishes to make Apple grade … fix lags,
+  bitterness, abrupt cuts etc").** Branch `claude/reel-revisit`. Measured
+  first (optical flow on every frame pair of round 3), then fixed at each
+  cause:
+  - The app camera is one monotone spline through its keys (`smooth.ts`), so
+    nothing jolts or stops dead between moves. The kit's per-segment
+    EASE_MODAL leaves at 2.25 times its average speed: the push-in jumped
+    2.5% of zoom in a frame, and the camera stopped dead at the synthesis tap.
+  - The ratchet steps are a damped spring from rest (the app's spring curve
+    jumped 50 to 80 px in a step's first frame). The slot spin is one speed
+    curve.
+  - The ink list moves as one composited layer (`willChange: transform`).
+    Resizing its type each frame made the text step about 0.5 px either way
+    on every slow push. The sign-off's push gets the same treatment.
+  - Motion blur: samples at most 3 px apart, melted by a blur along the move.
+    Before, nine copies read as stripes.
+  - The synthesis's page unrolls from the tap. The app opens it in one frame,
+    which read as a cut.
+  - The tear rips, then the sheet is pulled away picking up speed; the
+    landing sheet drops onto the pad instead of slamming down.
+  - The payoff is re-shot at 120 fps and played at half speed. At the app's
+    speed each row's 280 ms fold was two frames. The ticks stay an 8th apart,
+    and the reel is two beats longer: 29.0 s, the payoff at 68%.
+  - The tab defocuses under the paper while the mark draws in over it.
+    Before, there were bare paper frames between them.
+
+  Re-captured `revisitClip`; re-voiced nothing (the takes are cached); score
+  and mix rebuilt; re-rendered whole.
+
+  **Verified:**
+  - all gates: 336 strings, voice 12.4 to 23.1 dB over the music,
+    −14.01 LUFS, −1.27 dBTP, the loop seam;
+  - the encode: 870 frames, 29.000 s, H.264 High BT.709, AAC 48 kHz, 22.0 MB,
+    −13.9 LUFS and −1.3 dBTP after AAC;
+  - no one-frame flash, stall, lone jump or alternating-speed run; the seams
+    are clean;
+  - the largest frame-to-frame speed change against round 3: push-in 31 → 3,
+    ratchet 50 → 26, folds 47 → 26, pull-back 24 → 14, landing 13 → 3;
+  - the last frame is the logo and the tagline.
+
+  **Left as is (measured):** composited type gets about 2% crisper each time
+  it crosses a whole pixel on a slow push; a fold is still the app's quick
+  curve, about four frames at half speed.
+
+  **Not verified:** watched on a phone; listened to on speakers.
 - **2026-10-23 — TICK IT OFF round 3: the foot of the frame no longer
   jumps while the list ticks off (owner: "The final second of the frame
   shown while narration finished 'even the procrastination one' is jumpy at
