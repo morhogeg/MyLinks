@@ -771,6 +771,99 @@ export const NEEDLE_VIDEO = {
   extra: [...NEEDLE.extra.filter((c) => c.id !== 'atomichabits'), CHEATCODES],
 };
 
+/**
+ * REVISIT (clips/revisit-timeline.mjs): the reel about what comes back. The
+ * same account FIND THE BOOK used (the 24 saves without the recipes, plus
+ * the 32 extra real saves), minus Sam's screenshot, plus one real YouTube
+ * save: Mark Manson's "How to Beat Procrastination Like It Owes You Money"
+ * (his own channel, 11:45). Its title and channel are YouTube's own
+ * (oEmbed), its length the channel's upload list, and everything the app
+ * says about it (summary, key moments, its "Do this") is Machina's own
+ * analysis of the video, the call a Pro save makes
+ * (capture/video-facts/-Feev1ZK6L4.json), checked against a second model's
+ * transcript of its first 45 seconds and its last two minutes.
+ *
+ * The Revisit tab then holds what this week left: a reminder that is due,
+ * the open "Do this" lines (each written for a save that calls for an
+ * action, as the analysis does; the video's is the analysis' own, word for
+ * word) and this week's synthesis, written from the six saves of the week.
+ */
+const DOSOMETHING = {
+  id: 'dosomething',
+  url: 'https://www.youtube.com/watch?v=-Feev1ZK6L4',
+  title: 'How to Beat Procrastination Like It Owes You Money',
+  // the analysis' summary, as the app stores it
+  summary: 'Inaction is primarily an emotional problem rather than a lack of knowledge or discipline.\n\nBy setting up an environment that makes desired actions inevitable and using small, concrete steps, you can overcome procrastination and build momentum.',
+  category: 'Productivity',
+  tags: ['procrastination', 'behavior-change', 'motivation'],
+  concepts: ['Do Something Principle', 'Environment Design', 'Incentive Structure'],
+  sourceType: 'youtube',
+  sourceName: 'YouTube',
+  youtubeChannel: 'Mark Manson',
+  // 11:45, as the analysis rounds it (videoDurationMinutes)
+  readTime: 12,
+  // saved this morning: the newest save, so the top of "Do this"
+  age: 0.15,
+  highlights: ['0:00 - Explains that inaction is an emotional problem', '1:09 - Introduces the 4 steps to taking action', '2:14 - Discusses creating incentives for behavior change', '8:12 - Explains leveraging social pressure', '10:31 - Highlights the importance of recognizing failure as progress'],
+  // the analysis' actionableTakeaway, verbatim
+  takeaway: 'When you feel stuck, identify the smallest, simplest action you can take today to move toward your goal and do it immediately to trigger the do something principle.',
+};
+
+export const REVISIT = {
+  /** no cooking (owner, 2026-10-02); no Sam (FIND THE BOOK's device) */
+  without: ['marcella', 'chicken', 'piranesi', 'systems'],
+  withoutCollections: ['cook'],
+  /** this week is six saves: the video, The Tail End, the V60, Four
+   *  Thousand Weeks, Cala Goloritzé and Perfect Days */
+  ages: { tailend: 1, coffee: 2, fourthousand: 4, goloritze: 5, perfectdays: 6 },
+  extra: [...NEEDLE.extra.filter((c) => c.id !== 'atomichabits'), DOSOMETHING],
+  /** the video the reel follows */
+  video: 'dosomething',
+  /**
+   * The open "Do this" lines, newest save first (the order Revisit lists
+   * them). Only saves that call for an action carry one, as in the app; each
+   * is true to its save's own summary. The video's is Machina's analysis.
+   */
+  takeaways: {
+    dosomething: DOSOMETHING.takeaway,
+    tailend: 'Call your parents this week, and put the next visit on the calendar.',
+    coffee: 'Tomorrow morning, try the two-stage pour with a 45-second bloom.',
+    fourthousand: 'Choose what you will leave undone this week, on purpose.',
+    goloritze: 'Start the trail down from the Golgo plateau early: it takes about an hour.',
+  },
+  /** a reminder the user set, due now (Revisit's first section) */
+  reminders: ['yoga'],
+  /**
+   * This week's synthesis ("This week in Machina"), written from the week's
+   * six saves. Every claim is in a card's summary or the video's analysis
+   * (the "do something principle": action is the cause of motivation, not
+   * its result; inaction is a feeling, not a lack of knowing what to do).
+   */
+  synthesis: {
+    title: 'A week about finally starting',
+    narrative: [
+      'Six saves this week, and the loudest one is a video on procrastination. Mark Manson’s point: putting things off is a feeling, not a lack of know-how, and the way out is the smallest step you can take today.',
+      'Four Thousand Weeks says you will never get to everything, so choose. The Tail End puts a number on why it matters: the visits you have left with your parents. And a quiet film, a slow coffee and a hidden beach make the case for doing fewer things, properly.',
+    ].join('\n'),
+    themes: [
+      {
+        title: 'Start before you feel ready',
+        insight: 'Manson says action comes before motivation, not after it. Burkeman and The Tail End add the reason not to wait: the time is shorter than it feels.',
+        cardIds: ['dosomething', 'fourthousand', 'tailend'],
+      },
+      {
+        title: 'Fewer things, done properly',
+        insight: 'A film about one quiet routine, a coffee worth slowing down for, and a beach you can only reach on foot or by boat.',
+        cardIds: ['perfectdays', 'coffee', 'goloritze'],
+      },
+    ],
+    standoutCardId: 'dosomething',
+    standoutReason: 'The one to act on. Its whole case fits in a line: don’t wait to feel like it; do the smallest thing, and the feeling follows.',
+    openQuestion: 'What is the smallest step you could take today on the thing you keep putting off?',
+    cardCount: 6,
+  },
+};
+
 /** The card the Save beat captures (it is also the first Ask source). */
 export const SAVE = {
   id: 'tailend',

@@ -36,7 +36,7 @@ import { fileURLToPath } from 'node:url';
 import { startServer } from './server.mjs';
 import { openDevice } from './device.mjs';
 import { Take } from './recorder.mjs';
-import { ASK, CAPTURE_USER, CARDS, NEEDLE, NEEDLE_VIDEO, SAVE, SAVETHIS, SEARCH, SYNTHESIS } from './library.mjs';
+import { ASK, CAPTURE_USER, CARDS, NEEDLE, NEEDLE_VIDEO, REVISIT, SAVE, SAVETHIS, SEARCH, SYNTHESIS } from './library.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.join(here, '..', 'public', 'reel', 'app');
@@ -262,6 +262,44 @@ async function needleCards(N, dirName, jsonName) {
   fs.writeFileSync(dest, JSON.stringify({ dpr: DPR, cards }, null, 1) + '\n');
   console.log(`wrote ${cards.length} cards → ${path.relative(path.join(here, '..'), dir)}`);
   return { frames: cards, marks: {} };
+}
+
+/**
+ * REVISIT's account (library.mjs `REVISIT`): FIND THE BOOK's haystack without
+ * Sam's screenshot, plus the Mark Manson video, this week's saves dated into
+ * this week; then what the Revisit tab reads: the open "Do this" lines (in
+ * the card's metadata, where every save path writes it), a reminder that has
+ * come due, and this week's synthesis, written as the server writes it
+ * (users/{uid}/syntheses/{weekId}). Today's Daily Brew stays: its review row
+ * is part of the tab.
+ */
+async function prepareRevisit(V = REVISIT) {
+  await prepareNeedle(V);
+  const all = [...CARDS, ...V.extra];
+  const refs = [...new Set([...V.synthesis.themes.flatMap((x) => x.cardIds), V.synthesis.standoutCardId])].map((id) => {
+    const c = all.find((x) => x.id === id);
+    return { id, title: c.title, category: c.category };
+  });
+  await page.evaluate(
+    ([uid, v, syn]) => {
+      const C = window.__capture;
+      const now = Date.now();
+      C.set(`users/${uid}/syntheses/${syn.weekId}`, { ...syn, createdAt: now - 3_600_000 });
+      for (const [id, text] of Object.entries(v.takeaways)) {
+        const p = `users/${uid}/links/${id}`;
+        const cur = C.get(p);
+        if (!cur) throw new Error(`prepareRevisit: no card ${id}`);
+        C.set(p, { ...cur, metadata: { ...(cur.metadata ?? {}), actionableTakeaway: text } });
+      }
+      // the reminder came due ten minutes ago (the sweep's in-app flag)
+      for (const id of v.reminders) {
+        const p = `users/${uid}/links/${id}`;
+        const cur = C.get(p);
+        C.set(p, { ...cur, reminderStatus: 'pending', reminderDue: true, reminderDueAt: now - 600_000, nextReminderAt: now - 600_000, reminderCount: 1 });
+      }
+    },
+    [UID, V, { ...V.synthesis, weekId: isoWeekId(new Date()), cards: refs }],
+  );
 }
 
 // Element rects the reel's camera aims at, by take. [selector, text filter?]
@@ -1100,6 +1138,93 @@ const takes = {
     }
     await t.thaw();
     return t.save({ later: later.map(([p]) => p.split('/').pop()) });
+  },
+
+  // ───────────────────────────────────────────────────────────── REVISIT
+  // One continuous use of the Revisit tab on REVISIT's account: the tab
+  // opening (its sections dealing in), this week's synthesis tapped open and
+  // read down to its themes, back up to "Do this", and the video's line
+  // ticked off (the circle filling, the line struck, the row folding away).
+  async revisitClip() {
+    await fresh(() => prepareRevisit());
+    const V = REVISIT;
+    const task = (id) => V.takeaways[id];
+    const head = (id) => task(id).slice(0, 24);
+    const title = (id) => [...CARDS, ...V.extra].find((c) => c.id === id).title;
+    const ids = Object.keys(V.takeaways);
+    const RV = {
+      revisitTab: R.revisitTab,
+      review: ['button', 'Review'],
+      remindersHead: ['button[aria-expanded]', 'Reminders'],
+      reminder: ['button', title(V.reminders[0])],
+      doHead: ['button[aria-expanded]', 'Do this'],
+      todo: ['div[class*="rounded-2xl"][class*="overflow-hidden"]', head(ids[0])],
+      weekHead: ['button[aria-expanded]', 'This week'],
+      recap: ['div[class*="border-accent/25"]'],
+      recapHead: ['button[aria-expanded]', 'This week in Machina'],
+      recapTitle: ['div', V.synthesis.title],
+      para1: ['p', 'Six saves this week'],
+      para2: ['p', 'Four Thousand Weeks says'],
+      theme1: ['section', V.synthesis.themes[0].title],
+      theme1Title: ['h3', V.synthesis.themes[0].title],
+      theme1Video: ['button', title(V.video)],
+      standout: ['button', 'Standout'],
+      toast: ['[role=status]'],
+      ...Object.fromEntries(
+        ids.flatMap((id, k) => [
+          [`row${k}`, ['div[class*="ps-1.5"][class*="pe-3"]', head(id)]],
+          [`task${k}`, ['div[class*="text-[14.5px]"]', head(id)]],
+          [`card${k}`, ['div[class*="text-[12px]"]', title(id)]],
+          [`tick${k}`, [`button[role=checkbox][aria-label*="${head(id)}"]`]],
+        ]),
+      ),
+      phrase: ['::phrase', 'p', 'the smallest step you can take today'],
+    };
+    const t = new Take(dev, OUT, 'clips/revisit/app');
+    const roll60 = (n) => t.roll(n, { rects: RV, step: 1000 / 60 });
+    t.mark('home');
+    await t.snap({ rects: RV });
+    // the tab: its sections deal in (the app's own staggered entrance)
+    await t.freeze();
+    await tab('Revisit').click();
+    t.mark('open');
+    await roll60(60);
+    await t.thaw();
+    await page.waitForTimeout(400);
+    t.mark('settled');
+    await t.snap({ rects: RV });
+    // this week's synthesis, tapped open in place
+    await t.freeze();
+    await visible(page.getByText('This week in Machina')).click();
+    t.mark('expand');
+    await roll60(40);
+    await t.thaw();
+    await page.waitForTimeout(400);
+    // read down it to the first theme (its saves listed, the video first)
+    await t.freeze();
+    await tagScroller(V.synthesis.title);
+    t.mark('read');
+    await rollScroll(t, await scrollTargetFor(title(V.video), 700), 3, RV);
+    t.mark('read-end');
+    await t.snap({ rects: RV });
+    // back up to the top of the tab: "Do this"
+    t.mark('back');
+    await rollScroll(t, 0, 6, RV);
+    t.mark('top');
+    await t.snap({ rects: RV });
+    await t.thaw();
+    await page.waitForTimeout(300);
+    // the video's line, ticked: the circle fills (the app's spring), the line
+    // is struck and held 650ms, then the row folds away and the list closes
+    await t.freeze();
+    await visible(page.locator(RV.tick0[0])).click();
+    t.mark('tick');
+    await roll60(100);
+    await t.thaw();
+    await page.waitForTimeout(600);
+    t.mark('after');
+    await t.snap({ rects: RV });
+    return t.save();
   },
 
   // ─────────────────────────────────────────────────── FIND THE BOOK: cards
