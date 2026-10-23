@@ -1,0 +1,13 @@
+{
+  "id": "7oJGvyVU65Y",
+  "url": "https://www.youtube.com/watch?v=7oJGvyVU65Y",
+  "fetched": "2026-10-23",
+  "oembed": {
+    "title": "19 Raw Lessons You Might Need To Learn Again - Mark Manson (4K)",
+    "author_name": "Chris Williamson",
+    "author_url": "https://www.youtube.com/@ChrisWillx"
+  },
+  "page": {
+    "error": "ERROR: [youtube] 7oJGvyVU65Y: Sign in to confirm you’re not a bot. This helps protect our community. Use --cookies-from-browser or --cookies for the authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp  for how to manually pass cookies. Also see  https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies  for tips on effectively exporting YouTube cookies"
+  }
+}
