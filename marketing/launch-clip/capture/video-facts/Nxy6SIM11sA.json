@@ -47,12 +47,12 @@
   },
   "clips": {
     "3:05-3:50": {
-      "model": null,
-      "text": "error: RuntimeError: Cannot send a request, as the client has been closed."
+      "model": "gemini-3.5-flash-lite",
+      "text": "limited in your abilities and knowledge, therefore the goal is to find and choose the best quest to suit your character to allow you to play the game as long and meaningfully as possible and this brings us to our first cheat code in video games you generally want to rack up as many side quests as possible to level up your character and get sick loot. But in the game of life, side quests are fun distraction at best and waste years of your life at worst. And this day and age it is incredibly easy to get sidetracked onto a bunch of useless side quests and vanity tasks that have no actual impact on the quality of your life. A huge hack to winning the game of life then is to simply be more focused and obsessed about your main quest than other people, so the fewer side quests the better. In video games, side quests tend to be kind of lame and"
     },
     "0:00-0:40": {
-      "model": null,
-      "text": "error: RuntimeError: Cannot send a request, as the client has been closed."
+      "model": "gemini-3.5-flash-lite",
+      "text": "Have you ever gotten completely lost in a video game and wondered, \"Why can't I have this sort of focus and dedication in my actual life?\" That's because, in life, you don't understand the game you are playing. In this video, I'm going to lay out in painfully simple terms exactly what the game of life entails, how it is played, and why you have failed to advance as far as you would like. And, of course, I will give you the cheat codes so that you can warp further ahead. Let's get into it. Now, video games are something known as finite games. They have a strict set of conditions"
     }
   }
 }
