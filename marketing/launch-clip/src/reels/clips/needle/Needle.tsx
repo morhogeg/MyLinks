@@ -10,7 +10,7 @@ import { INK, KineticLine } from '../../kit/Type';
 import { App } from './App';
 import { EndCard, GatherMark, signOffPaper } from './Brand';
 import { FIELD_BG, MotionField, type FieldState } from './Field';
-import { BURST, FOCAL, FRAME, READS, cameraA, cameraB, fieldA, fieldB, fieldBurst, focusA, focusB, geom, targetAt, TARGET, WARP } from './field';
+import { BURST, FOCAL, FRAME, READS, SEARCH_END, cameraA, cameraB, fieldA, fieldB, fieldBurst, focusA, focusB, geom, targetAt, TARGET, WARP } from './field';
 import { NEEDLE } from './variant';
 
 /**
@@ -51,7 +51,8 @@ const stateA = (t: number): FieldState => {
   const rings: Record<string, number> = {};
   for (const r of READS) rings[`a-${r.id}`] = readRing(t, r.from, r.to);
   const read = READS.find((r) => t >= r.from - 20 && t <= r.to + 4);
-  return { cam, insts, focus: focusA(t), aperture: 5.5, rings, subject: read ? `a-${read.id}` : undefined };
+  // (round 4) the stop shows the heap: a deeper focus, so the pile reads as a pile
+  return { cam, insts, focus: focusA(t), aperture: t > SEARCH_END ? 3.5 : 5.5, rings, subject: read ? `a-${read.id}` : undefined };
 };
 const stateB = (t: number): FieldState => {
   const { cam, insts } = fieldB(t);
@@ -114,32 +115,65 @@ const FindPing: React.FC<{ f: number }> = ({ f }) => {
   );
 };
 
-/** the dare, set big over the field on frame 0; it rolls out as the search starts */
+/**
+ * The dare, set big over the field on frame 0; it rolls out as the search
+ * starts. (round 4, owner: it took a while to read as a dare) It says so: its
+ * first line is a kicker, BET YOU CAN'T, over the big type, and under it an
+ * ink timer runs out on the push, where the camera dives in to look for you.
+ */
 const HOOK = CAPTIONS[0];
+/** the dare's type, px: the kicker, the big lines and the timer under them */
+export const DARE = { top: 262, kicker: 46, kickerGap: 16, size: 104, timerGap: 26, timer: 7, timerW: 520 };
 const Hook: React.FC<{ f: number }> = ({ f }) => {
   if (f >= HOOK.to + 1) return null;
-  const lines = HOOK.text.split('\n');
+  const all = HOOK.text.split('\n');
+  const kicker = HOOK.kicker ? all[0] : null;
+  const lines = HOOK.kicker ? all.slice(1) : all;
   const out = prog(f, HOOK.to - 7, HOOK.to, (t) => t * t * t);
+  // full on frame 0 (the cover, and where the loop lands), empty on the push
+  const left = 1 - prog(f, 0, HITS.push, linear);
+  const roll = { transform: `translateY(${Math.round(-out * 108)}%)` };
+  const clip = { overflow: 'hidden', padding: '0.04em 0.12em 0.12em', margin: '-0.04em 0 -0.12em' } as const;
   return (
-    <div style={{ position: 'absolute', left: 0, right: 0, top: 262, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-      {lines.map((l, k) => (
-        <div key={k} style={{ overflow: 'hidden', padding: '0.04em 0.12em 0.12em', margin: '-0.04em 0 -0.12em' }}>
+    <div style={{ position: 'absolute', left: 0, right: 0, top: DARE.top, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      {kicker && (
+        <div style={{ ...clip, marginBottom: DARE.kickerGap - 0.12 * DARE.kicker }}>
           <div
             style={{
+              ...roll,
               fontFamily: sans,
-              fontSize: 118,
+              fontSize: DARE.kicker,
+              fontWeight: 760,
+              letterSpacing: '0.16em',
+              textTransform: 'uppercase',
+              lineHeight: 1.1,
+              color: INK,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {kicker}
+          </div>
+        </div>
+      )}
+      {lines.map((l, k) => (
+        <div key={k} style={clip}>
+          <div
+            style={{
+              ...roll,
+              fontFamily: sans,
+              fontSize: DARE.size,
               fontWeight: 720,
               letterSpacing: '-0.042em',
               lineHeight: 1.02,
               color: INK,
               whiteSpace: 'nowrap',
-              transform: `translateY(${Math.round(-out * 108 - k * 0)}%)`,
             }}
           >
             {l}
           </div>
         </div>
       ))}
+      {left > 0 && <div style={{ marginTop: DARE.timerGap, width: DARE.timerW * left, height: DARE.timer, borderRadius: DARE.timer / 2, background: INK }} />}
     </div>
   );
 };
@@ -166,12 +200,12 @@ const Lines: React.FC<{ f: number }> = ({ f }) => (
  */
 const scrimAt = (f: number) => {
   // [solid until, clear by, opacity]
-  if (f < HOOK.to + 4) return { solid: 600, clear: 860, o: 1 };
+  if (f < HOOK.to + 4) return { solid: 660, clear: 900, o: 1 };
   if (f >= HITS.typing - 2 && f < HITS.send) return { solid: 280, clear: 520, o: 1 };
   if (f >= HITS.answer && f < HITS.lockup) return { solid: 470, clear: 610, o: 1 - prog(f, HITS.lockup - 15, HITS.lockup - 3, EASE_IN_OUT) };
   if (f >= HITS.lockup && f < HITS.ps - 2) return { solid: 510, clear: 720, o: 0 };
   // the P.S. sits in the dare's own scrim, so the loop's seam is invisible
-  if (f >= HITS.ps - 2) return { solid: 600, clear: 860, o: 1 };
+  if (f >= HITS.ps - 2) return { solid: 660, clear: 900, o: 1 };
   const on = CAPTIONS.some((c) => c.place !== 'scene' && f >= c.at - 8 && f <= c.to + 4);
   return { solid: 510, clear: 720, o: on ? 1 : 0.0 };
 };

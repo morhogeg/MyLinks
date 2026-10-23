@@ -79,12 +79,13 @@ ok(`timing: ${CAPTIONS.length} lines inside their windows, none overlapping; the
 const totalWords = CAPTIONS.reduce((n, c) => n + c.text.split(/\s+/).length, 0);
 (totalWords <= 75 ? ok : fail)(`script: ${totalWords} words (the brief: under about 75)`);
 
-// ── the safe area: the dare (top 262, three lines of 118px) and the band
-// lines (top 330, two lines of 68px) stay clear of the top 250px; the
-// lockup's lowest row (812 + 261 + 55) clears the bottom 340px
+// ── the safe area: the dare (Needle.tsx `DARE`: top 262, the kicker, three
+// lines of 104px and the timer under them) and the band lines (top 330, two
+// lines of 68px) stay clear of the top 250px; the lockup's lowest row
+// (812 + 261 + 55) clears the bottom 340px
 const SAFE = { top: 250, bottom: HEIGHT - 340 };
 const boxes = [
-  ['the dare', 262, 262 + 3 * 118 * 1.02],
+  ['the dare', 262, 262 + 46 * 1.1 + 16 + 3 * 104 * 1.02 + 26 + 7],
   ['a line', 330, 330 + 2 * 68 * 1.12],
   ['the lockup', 812 - 108, 812 + 261 + 55],
 ];

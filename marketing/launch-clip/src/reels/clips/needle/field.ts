@@ -126,7 +126,7 @@ export const NAMED: Record<'goloritze' | 'jobs' | 'coffee', { x: number; y: numb
   coffee: { x: -330, y: 150, z: -7200, rx: 2, ry: 8, rz: -2 },
 };
 
-export const LAYOUT_A: Inst[] = (() => {
+const LAYOUT_A_FIELD: Inst[] = (() => {
   const r = rng(20261022);
   const out: Inst[] = [];
   for (const [id, sx, sy, sw, rx, ry, rz] of FIRST_FRAME) {
@@ -196,7 +196,8 @@ export const LAYOUT_A: Inst[] = (() => {
 const aimAt = (n: { x: number; y: number; z: number }, d: number): Cam => ({ x: n.x, y: n.y - (120 * d) / FOCAL, z: n.z + d });
 
 type CamKey = { f: number } & Cam;
-const STOP: Cam = { x: NAMED.coffee.x + 760, y: 40, z: NAMED.coffee.z - 260 };
+/** (round 4) the dead stop is IN the pile: on its axis, past the coffee (the heap fills the view) */
+const STOP: Cam = { x: 40, y: 30, z: NAMED.coffee.z - 500 };
 const KEYS_A: CamKey[] = [
   { f: 0, x: 0, y: 0, z: 0 },
   { f: HITS.push, x: 0, y: 10, z: -200 },
@@ -250,7 +251,7 @@ const monotone = (fs: number[], vs: number[]) => {
   };
 };
 
-const SEARCH_END = 290;
+export const SEARCH_END = 290;
 const axisA = (k: 'x' | 'y' | 'z') => {
   const keys = KEYS_A.filter((q) => q.f <= SEARCH_END);
   return monotone(
@@ -284,7 +285,8 @@ export const focusA = (f: number) => {
     named('goloritze', HITS.beach, 188) ??
     named('jobs', HITS.talk, 236) ??
     named('coffee', HITS.coffee, 290) ??
-    (f < HITS.push + 20 ? 1380 : 1350)
+    // (round 4) at the stop, the middle of the heap
+    (f < HITS.push + 20 ? 1380 : f > SEARCH_END ? 1800 : 1350)
   );
 };
 
@@ -321,6 +323,43 @@ const inView = (i: Inst, cam: Cam, margin = 500) => {
   const sy = FRAME.cy + (i.y - cam.y) * s;
   return sx > -margin && sx < FRAME.w + margin && sy > -margin && sy < FRAME.h + margin;
 };
+
+/**
+ * (round 4, owner: "Give up?" looked like the side of the pile, half the
+ * frame empty) The heap: the search stops dead IN the pile, and from the stop
+ * a wall of saves fills the frame edge to edge: the nearest cut off by its
+ * edges (soft, out of focus), the middle ones overlapping, the far ones in
+ * every gap, each tilted its own way. Art-directed from the stop as frame 0
+ * is from the start, nearest first; no save in it is one already readable
+ * from the stop, so none shows twice.
+ */
+const heap = (field: Inst[]): Inst[] => {
+  const r = rng(20261024);
+  const seen = new Set(field.filter((i) => inView(i, STOP, 0) && STOP.z - i.z < 4000).map((i) => i.id));
+  const pool = CARDS.map((c) => c.id).filter((id) => id !== NEEDLE_ID && !(id in NAMED) && !seen.has(id));
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(r() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  // [screen x, screen y, rect width px]: the near ones at the frame's edges,
+  // then a jittered grid of middle ones, then the far ones
+  const spots: [number, number, number][] = [];
+  for (const [sx, sy] of [[10, 860], [1070, 1010], [40, 1820], [1050, 1880], [540, 2020]]) spots.push([sx + (r() - 0.5) * 80, sy + (r() - 0.5) * 80, 560 + r() * 140]);
+  for (let row = 0; row < 4; row++) for (let col = 0; col < 3; col++) spots.push([175 + col * 365 + (r() - 0.5) * 170, 700 + row * 370 + (r() - 0.5) * 150, 300 + r() * 180]);
+  for (let row = 0; row < 5; row++) for (let col = 0; col < 4; col++) spots.push([130 + col * 273 + (r() - 0.5) * 150, 600 + row * 300 + (r() - 0.5) * 140, 170 + r() * 110]);
+  return spots.slice(0, pool.length).map(([sx, sy, sw], k) => ({
+    key: `h-${pool[k]}`,
+    id: pool[k],
+    ...fromScreen(sx, sy, sw, STOP),
+    rx: (r() - 0.5) * 16,
+    ry: (r() - 0.5) * 50,
+    rz: (r() - 0.5) * 36,
+  }));
+};
+/** (the field's own saves right in front of the stop would fill it with a
+ *  few giant, out-of-focus cards: the heap takes their place) */
+const AT_STOP = LAYOUT_A_FIELD.filter((i) => !(inView(i, STOP, 200) && STOP.z - i.z < 1300));
+export const LAYOUT_A: Inst[] = [...AT_STOP, ...heap(AT_STOP)];
 
 /** the gather's start and end, per card (frames) */
 const gatherWindow = (key: string) => {
