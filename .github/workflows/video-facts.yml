@@ -41,11 +41,11 @@ jobs:
         with:
           python-version: "3.13"
 
-      # the functions' own pins, only when something is to be analyzed
+      # the functions' own pins, only when Gemini is called (analyze, clips)
       - name: Install
         run: |
           pip install yt-dlp
-          if python3 -c "import json,sys; sys.exit(0 if json.load(open('capture/video-request.json')).get('analyze') else 1)"; then
+          if python3 -c "import json,sys; r=json.load(open('capture/video-request.json')); sys.exit(0 if r.get('analyze') or r.get('clips') else 1)"; then
             pip install -r ../../functions/requirements.txt
           fi
 
