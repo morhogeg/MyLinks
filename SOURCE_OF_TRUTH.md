@@ -2637,6 +2637,32 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-23 (round 18) — SAVE THIS: a steady graph, a smooth way into
+  Ask (owner: "when the graph first appears, it's shaking and jittery";
+  "the cut to Ask chat is too sharp and sudden").** Branch
+  `claude/reel-save-this`. The shake had two causes: round 17 joined the
+  app's graph six 60fps frames in, where its layout and camera still wobble
+  as they settle (node0 swings 25pt and jumps 14pt in one frame), and the
+  reel's camera re-aimed at the three dots every frame, so it shook with
+  them. The reel now joins fifty frames in (from 24 to 48 the app also hides
+  the procrastination talk's title where it runs into the others; from 50
+  all three are titled, start to end), and the graph camera is that
+  framing eased over a gaussian window (σ 6 frames). The hard cut to Ask is
+  now a hand-off in the pause before "Now": in the main edition the graph
+  falls back into the paper (its paper still over its header) and Ask
+  opening rises out of it, settling, on a gentle curve that never empties
+  the frame; in the no-fade edition the phone screen stays put and its
+  content dissolves from the graph to Ask. The score's click on the cut is
+  now air under the move. **Verified:** gates (bans, windows, 80 words,
+  every line over the music, −14.04 LUFS, −1.26 dBTP, audio seam step 0.060
+  against the score's own 0.107); stills of both editions frame by frame
+  through the graph and the hand-off; in both encodes node0's fill tracked
+  through the graph shot (its largest frame-to-frame change of speed 2.5px
+  and 1.8px, at the tracking's noise; the round-17 model had it swinging
+  ~100px back and forth as it appeared), the per-frame picture change
+  across the old cut spread over ~12 frames, no one-frame flashes, 882
+  frames, 29.4s, −13.9 LUFS, −1.3 dBTP. **Not verified:** listened to; seen
+  on a phone.
 - **2026-10-22 (round 17) — SAVE THIS: clean caption changes, the card's
   own way into the graph, the save cited as an X post, and a no-fade
   edition (owner: the 0:05 caption "breaking apart reads like a rendering

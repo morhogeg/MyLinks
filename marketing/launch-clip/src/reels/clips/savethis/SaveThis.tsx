@@ -8,7 +8,7 @@ import { CLOCK } from '../../kit/camera';
 import { EASE_IN_OUT, prog } from '../../kit/curves';
 import { Lens, Paper } from '../../kit/Paper';
 import { GRADE } from './grade';
-import { App, PROOF_LINE, markToFor, screenTopAt } from './App';
+import { App, HANDOFF, PROOF_LINE, graphPaperLeft, markToFor, screenTopAt } from './App';
 import { EndCard } from './EndCard';
 import { Opening } from './Opening';
 import { POSTER } from './Poster';
@@ -62,12 +62,13 @@ export const SaveThis: React.FC<{
       <BandScrim opacity={scrim} tone={GRADE.tone} />
       {/* (round 4) on the lit ties, the paper rises further, over the
           graph's own header and legend */}
-      {fades && f >= HITS.graph - 3 && f < HITS.knows && (
+      {fades && f >= HITS.graph - 3 && f < HANDOFF.to && (
         <AbsoluteFill
           style={{
             pointerEvents: 'none',
-            // (round 17) up just ahead of the graph, as the feed gives way to it
-            opacity: prog(f, HITS.graph - 3, HITS.graph, EASE_IN_OUT),
+            // (round 17) up just ahead of the graph, as the feed gives way to
+            // it; (round 18) down once the graph has gone into the paper
+            opacity: prog(f, HITS.graph - 3, HITS.graph, EASE_IN_OUT) * graphPaperLeft(f),
             background: `linear-gradient(180deg, ${GRADE.tone} 0px, ${GRADE.tone} 700px, ${clearOf(GRADE.tone)} 930px)`,
           }}
         />
@@ -75,11 +76,11 @@ export const SaveThis: React.FC<{
       {/* (round 11) under the graph, paper over the frame's foot (Instagram's
           caption zone, well below the dots): the app's tab bar rides just
           under the edge, and its focus panel slides up as the thumb taps */}
-      {fades && f >= HITS.graph - 3 && f < HITS.knows && (
+      {fades && f >= HITS.graph - 3 && f < HANDOFF.to && (
         <AbsoluteFill
           style={{
             pointerEvents: 'none',
-            opacity: prog(f, HITS.graph - 3, HITS.graph, EASE_IN_OUT),
+            opacity: prog(f, HITS.graph - 3, HITS.graph, EASE_IN_OUT) * graphPaperLeft(f),
             background: `linear-gradient(0deg, ${GRADE.tone} 0px, ${GRADE.tone} 320px, ${clearOf(GRADE.tone)} 375px)`,
           }}
         />

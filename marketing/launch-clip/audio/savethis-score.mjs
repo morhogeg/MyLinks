@@ -183,10 +183,12 @@ const arrange = (o) => {
   sub(t(LANDS), 43, 0.22, 0.3);
 
   // ── (round 6) Ask: the answer streams on the band. (round 10) "Now every
-  // save is one question away": the cut from the graph to Ask opening, a
-  // light note on it, the drums out; (round 14) "So, ask it anything": the
-  // question sent on "ask", in the same shot
-  tick(t(H.knows), 0.09, 1.15);
+  // save is one question away": the graph gives way to Ask opening (round
+  // 18: a dissolve under a pull back, so air under the move, in the pause
+  // before "Now", not the click of a cut), a light note as it lands, the
+  // drums out; (round 14) "So, ask it anything": the question sent on
+  // "ask", in the same shot
+  whoosh(t(H.knows - 10), 0.42, 0.03, 0);
   pluck(t(H.knows + 1), 79, 0.05, 0, 0.5);
   sub(t(H.knows), 43, 0.2, 0.3);
   tick(t(H.asked), 0.11, 1.2);

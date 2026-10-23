@@ -766,9 +766,9 @@ npx remotion render src/index.ts MachinaSaveThisNoFade out/savethis/master_nofad
 | 0:11.2 | "Saved to Machina"; the card: its cover is this reel's frame 0; its summary lifts on "sums it up", its topic chip on "files it by topic" | understands it, sums it up, / files it by topic, | "understands it, sums it up, files it by topic," | bell |
 | 0:12.8 | (Round 17) On "topic" the thumb presses the card's ⋯ and its actions sheet rises, the app's own | | | a tick |
 | 0:13.5 | "See in graph" lifts and is pressed, on "connects" | and connects it to / what you've saved before. | "and connects it to what you've saved before." | a tick |
-| 0:13.7 | The sheet goes at once (as in the app) and the card lifts off the feed and shrinks into its own dot, turning its orange, as the app's graph opens under it (round 14: only the three, no map of every save first): its ties to two older saves lit and titled (Four Thousand Weeks and the procrastination talk), the rest receded, as the app's own camera settles on them | | | |
+| 0:13.7 | The sheet goes at once (as in the app) and the card lifts off the feed and shrinks into its own dot, turning its orange, as the app's graph opens under it (round 14: only the three, no map of every save first): its ties to two older saves lit and titled (Four Thousand Weeks and the procrastination talk), the rest receded, as the app's own camera glides in on them (round 18: joined once the app's layout has settled, all three titled, on a steady camera) | | | |
 | 0:14.2 | The card lands: its dot pings once | | | two linked notes, a low swell |
-| 0:15.6 | Cut to Ask opening, settled and held still (rounds 14 and 15: its whole mark, its own header), "What do you want to recall? Answers come only from your 23 saves, with sources you can open.", and the one-tap questions it suggests about the saves; one slow push from here to the proof | Now every save is / one question away. | "Now every save is one question away." | a click, a light note; the drums out |
+| 0:15.4 | (Round 18: no hard cut) In the pause before "Now", the graph falls back into the paper and Ask opening rises out of it, settling: settled and held still (rounds 14 and 15: its whole mark, its own header), "What do you want to recall? Answers come only from your 23 saves, with sources you can open.", and the one-tap questions it suggests about the saves; one slow push from here to the proof | Now every save is / one question away. | "Now every save is one question away." | air under the move, a light note as it lands; the drums out |
 | 0:18.3 | "So," over Ask opening; on "ask" the question is sent and the chat takes the opening's place in the same shot (round 14: no cut to the composer and back): "What connects my 3 saves about procrastination?" | So, ask it anything, / and get the answer, / with the proof. | "So, ask it anything, and get the answer, with the proof." | a click, a low note |
 | 0:18.7 | The answer streams under the question ("All three agree: …"), drawn from the three | | | |
 | 0:21.0 | On "proof": the camera settles on the answer and the saves it came from, cited (Tim Urban's talk, Four Thousand Weeks, this reel, an X post from @machinaapp: round 17); the paper rises over the question | | | the band lands, full |
@@ -854,9 +854,21 @@ fades over the screens' top and bottom hid the iOS status bar, so
 them: every screen whose top is in frame hangs just under the captions,
 status bar and rounded corners in view, as on a phone (the card, the
 graph and the proof framed wider, the graph opening in the very screen
-the feed leaves); the pill is still framed close, the screen's top far
+the feed leaves, and Ask taking the graph's place in it with a dissolve,
+round 18); the pill is still framed close, the screen's top far
 above, and there each caption line sits on a paper pill, Instagram's own
 way of setting type over a picture. Hook and sign-off are unchanged.
+
+**The graph's steadiness (round 18).** The owner saw the graph "shaking
+and jittery" as it appeared. Two causes: the app's own layout and camera
+wobble back and forth for its first twenty 60fps frames (node0 swings 25pt
+and jumps 14pt in one frame), and the reel's camera re-aimed at the three
+every frame, so it shook with them. The reel now joins the graph fifty
+frames in (from 24 to 48 the app also hides the procrastination talk's
+title where it runs into the others; from 50 all three are titled), and
+the graph camera is that per-frame framing eased over a gaussian window
+(σ 6 frames): on screen the dots' largest frame-to-frame change of speed
+drops from 28 to under 6px.
 
 **Voice.** Gemini TTS, Sulafat, per-line direction (the timeline is the
 script). Two lines were re-voiced quicker (run 2: the shaft line read

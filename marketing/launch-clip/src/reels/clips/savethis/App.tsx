@@ -60,11 +60,19 @@ const STREAM = takeOf(T).marks.sources - takeOf(T).marks.answer;
 /** (owner, round 17: the hard cut did not show how you get to the graph)
  *  the card's own way in: the take presses its ⋯ and its actions sheet
  *  rises, held to "See in graph"; the app's graph then opens focused on it,
- *  its ties lit, and the reel joins that opening once the three are drawn */
+ *  its ties lit. (Owner, round 18: the graph "shaking and jittery" as it
+ *  appeared) the reel joins it fifty 60fps frames in: before twenty, the
+ *  app's layout and camera wobble back and forth as they settle (node0
+ *  swings 25pt and jumps 14pt in one frame), and from 24 to 48 the app
+ *  hides the procrastination talk's title where it runs into the others;
+ *  from 50 on the three glide, all titled */
 const SHEET_RUN = takeOf(T).marks.graphPick - takeOf(T).marks.moreTap;
 const SHEET_HELD = at(T, 'moreTap', SHEET_RUN - 1);
 const GRAPH_RUN = takeOf(T).marks.scroll - takeOf(T).marks.graph;
-const GRAPH_JOIN = 6;
+const GRAPH_JOIN = 50;
+/** the graph's take frame on an output frame (it plays on under the hand-off
+ *  to Ask) */
+const graphFrame = (f: number) => at(T, 'graph', Math.min(GRAPH_RUN - 1, GRAPH_JOIN + (f - S.graph)));
 /** the card as it was before its sheet rose (it lifts off the feed), its ⋯,
  *  and the sheet's "See in graph" */
 const CARD_AT = at(T, 'moreTap') - 1;
@@ -94,7 +102,7 @@ export const frameAt = (f: number) => {
   if (f < S.graph) return at(T, 'moreTap', Math.min(SHEET_RUN - 1, (f - S.moreTap) * 2));
   // …and the app's graph opens on it, its ties lit, at half speed (one
   // 60fps capture an output frame), as the card shrinks into its dot
-  if (f < S.knows) return at(T, 'graph', Math.min(GRAPH_RUN - 1, GRAPH_JOIN + (f - S.graph)));
+  if (f < S.knows) return graphFrame(f);
   // (round 10) CUT to Ask opening, settled (round 15), held…
   if (f < S.asked) return ASK_HELD;
   // …(round 14) sent on "ask", the answer streaming, a chunk every 2 frames…
@@ -159,7 +167,8 @@ const tiesAt = (i: number) => {
  *  panel the app slides up stays below it; the titles clear of the sides
  *  (and of the feed's buttons down the right); never closer than 4x */
 const GRAPH = { z: 4.0, fy: 1130, margin: 60 };
-export const graphCam = (f: number): Cam => {
+/** the framing the three call for on one frame */
+const graphFraming = (f: number): Cam => {
   const ties = tiesAt(frameAt(f));
   // as wide as the titles need, a slow push over the shot (to 30px of the
   // frame's sides at most)
@@ -168,6 +177,26 @@ export const graphCam = (f: number): Cam => {
   const half = (540 - 30) / z;
   const cx = Math.min(Math.max(ties.x, ties.x1 - half), ties.x0 + half);
   return { cx, cy: ties.y, z, fx: 540, fy: GRAPH.fy, rx: 0, ry: 0, rz: 0 };
+};
+/** (owner, round 18) that framing eased over a window of frames (gaussian,
+ *  σ GRAPH_EASE, clamped to the shot): the camera follows the three as the
+ *  app's camera glides in on them, never the frame-to-frame give of the
+ *  app's layout, which a camera re-aimed every frame turned into a shake */
+const GRAPH_EASE = 6;
+export const graphCam = (f: number): Cam => {
+  let w = 0;
+  let cx = 0;
+  let cy = 0;
+  let lz = 0;
+  for (let k = -3 * GRAPH_EASE; k <= 3 * GRAPH_EASE; k++) {
+    const c = graphFraming(Math.min(S.knows - 1, Math.max(S.graph, f + k)));
+    const g = Math.exp(-(k * k) / (2 * GRAPH_EASE * GRAPH_EASE));
+    w += g;
+    cx += g * c.cx;
+    cy += g * c.cy;
+    lz += g * Math.log(c.z);
+  }
+  return { cx: cx / w, cy: cy / w, z: Math.exp(lz / w), fx: 540, fy: GRAPH.fy, rx: 0, ry: 0, rz: 0 };
 };
 
 /**
@@ -260,8 +289,55 @@ type Rig = { keys: Key[]; graph: (f: number) => Cam };
 const FADED: Rig = { keys: appKeys, graph: graphCam };
 const FLAT: Rig = { keys: flatKeys, graph: flatGraphCam };
 
-/** the camera on an output frame */
-const camOf = (R: Rig, f: number) => (f >= S.graph && f < S.knows ? R.graph(f) : camAt(R.keys, f));
+/**
+ * (owner, round 18: the cut from the graph to Ask "too sharp and sudden")
+ * Around S.knows the graph gives way to Ask opening, in the pause before
+ * "Now". Faded: the graph falls back into the paper (its own paper still
+ * over its header) and Ask opening rises out of it, settling; they share
+ * only a few faint frames, so text never stacks on text. Flat: the phone
+ * screen stays where it is and what is on it dissolves from the graph to
+ * Ask, as the app's own screens change. Air in the score under the move.
+ */
+export const HANDOFF = { from: S.knows - 8, to: S.knows + 8 };
+/** how much of the graph is left (0–1), and how far Ask opening is in:
+ *  faded, on a gentle curve, overlapping by a few frames, so between them
+ *  the frame never empties (a third of either at the least) */
+const smooth = (t: number) => t * t * (3 - 2 * t);
+const graphLeft = (f: number, flat: boolean) => (flat ? 1 : 1 - smooth(prog(f, HANDOFF.from, S.knows + 2, linear)));
+const askIn = (f: number, flat: boolean) =>
+  flat ? EASE_IN_OUT(prog(f, HANDOFF.from + 3, HANDOFF.to - 3, linear)) : smooth(prog(f, S.knows - 4, HANDOFF.to, linear));
+/** the graph's paper (SaveThis.tsx) goes once the graph has */
+export const graphPaperLeft = (f: number) => 1 - EASE_IN_OUT(prog(f, S.knows - 1, S.knows + 5, linear));
+
+/** flat: one camera from the graph's framing to Ask's, the screen's top held */
+const handoffFlat = (f: number): Cam => {
+  const a = FLAT.graph(HANDOFF.from);
+  const b = camAt(FLAT.keys, HANDOFF.to);
+  // Ask's framing taken about the graph's reference point, so the two blend
+  // as one move
+  const bx = b.fx + (a.cx - b.cx) * b.z;
+  const by = b.fy + (a.cy - b.cy) * b.z;
+  const t = EASE_IN_OUT(prog(f, HANDOFF.from, HANDOFF.to, linear));
+  return { cx: a.cx, cy: a.cy, z: a.z * Math.exp(Math.log(b.z / a.z) * t), fx: a.fx + (bx - a.fx) * t, fy: a.fy + (by - a.fy) * t, rx: 0, ry: 0, rz: 0 };
+};
+
+/** the camera on an output frame (in the hand-off, the graph's) */
+const camOf = (R: Rig, f: number): Cam => {
+  if (f >= HANDOFF.from && f < HANDOFF.to) {
+    if (R === FLAT) return handoffFlat(f);
+    // faded: the graph falls back a little as it goes
+    const a = R.graph(HANDOFF.from);
+    return { ...a, z: a.z * (1 - 0.1 * EASE_IN_OUT(prog(f, HANDOFF.from, S.knows + 2, linear))) };
+  }
+  return f >= S.graph && f < S.knows ? R.graph(f) : camAt(R.keys, f);
+};
+/** in the hand-off, Ask opening's camera: faded, it settles back into its
+ *  framing from a touch closer, the same way the graph went */
+const askCamOf = (R: Rig, f: number): Cam => {
+  if (R === FLAT) return handoffFlat(f);
+  const c = camAt(R.keys, f);
+  return { ...c, z: c.z * (1 + 0.05 * (1 - EASE_MODAL(prog(f, S.knows - 4, HANDOFF.to, linear)))) };
+};
 /** where the screen's top edge is in frame (px): above the band, the app is
  *  under the type */
 export const screenTopAt = (f: number, fades = true) => {
@@ -337,8 +413,10 @@ export const App: React.FC<{ f: number; fades?: boolean }> = ({ f, fades = true 
   // the graph's camera rides the app's, so what it shows stays put: no
   // smear from its own travel
   const inGraph = f >= S.graph && f < S.knows;
+  // (round 18) the hand-off to Ask: the graph plays on under it
+  const inHandoff = f >= HANDOFF.from && f < HANDOFF.to;
   const cam = camOf(R, f);
-  const v = inGraph ? { x: 0, y: 0 } : camVelocity(R.keys, f, 1);
+  const v = inGraph || inHandoff ? { x: 0, y: 0 } : camVelocity(R.keys, f, 1);
   // the iris: a circle from the card's mark, open by the time it lands
   const r = prog(f, S.iris - 1, S.iris + 18, EASE_IN_OUT);
   const iris = r < 0.999 ? { x: center(MARK).x, y: center(MARK).y, r: 6 + r * 790 } : null;
@@ -377,7 +455,7 @@ export const App: React.FC<{ f: number; fades?: boolean }> = ({ f, fades = true 
 
   return (
     <AbsoluteFill>
-      <AppShot take={T} i={i} cam={cam} motion={{ x: v.x, y: v.y }} iris={iris} shadow={r} opacity={1 - gone}>
+      <AppShot take={T} i={inHandoff ? graphFrame(f) : i} cam={cam} motion={{ x: v.x, y: v.y }} iris={iris} shadow={r} opacity={(1 - gone) * (inHandoff ? graphLeft(f, R === FLAT) : 1)}>
         {/* (round 3) "sums it up": its summary; "files it by topic": its topic */}
         {f >= SUMS_AT - 4 && f < S.moreTap && (
           <Lift take={T} i={i} rect={SUMMARY} radius={10} lift={Math.max(upSum, 0.002)} rise={1.5} grow={0.012} ring={0.6 * upSum} />
@@ -416,6 +494,9 @@ export const App: React.FC<{ f: number; fades?: boolean }> = ({ f, fades = true 
         </AppShot>
       )}
       <Morph f={f} rig={R} />
+      {/* (round 18) Ask opening comes up over the graph as the camera
+          settles on it */}
+      {inHandoff && <AppShot take={T} i={ASK_HELD} cam={askCamOf(R, f)} shadow={R === FLAT ? 0 : r} edge={R === FLAT ? 0 : undefined} opacity={askIn(f, R === FLAT)} />}
       {/* (round 14) the question sent: Ask opening gives way to its chat in
           place, over three frames */}
       {f >= S.asked && f < S.asked + 3 && (
