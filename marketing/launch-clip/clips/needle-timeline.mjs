@@ -107,13 +107,16 @@ export const CAPTIONS = [
   { at: HITS.giveUp, to: 318, text: 'Give up?', style: 'A teasing, grinning two-word question, light and quick.', pace: PACE },
   { at: 323, to: 386, text: 'Or just ask\nMachina.', duck: 0.4, style: 'The turn: bright, warm and confident, a little conspiratorial; the name lands with a smile.', pace: PACE },
   // the warp: through every save at speed
-  { at: 452, to: 510, text: 'It’s read every\nsingle one.', style: 'Impressed and warm, quick, a little awed, as if watching it happen right now; no drawn-out words.', pace: PACE },
+  // (round 4) "already": it read each save when it was saved; the tunnel is
+  // its memory, not a read-through at the moment of the question
+  { at: 452, to: 510, text: 'It already read\nevery single one.', style: 'Impressed and warm, quick and a little awed, a light lean on "already"; no drawn-out words.', pace: PACE },
   { at: 525, to: 572, text: 'Even that screenshot.', style: 'A delighted, quick aside with a small laugh in the voice, pointing at one thing.', pace: PACE },
   // (round 2, owner: a book everyone knows) the payoff in two: the voice
   // names the book just after the find's hit (its take carries over the dive
-  // into the answer), then reads Sam's advice off the real answer
+  // into the answer), then (round 4, owner: Sam's advice was a wasted line)
+  // the everyday pain it ends, over the real answer
   { at: HITS.found + 4, to: 610, text: 'Atomic Habits.', style: 'The reveal, recognizing it: "Atomic Habits" said clearly, with a delighted, satisfied smile, like spotting a friend across a crowded room; quick and light, one breath.', pace: PACE },
-  { at: 613, to: 674, text: 'Sam said start with\nthe two-minute rule.', style: 'Warm and quick, passing on a friend\'s advice with a smile; light, no drawn-out words, landing softly on "rule".', pace: PACE },
+  { at: 613, to: 674, text: 'No more “wait,\nwhat was it called?”', style: 'Relieved and playful, quick: "No more" light and knowing, then the quoted bit in a mock-searching voice, the way everyone mutters it; landing lightly on "called"; no drawn-out words.', pace: PACE },
   { at: HITS.lockup, to: 776, place: 'scene', text: 'Machina.\nEverything you save, finally useful.', duck: 0.4, style: 'A confident, warm sign-off; the name with a smile, then the tagline sincere but brisk, no drawn-out words.', pace: PACE },
   // the rewatch: the needle was on frame 0
   { at: HITS.ps, to: TOTAL_FRAMES + 6, text: 'P.S. It was in\nthe first frame.', duck: 0.4, style: 'A quick, playful aside, close and conspiratorial, like letting the listener in on a secret; light, no drawn-out words.', pace: PACE },
@@ -128,15 +131,14 @@ export const CAPTIONS = [
  * capture/video-facts/Nxy6SIM11sA.json). Only the lines that name the needle
  * change; the rest are the book's, voiced once (the same takes). The payoff
  * gains what a screenshot cannot give: the answer knows the MINUTE (its key
- * moment, 3:16), pinged on screen as the tip is said.
+ * moment, 3:16), pinged on screen.
  */
 const VIDEO_LINES = {
   6: { text: 'Bet you can’t\nfind the video\nSam told you\nto watch.', style: 'A playful, teasing dare to a friend, grinning: "Bet you can\'t" with a cheeky lift, then the rest quick and bright in one breath; landing lightly on "watch".' },
   525: { text: 'Watched the videos, too.', style: 'A delighted, quick aside with a small laugh in the voice, as if it is a little ridiculous how thorough it is.' },
-  // the name, as the book's is named, so Sam's tip (the longer line) can
-  // start just after the camera lands in the answer
-  [HITS.found + 4]: { at: HITS.found + 2, to: 601, text: 'Mark Manson.', style: 'The reveal, recognizing it: "Mark Manson" said clearly, with a delighted, satisfied smile, like spotting a friend across a crowded room; quick and light, one breath.' },
-  613: { at: 602, text: 'Sam’s cheat code?\nSkip the side quests.', style: 'Quick and warm, passing on a friend\'s tip with a grin: the question and the tip in one breath, barely a beat between them, landing softly on "quests"; no drawn-out words.' },
+  // the name, as the book's is named (the book's window and the book's
+  // next line, shared: round 4)
+  [HITS.found + 4]: { text: 'Mark Manson.', style: 'The reveal, recognizing it: "Mark Manson" said clearly, with a delighted, satisfied smile, like spotting a friend across a crowded room; quick and light, one breath.' },
 };
 export const VIDEO_CAPTIONS = CAPTIONS.map((c) => (VIDEO_LINES[c.at] ? { ...c, ...VIDEO_LINES[c.at] } : c));
 
