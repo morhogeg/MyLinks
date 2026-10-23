@@ -27,7 +27,8 @@ import VO from './revisit-vo.json';
  * pulled out of it onto the real "Do this" rows, each "Watch …" rewritten as
  * the thing to do; "Even the procrastination one.": the video's line is
  * ticked, the rest follow on the beat, the list folds away to "All done.";
- * the tab; the sign-off; a fresh sheet lands with the list on it: frame 0.
+ * the tab; the sign-off, held on the logo and the tagline to the last frame
+ * (round 2); the loop cuts from the logo back to the hook.
  * Every app pixel is the shipped app (capture/shoot.mjs `revisitClip`); the
  * ink list, the sheets and the camera are this reel's, in the house grade.
  */
@@ -41,8 +42,8 @@ const LINES = VO as VoLine[];
 // ─────────────────────────────────────────────────────────── the hook's type
 
 const HOOK = CAPTIONS[0];
-/** the hook, set big over the list: on frame 0, and on the sheet that lands
- *  at the end (the loop); it rolls out as the list starts to move */
+/** the hook, set big over the list on frame 0; it rolls out as the list
+ *  starts to move */
 const HookType: React.FC<{ out?: number }> = ({ out = 0 }) => (
   <div style={{ position: 'absolute', left: 0, right: 0, top: 262, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
     {HOOK.text.split('\n').map((l, k) => (
@@ -439,6 +440,8 @@ export const Revisit: React.FC<{ withAudio?: boolean; withCaptions?: boolean }> 
   return (
     <AbsoluteFill style={{ fontFamily: sans, background: SET_BG }}>
       {withAudio && <Audio src={staticFile('clips/revisit/score-vo.wav')} />}
+      {/* the set's gradient is drawn in 8 bits: the kit's dither keeps it from banding */}
+      <Dither />
       {/* the real app: the card, the synthesis, the list, the ticks, the tab */}
       <App f={f} />
       {foot && (
@@ -454,23 +457,14 @@ export const Revisit: React.FC<{ withAudio?: boolean; withCaptions?: boolean }> 
       {/* the pull-out: a sheet lands with the list, five saves leave it */}
       <PullOut f={f} />
       {/* the sign-off's paper, the lockup */}
-      {paper > 0 && f < HITS.landLoop + 26 && <AbsoluteFill style={{ background: SET_BG, opacity: paper }} />}
+      {paper > 0 && (
+        <AbsoluteFill style={{ background: SET_BG, opacity: paper }}>
+          <Dither />
+        </AbsoluteFill>
+      )}
       <EndCard f={f} show={withCaptions} />
       {/* act one: the pad, its list, the spin, the stop; torn off */}
       <TornPad f={f} captions={withCaptions} />
-      {/* the loop: a fresh sheet lands with the list on it, exactly frame 0 */}
-      {f >= HITS.landLoop && (
-        <MotionSheet
-          f={f}
-          at={(t) => landAt(t, HITS.landLoop, 24)}
-          draw={(p) => (
-            <Sheet pose={p}>
-              <ListAt t={0} />
-              {withCaptions && <HookType />}
-            </Sheet>
-          )}
-        />
-      )}
       {withCaptions && <Lines f={f} />}
       <Lens vignette={0.35} grain={0.035} />
     </AbsoluteFill>

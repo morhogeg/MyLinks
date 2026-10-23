@@ -1028,9 +1028,12 @@ for an action light up and fly onto the real "Do this" rows, and each
 the real task is written in. The payoff (70%): "Even the procrastination
 one.", the video's line ticked, the other four following on the beat, the
 rows folding away to the app's own "All done. New tasks arrive with your
-saves."; the whole tab; the sign-off; then a fresh sheet lands with the list
-on it, exactly frame 0, and the loop reads as new saves, new list. The device
-is the pad and its circle (sheets tear off and land; the circle you never
+saves."; the whole tab; the sign-off, held on the logo and the tagline to
+the last frame (round 2, owner: "the final frame is the to do list again -
+it should be the Machina logo and tagline"; round 1 ended on a fresh sheet
+landing as frame 0), and the loop cuts on the beat from the logo back to the
+hook. The device is the pad and its circle (a sheet tears off, another
+lands; the circle you never
 fill is the app's own "Do this" circle, and in the end it fills), none of
 FIND THE BOOK's (no dare, no hidden object, no 3D field, no tunnel, no P.S.).
 
@@ -1086,7 +1089,8 @@ node scripts/revisit-stills.mjs        # review stills → out/revisit-stills/
 | 0:21.7 | The rows fold away: "All done. New tasks arrive with your saves." | | | a bell |
 | 0:21.9 | Back out to the whole tab: the review row, the reminder that came due, "Do this: All done.", this week's synthesis | | | |
 | 0:23.1 | The app dissolves into paper; the app's own launch mark draws in, the wordmark on the spoken name, the tagline word by word | MACHINA / Everything you save, finally useful. | "Machina. Everything you save, finally useful." | the brand's impact, lighter; a bell |
-| 0:27.0 | A fresh sheet lands with the list on it: frame 0 | | | a whoosh and a pat into the loop's downbeat |
+| 0:26.1 | The lockup holds to the last frame on a slow push (round 2: the last frame is the logo and the tagline) | | | the last bar leans to vi; a bell rings over the cut |
+| 0:28.0 | The loop cuts on the beat from the logo to the hook (0:00) | | | the stab lands again |
 
 **What is real and what is not.** Every app pixel is the shipped app on
 `main` (2026-10-23), one continuous use of it captured by
@@ -1161,7 +1165,7 @@ unfolding and the landing sheet); frame 839 against frame 0: 42.3dB PSNR
 (62.6dB in the stills; the rest is the encoder). Nobody has listened to it
 on speakers.
 
-**Rendering note.** A sheet in motion (the tear, the landings) has its own
+**Rendering note.** A sheet in motion (the tear, the landing) has its own
 shutter: up to eight poses averaged, then ONE blur over the average. A blur
 on each sample cost about four minutes a frame in the render's software
 compositor; one blur costs seconds.

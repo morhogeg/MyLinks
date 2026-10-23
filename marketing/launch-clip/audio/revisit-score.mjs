@@ -21,8 +21,9 @@
  *    apart), a whoosh as they fly, a pen stroke for each rewritten line;
  *  - the breath before the payoff, then THE TICKS (75%): five rising pings
  *    on 8ths, home on I, the band in full;
- *  - "All done.": a bell; the tab; the sign-off rests IV → I; the fresh
- *    sheet lands on vi, into the loop's downbeat.
+ *  - "All done.": a bell; the tab; the sign-off rests IV → I under the
+ *    logo, which holds to the last frame (round 2); the last bar leans to
+ *    vi, a bell ringing over the cut back into the loop's downbeat.
  *
  * THE LOOP: rendered twice in a row and the second copy kept, so every tail
  * rings on into frame 0 as it will when a feed plays it again. No fades.
@@ -139,7 +140,7 @@ const energy = (f) =>
   : f < H.tick ? 0.35
   : f < H.allDone ? 1
   : f < H.lockup ? 0.55
-  : f < H.clear ? 0.4
+  : f < H.loopLead ? 0.4
   : 0.3;
 
 /** where the drums play, and how */
@@ -166,7 +167,7 @@ const arrange = (o) => {
     const ch = VOICINGS[name];
     const e = energy(a);
     const level = 0.075 + 0.07 * Math.max(e, 0.35);
-    const lift = from === 0 || from >= H.clear ? 12 : 0;
+    const lift = from === 0 || from >= H.loopLead ? 12 : 0;
     ch.upper.forEach((m, i) => pad(t(a), (b - a) / FPS + 0.04, m + lift, level * (i === 0 ? 1 : 0.85), ((i / 3) * 2 - 1) * 0.55));
     pad(t(a), (b - a) / FPS + 0.04, ch.bass + 12, level * 0.5, 0);
   });
@@ -298,13 +299,13 @@ const arrange = (o) => {
   sub(t(H.lockup + 5), 41, 0.3, 0.8);
   bell(t(afterVoice(H.lockup + 80)), 88, 0.06, -0.1, 2.2);
 
-  // ── the fresh sheet lands on vi, into the loop's downbeat
-  whoosh(t(H.landLoop), 0.7, 0.035, 0);
-  pat(t(H.landLoop + 22), 0.11);
+  // ── the last bar leans to vi under the logo; a bell rings over the cut
+  // back to the hook (the second copy carries its tail into frame 0)
   [
-    [H.landLoop + 4, 76],
-    [H.landLoop + 12, 79],
+    [H.loopLead + 4, 76],
+    [H.loopLead + 12, 79],
   ].forEach(([fr, m]) => keys(t(fr), m, 0.055, -0.2, 0.8));
+  bell(t(TOTAL_FRAMES - 4), 88, 0.045, 0.1, 2.4);
 
   // ── risers, each ENDING on its reveal, out of the voice's way
   for (const [from, to] of RISERS) {

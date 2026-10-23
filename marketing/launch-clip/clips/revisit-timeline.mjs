@@ -17,8 +17,9 @@
  * this" list, where each "Watch …" is rewritten as the thing to do. The
  * payoff (75%): "Even the procrastination one." The video's line is ticked,
  * the rest follow on the beat, and the real list folds away to "All done.
- * New tasks arrive with your saves." The tagline; then a fresh sheet lands
- * with the list back on it, exactly frame 0: new saves, a new list.
+ * New tasks arrive with your saves." The tagline, held on the logo to the
+ * last frame (round 2, owner: the final frame is the logo and the tagline);
+ * the loop cuts on the beat from the logo back to the hook.
  *
  * Written in OUTPUT frames on a 120 BPM grid (15 frames a beat, a bar is 2s).
  * The cut is timed to the narrator's measured takes
@@ -69,8 +70,7 @@ export const HITS = {
   allDone: 650, // the rows fold away: "All done. New tasks arrive with your saves."
   wide: 656, // back out to the whole Revisit tab
   lockup: 692, // the app dissolves into paper; "Machina. Everything you save, finally useful."
-  clear: 800, // the lockup clears
-  landLoop: 810, // a fresh sheet lands with the list on it: frame 0
+  loopLead: 810, // the last bar leans back to vi, into the loop's downbeat (the cut to frame 0)
 };
 
 /** The cut. */
@@ -79,7 +79,7 @@ export const SCENES = [
   { id: 'home', from: HITS.card, dur: HITS.land + 12 - HITS.card }, // the card, the synthesis
   { id: 'pull', from: HITS.land, dur: HITS.push2 - HITS.land }, // the list pulled down to five, rewritten
   { id: 'tick', from: HITS.push2, dur: HITS.lockup - HITS.push2 }, // the ticks, all done, the tab
-  { id: 'end', from: HITS.lockup, dur: TOTAL_FRAMES - HITS.lockup }, // the sign-off, the fresh sheet
+  { id: 'end', from: HITS.lockup, dur: TOTAL_FRAMES - HITS.lockup }, // the sign-off, held to the last frame
 ];
 
 /**
@@ -124,7 +124,8 @@ export const RISERS = [
  * the "later"s hang on vi and IV; the spin climbs on V and stops on nothing;
  * the tear opens on I (the real app); Sunday's page rests on IV; the pull-out
  * lifts through V; the ticks land home on I, step by step; the sign-off rests
- * IV → I, and the fresh sheet leaves on vi, the chord the loop opens on.
+ * IV → I under the logo, and the last bar leans to vi, the chord the loop
+ * opens on.
  */
 export const CHORDS = [
   [0, 'Am7'],
@@ -138,5 +139,5 @@ export const CHORDS = [
   [HITS.tick, 'Cmaj7'],
   [HITS.lockup, 'Fmaj7'],
   [HITS.lockup + 30, 'Cmaj7'],
-  [HITS.clear, 'Am7'],
+  [HITS.loopLead, 'Am7'],
 ];

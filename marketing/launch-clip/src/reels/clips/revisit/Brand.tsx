@@ -1,6 +1,6 @@
 import React from 'react';
 import { AbsoluteFill } from 'remotion';
-import { CAPTIONS, FPS, HITS } from '../../../../clips/revisit-timeline.mjs';
+import { CAPTIONS, FPS, HITS, TOTAL_FRAMES } from '../../../../clips/revisit-timeline.mjs';
 import { sans } from '../../../fonts';
 import { AnimatedMark, Wordmark } from '../../../ui/Brand';
 import { EASE_IN_OUT, EASE_MODAL, prog } from '../../kit/curves';
@@ -12,7 +12,8 @@ import VO from './revisit-vo.json';
  * Citation mark's own launch motion, the drawn wordmark): on paper, the mark
  * draws in and its point strikes on the spoken "Machina", the wordmark wipes
  * in, the tagline arrives word by word on the voice. It holds, on a slow
- * push, until the fresh sheet lands over it (Revisit.tsx).
+ * push, to the last frame (round 2, owner: the reel ends on the logo and the
+ * tagline); the loop cuts from it back to the hook.
  */
 
 const MARK_W = 300;
@@ -28,10 +29,10 @@ export const EndCard: React.FC<{ f: number; show: boolean }> = ({ f, show }) => 
   const starts = TAG_T?.words.map((s) => TAG.at + Math.round(s * FPS)) ?? [];
   const name = starts[0] ?? TAG.at;
   const from = name - Math.round(0.56 * MARK_DRAW);
-  if (f < from || f > HITS.landLoop + 30) return null;
+  if (f < from) return null;
   const u = prog(f, from, from + MARK_DRAW, (t) => t);
   const wipe = prog(f, name - 3, name + 12, EASE_MODAL);
-  const push = 1 + 0.03 * prog(f, from, HITS.landLoop + 24, (t) => t);
+  const push = 1 + 0.03 * prog(f, from, TOTAL_FRAMES - 1, (t) => t);
   const words = TAG.text.split('\n')[1].split(' ');
   return (
     <AbsoluteFill style={{ pointerEvents: 'none', transform: `scale(${push})`, transformOrigin: `540px ${MARK_Y}px` }}>
