@@ -191,10 +191,10 @@ WORD_TIMING["savethis"] = os.path.join(ROOT, "src", "reels", "clips", "savethis"
 # Read from clips/needle-timeline.mjs exactly as SAVE THIS's are, and voiced
 # the same way (Gemini TTS, Sulafat, a line's own style and pace):
 # out/vo/needle/ + src/reels/clips/needle/needle-vo.json
-def needle_script():
+def needle_script(needle="book"):
     js = (
         "import('./clips/needle-timeline.mjs').then(m => console.log(JSON.stringify("
-        "{ fps: m.FPS, captions: m.CAPTIONS })))"
+        f"{{ fps: m.FPS, captions: m.NEEDLES.{needle}.captions }})))"
     )
     raw = subprocess.run(["node", "-e", js], cwd=ROOT, check=True, capture_output=True, text=True).stdout
     data = json.loads(raw)
@@ -218,13 +218,16 @@ def needle_script():
 
 SCRIPTS["needle"] = (needle_script, os.path.join(VO, "needle"))
 WORD_TIMING["needle"] = os.path.join(ROOT, "src", "reels", "clips", "needle", "needle-vo.json")
+# (round 3) the video's needle: its own four lines, the book's takes for the rest
+SCRIPTS["needle-video"] = (lambda: needle_script("video"), os.path.join(VO, "needle-video"))
+WORD_TIMING["needle-video"] = os.path.join(ROOT, "src", "reels", "clips", "needle", "needle-video-vo.json")
 
 # a script's own engine (VO_ENGINE overrides): the FIND clip is voiced by
 # Gemini TTS, Sulafat, with its own tone and line-by-line direction (owner,
 # 2026-10-03: each video gets its own tone); everything else stays on Kokoro
-ENGINE = {"find": "gemini", "savethis": "gemini", "needle": "gemini"}
+ENGINE = {"find": "gemini", "savethis": "gemini", "needle": "gemini", "needle-video": "gemini"}
 # and its Gemini model (GEMINI_TTS_MODEL overrides)
-GEMINI_MODEL = {"find": "gemini-3.8-flash-tts", "savethis": "gemini-3.8-flash-tts", "needle": "gemini-3.8-flash-tts"}
+GEMINI_MODEL = {"find": "gemini-3.8-flash-tts", "savethis": "gemini-3.8-flash-tts", "needle": "gemini-3.8-flash-tts", "needle-video": "gemini-3.8-flash-tts"}
 
 
 def speech_runs(samples, sr, gap=0.09):

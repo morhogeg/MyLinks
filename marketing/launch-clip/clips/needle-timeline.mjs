@@ -115,6 +115,35 @@ export const CAPTIONS = [
   { at: HITS.ps, to: TOTAL_FRAMES + 6, text: 'P.S. It was in\nthe first frame.', duck: 0.4, style: 'A quick, playful aside, close and conspiratorial, like letting the listener in on a secret; light, no drawn-out words.', pace: PACE },
 ];
 
+/**
+ * (round 3, owner: "a YouTube video as the main thing … a Mark Manson
+ * video", shown beside the book) THE VIDEO: the same cut, camera and score,
+ * with Sam's pick a YouTube save, Mark Manson's "Life is a Video Game, Here
+ * Are the Cheat Codes" (his own channel; title, channel and length checked
+ * against YouTube, its summary and key moments Machina's own analysis of it:
+ * capture/video-facts/Nxy6SIM11sA.json). Only the lines that name the needle
+ * change; the rest are the book's, voiced once (the same takes). The payoff
+ * gains what a screenshot cannot give: the answer knows the MINUTE (its key
+ * moment, 3:16), pinged on screen as the tip is said.
+ */
+const VIDEO_LINES = {
+  6: { text: 'Find the video\nSam told you\nto watch.', style: 'A playful dare to a friend, quick and bright, with a grin; one breath, no pause inside the line; landing lightly on "watch".' },
+  525: { text: 'Watched the videos, too.', style: 'A delighted, quick aside with a small laugh in the voice, as if it is a little ridiculous how thorough it is.' },
+  [HITS.found + 4]: { text: 'The Mark Manson one.', style: 'The reveal, recognizing it: "The Mark Manson one" said clearly, with a delighted, satisfied smile, like spotting a friend across a crowded room; quick and light, one breath.' },
+  613: { text: 'Sam’s cheat code?\nSkip the side quests.', style: 'Warm and quick, passing on a friend\'s tip with a grin: a light question, then the tip, landing softly on "quests"; no drawn-out words.' },
+};
+export const VIDEO_CAPTIONS = CAPTIONS.map((c) => (VIDEO_LINES[c.at] ? { ...c, ...VIDEO_LINES[c.at] } : c));
+
+/**
+ * Which needle a render is: the book (the default) or the video. The
+ * picture picks it from its input props (src/reels/clips/needle/variant.ts),
+ * the audio scripts from their `video` argument.
+ */
+export const NEEDLES = {
+  book: { name: 'book', captions: CAPTIONS },
+  video: { name: 'video', captions: VIDEO_CAPTIONS },
+};
+
 /** no chapter words in this one */
 export const KICKERS = [];
 
