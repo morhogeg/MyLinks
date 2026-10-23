@@ -1,0 +1,48 @@
+{
+  "id": "MF7RzKFMuT4",
+  "url": "https://www.youtube.com/watch?v=MF7RzKFMuT4",
+  "fetched": "2026-10-23",
+  "oembed": {
+    "title": "How to Get What You Want By Letting Go [The Backwards Law]",
+    "author_name": "Mark Manson",
+    "author_url": "https://www.youtube.com/@IAmMarkManson"
+  },
+  "page": {
+    "error": "ERROR: [youtube] MF7RzKFMuT4: Sign in to confirm you’re not a bot. This helps protect our community. Use --cookies-from-browser or --cookies for the authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp  for how to manually pass cookies. Also see  https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies  for tips on effectively exporting YouTube cookies"
+  },
+  "analysis": {
+    "model": "gemini-3.1-flash-lite",
+    "language": "en",
+    "title": "The Backwards Law: How to Find Happiness by Letting Go",
+    "summary": "The **Backwards Law** posits that the more effort one exerts to achieve a specific psychological state, such as **happiness**, **confidence**, or **security**, the further away one moves from that goal.\n\nThis phenomenon occurs because the act of desiring a positive experience is itself a negative experience, while accepting a negative experience is a positive one.\n\nTo achieve these states, one must learn to **relinquish control** and accept that failure is an inherent part of the process.",
+    "category": "Psychology",
+    "tags": [
+      "self-improvement",
+      "philosophy",
+      "mental health"
+    ],
+    "actionableTakeaway": "When you feel anxious or unhappy, stop trying to force yourself to feel better; instead, accept the negative emotion as it is, which paradoxically allows you to move past it.",
+    "detailedSummary": "## Key Points\n- **Linear curves** apply to mindless, repetitive tasks like paperwork or driving, where increased effort directly correlates with increased output.\n- **Diminishing returns curves** apply to complex, novel experiences such as eating, traveling, or socializing, where the reward decreases as the experience is repeated.\n- **Inverted curves** apply to psychological and emotional states like happiness, confidence, and security, where the more effort one exerts to achieve them, the more one fails to do so.\n- **Drown-proofing** is a Navy SEAL training exercise that serves as a physical metaphor for the Backwards Law, as struggling to keep one's head above water causes one to sink, while letting oneself sink allows for a push off the bottom to reach the surface.\n- **Aldous Huxley** observed that the harder one tries with the conscious will to do something, the less one succeeds, emphasizing the importance of combining relaxation with activity.\n- **Acceptance** of negative experiences is the only way to reach a positive state, as the constant desire to be free from constraints is itself a constraint.",
+    "sourceName": "Mark Manson",
+    "sourcePlatform": "youtube",
+    "sourceHandle": "@MarkManson",
+    "concepts": [
+      "The Backwards Law",
+      "Diminishing Returns",
+      "Paradox of Choice",
+      "Acceptance",
+      "Psychological Flexibility"
+    ],
+    "videoHighlights": [
+      "0:02 - Explains the Navy SEAL drown-proofing exercise.",
+      "0:33 - Introduces the first lesson of drown-proofing: the more you struggle, the more likely you are to sink.",
+      "2:10 - Illustrates the linear relationship between effort and reward.",
+      "3:05 - Defines the diminishing returns curve.",
+      "4:32 - Introduces the inverted curve and the Backwards Law."
+    ],
+    "speakers": [
+      "Mark Manson"
+    ],
+    "videoDurationMinutes": 10
+  }
+}

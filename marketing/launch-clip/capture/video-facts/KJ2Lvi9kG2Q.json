@@ -1,0 +1,49 @@
+{
+  "id": "KJ2Lvi9kG2Q",
+  "url": "https://www.youtube.com/watch?v=KJ2Lvi9kG2Q",
+  "fetched": "2026-10-23",
+  "oembed": {
+    "title": "How to Read Faster",
+    "author_name": "Mark Manson",
+    "author_url": "https://www.youtube.com/@IAmMarkManson"
+  },
+  "page": {
+    "error": "ERROR: [youtube] KJ2Lvi9kG2Q: Sign in to confirm you’re not a bot. This helps protect our community. Use --cookies-from-browser or --cookies for the authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp  for how to manually pass cookies. Also see  https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies  for tips on effectively exporting YouTube cookies"
+  },
+  "analysis": {
+    "model": "gemini-3.1-flash-lite",
+    "language": "en",
+    "title": "How to Read More Books and Remember What You Read",
+    "summary": "Reading more effectively involves **cutting the inner monologue** to increase speed and using your **finger as a guide** to stabilize eye movement.\n\nPrioritize reading quality by **skipping books or chapters** that do not provide value, and maintain consistency by **scheduling reading time** into your daily routine.\n\nImprove retention by **discussing ideas** with others and focusing on **implementing concepts** rather than relying on ineffective methods like highlighting or note-taking.",
+    "category": "Productivity",
+    "tags": [
+      "reading",
+      "learning",
+      "books",
+      "self-improvement"
+    ],
+    "actionableTakeaway": "Read at least 10% of a book before deciding to put it down, and if you are not engaged, check the table of contents for more interesting chapters or abandon the book entirely.",
+    "detailedSummary": "## Key Points\n- **Cut the inner monologue**: Most people are taught to sound out words in their heads while reading, which is a slow habit that can be unlearned to increase reading speed.\n- **Read with your finger**: Using a finger to scan text stabilizes eye movement, prevents losing your place, and can improve reading speed by **20% to 30%**.\n- **Stop reading what you do not like**: There is no obligation to finish a book if it is not providing value. Use the **10% rule** to decide if a book is worth continuing.\n- **Schedule reading time**: Reading is a highly transportable hobby that can be integrated into daily activities like commuting, eating lunch, or exercising.\n- **Read more than one book at a time**: Dividing reading into categories like **philosophical**, **non-fiction**, and **light reading** allows you to switch between books when you lose interest in one.\n- **Remembering what you read**: Highlighting and note-taking are largely ineffective for retention. Instead, focus on **implementing ideas** into your life or **discussing them** with others to signal to your brain that the information is useful.",
+    "sourceName": "Mark Manson",
+    "sourcePlatform": "youtube",
+    "sourceHandle": "@MarkManson",
+    "concepts": [
+      "Spaced Repetition",
+      "Active Recall",
+      "Pareto Principle",
+      "Implementation Intention"
+    ],
+    "videoHighlights": [
+      "1:29 - Cut the inner monologue",
+      "2:46 - Read with your finger",
+      "4:03 - Stop reading shit you don't like",
+      "7:47 - Schedule your reading time",
+      "9:45 - Read more than one book at a time",
+      "11:12 - Remembering what you read"
+    ],
+    "speakers": [
+      "Mark Manson"
+    ],
+    "videoDurationMinutes": 17
+  }
+}

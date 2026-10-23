@@ -1,0 +1,47 @@
+{
+  "id": "brUUb5-LZKU",
+  "url": "https://www.youtube.com/watch?v=brUUb5-LZKU",
+  "fetched": "2026-10-23",
+  "oembed": {
+    "title": "3 Rules That Will Immediately Change Your Life",
+    "author_name": "Mark Manson",
+    "author_url": "https://www.youtube.com/@IAmMarkManson"
+  },
+  "page": {
+    "error": "ERROR: [youtube] brUUb5-LZKU: Sign in to confirm you’re not a bot. This helps protect our community. Use --cookies-from-browser or --cookies for the authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp  for how to manually pass cookies. Also see  https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies  for tips on effectively exporting YouTube cookies"
+  },
+  "analysis": {
+    "model": "gemini-3.1-flash-lite",
+    "language": "en",
+    "title": "Three Rules for Life",
+    "summary": "Adopting **radical responsibility** means accepting ownership of your experience, even when you are not at fault for the circumstances.\n\n**Radical acceptance** involves treating emotions as useful biological feedback rather than judging them as inherently good or bad.\n\n**Radical growth** requires that your actions and decisions be consistently motivated by the intention to improve your own life and the lives of others.",
+    "category": "Philosophy",
+    "tags": [
+      "personal development",
+      "emotional intelligence",
+      "responsibility",
+      "self-improvement"
+    ],
+    "actionableTakeaway": "Practice radical responsibility by acknowledging that while you may not be at fault for a situation, you are always responsible for how you choose to respond to it.",
+    "detailedSummary": "## Key Points\n- **Radical Responsibility**: You are responsible for everything in your own experience, even if it is not your fault. This concept, rooted in **existentialism**, emphasizes that you are constantly making choices about how to perceive and act in every moment.\n- **Living in Bad Faith**: This occurs when you avoid responsibility by blaming others or conforming to external expectations, effectively living for others rather than yourself.\n- **Living in Authenticity**: This is the opposite of bad faith, where you consciously make choices based on your own principles and values, even when facing social pressure or punishment.\n- **Radical Acceptance**: There is no such thing as a bad emotion, only bad reactions to emotions. Emotions are biological feedback mechanisms designed to help you survive.\n- **Emotional Skill**: Treat emotional management as a skill to be trained. You must be willing to experience emotions like **anger**, **anxiety**, or **sadness** to learn how to handle them effectively.\n- **Radical Growth**: Every action and decision should be motivated by the intention to improve lives, both your own and others. This requires constant effort and a commitment to growth, as virtues like **honesty** require ongoing practice.",
+    "sourceName": "Mark Manson",
+    "sourcePlatform": "youtube",
+    "sourceHandle": "@MarkManson",
+    "concepts": [
+      "Existentialism",
+      "Radical Responsibility",
+      "Emotional Intelligence",
+      "Authenticity",
+      "Virtue Ethics"
+    ],
+    "videoHighlights": [
+      "1:41 - Defines the first rule: radical responsibility.",
+      "6:05 - Defines the second rule: radical acceptance.",
+      "10:37 - Defines the third rule: radical growth."
+    ],
+    "speakers": [
+      "Mark Manson"
+    ],
+    "videoDurationMinutes": 13
+  }
+}

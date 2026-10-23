@@ -1,0 +1,48 @@
+{
+  "id": "Nxy6SIM11sA",
+  "url": "https://www.youtube.com/watch?v=Nxy6SIM11sA",
+  "fetched": "2026-10-23",
+  "oembed": {
+    "title": "Life is a Video Game, Here Are the Cheat Codes",
+    "author_name": "Mark Manson",
+    "author_url": "https://www.youtube.com/@IAmMarkManson"
+  },
+  "page": {
+    "error": "ERROR: [youtube] Nxy6SIM11sA: Sign in to confirm you’re not a bot. This helps protect our community. Use --cookies-from-browser or --cookies for the authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp  for how to manually pass cookies. Also see  https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies  for tips on effectively exporting YouTube cookies"
+  },
+  "analysis": {
+    "model": "gemini-3.1-flash-lite",
+    "language": "en",
+    "title": "How to Win the Game of Life",
+    "summary": "Life is an **infinite game** where the goal is to continue playing as long as possible, rather than achieving a final victory.\n\nBuilding **character** through **failures** and **setbacks** is essential for long-term success, as these experiences provide more growth than easy wins.\n\nFocusing on a **main quest** while setting **boundaries** against distractions and others' agendas is the primary strategy for navigating life effectively.",
+    "category": "Productivity",
+    "tags": [
+      "personal development",
+      "character building",
+      "goal setting",
+      "mental models"
+    ],
+    "actionableTakeaway": "Identify your main quest and set boundaries by saying no to side quests that do not align with your character or long-term goals.",
+    "detailedSummary": "## Key Points\n- **Infinite Game** vs. **Finite Game**: Unlike video games with clear win conditions, life is an infinite game where the objective is to sustain play and build character over time.\n- **Failure as Growth**: Success in life comes from learning through **failures** and **setbacks**, which act as character-building experiences, whereas successes often maintain the status quo.\n- **Main Quest Focus**: Prioritize a central, meaningful **main quest** and avoid getting sidetracked by **side quests** or vanity tasks that lack impact on the quality of your life.\n- **Boundaries**: Protect your time and energy by establishing **boundaries**, recognizing that you cannot complete others' quests for them, and they cannot complete yours for you.\n- **Envy Trap**: Avoid the **envy trap** by understanding that you cannot desire the benefits of someone else's life without also accepting the costs they paid to achieve them.\n- **Charity Cheat Code**: Helping others win their own quests can create alliances and goodwill, which in turn facilitates your own progress.",
+    "sourceName": "Mark Manson",
+    "sourcePlatform": "youtube",
+    "sourceHandle": "@MarkManson",
+    "concepts": [
+      "Infinite Game",
+      "Opportunity Cost",
+      "Self-Knowledge",
+      "Boundary Setting"
+    ],
+    "videoHighlights": [
+      "0:54 - Defines life as an infinite game",
+      "1:57 - Explains that character is built through failures",
+      "3:16 - Introduces the first cheat code: skip the side quests",
+      "8:00 - Discusses the importance of boundaries",
+      "11:28 - Explains the charity cheat code"
+    ],
+    "speakers": [
+      "Mark Manson"
+    ],
+    "videoDurationMinutes": 13
+  }
+}

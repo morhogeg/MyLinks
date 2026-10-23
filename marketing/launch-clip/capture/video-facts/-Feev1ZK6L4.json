@@ -1,0 +1,50 @@
+{
+  "id": "-Feev1ZK6L4",
+  "url": "https://www.youtube.com/watch?v=-Feev1ZK6L4",
+  "fetched": "2026-10-23",
+  "oembed": {
+    "title": "How to Beat Procrastination Like It Owes You Money",
+    "author_name": "Mark Manson",
+    "author_url": "https://www.youtube.com/@IAmMarkManson"
+  },
+  "page": {
+    "error": "ERROR: [youtube] -Feev1ZK6L4: Sign in to confirm you’re not a bot. This helps protect our community. Use --cookies-from-browser or --cookies for the authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp  for how to manually pass cookies. Also see  https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies  for tips on effectively exporting YouTube cookies"
+  },
+  "analysis": {
+    "model": "gemini-3.1-flash-lite",
+    "language": "en",
+    "title": "The Do Something Principle for Overcoming Inaction",
+    "summary": "Inaction is primarily an emotional problem rather than a lack of knowledge or discipline.\n\nBy setting up an environment that makes desired actions inevitable and using small, concrete steps, you can overcome procrastination and build momentum.",
+    "category": "Productivity",
+    "tags": [
+      "procrastination",
+      "behavior change",
+      "motivation",
+      "self-improvement"
+    ],
+    "actionableTakeaway": "When you feel stuck, identify the smallest, simplest action you can take today to move toward your goal and do it immediately to trigger the do something principle.",
+    "detailedSummary": "## Key Points\n- **Inaction** is fundamentally an emotional issue, as people often procrastinate because they do not feel like performing a task, not because they lack the necessary knowledge.\n- **Environment design** is the most effective factor for behavior change, as it can force desired actions to become inevitable.\n- **Incentives** should be created by establishing clear rewards and punishments for specific behaviors to influence the mind.\n- **Social pressure** can be leveraged as a powerful tool to motivate action, as humans are social beings who naturally respond to the influence and approval of others.\n- **Failure** should be recognized as a necessary part of the process that moves you forward, rather than a reason to stop.\n- The **Do Something Principle** posits that action is not the result of motivation, but rather the cause of it; starting with any small action, no matter how minor, will naturally spur further progress.",
+    "sourceName": "Mark Manson",
+    "sourcePlatform": "youtube",
+    "sourceHandle": "@MarkManson",
+    "concepts": [
+      "Do Something Principle",
+      "Environment Design",
+      "Incentive Structure",
+      "Social Pressure",
+      "Growth Mindset"
+    ],
+    "videoHighlights": [
+      "0:00 - Explains that inaction is an emotional problem",
+      "1:09 - Introduces the 4 steps to taking action",
+      "2:14 - Discusses creating incentives for behavior change",
+      "8:12 - Explains leveraging social pressure",
+      "10:31 - Highlights the importance of recognizing failure as progress"
+    ],
+    "speakers": [
+      "Mark Manson",
+      "Jiwon"
+    ],
+    "videoDurationMinutes": 12
+  }
+}
