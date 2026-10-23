@@ -1141,34 +1141,41 @@ const takes = {
   },
 
   // ───────────────────────────────────────────────────────────── REVISIT
-  // One continuous use of the Revisit tab on REVISIT's account: the tab
-  // opening (its sections dealing in), this week's synthesis tapped open and
-  // read down to its themes, back up to "Do this", and the video's line
-  // ticked off (the circle filling, the line struck, the row folding away).
+  // One continuous use of the app on REVISIT's account (TICK IT OFF):
+  //  home    the feed: the video's card on top, summed up, and this week's
+  //          synthesis waiting above it
+  //  expand  the synthesis tapped open in place (the app's own unfolding),
+  //          its first paragraph naming the video
+  //  open    the Revisit tab: its sections dealing in (the review row, the
+  //          reminder that came due, "Do this")
+  //  list    scrolled so "Do this" fills the screen: five lines, five saves
+  //  tick    every line ticked, an 8th note apart (120 BPM), the video's
+  //          first: each circle fills, its line is struck and held, the rows
+  //          fold away one after another, and the list says "All done."
   async revisitClip() {
     await fresh(() => prepareRevisit());
     const V = REVISIT;
-    const task = (id) => V.takeaways[id];
-    const head = (id) => task(id).slice(0, 24);
+    const head = (id) => V.takeaways[id].slice(0, 24);
     const title = (id) => [...CARDS, ...V.extra].find((c) => c.id === id).title;
     const ids = Object.keys(V.takeaways);
     const RV = {
       revisitTab: R.revisitTab,
-      review: ['button', 'Review'],
-      remindersHead: ['button[aria-expanded]', 'Reminders'],
-      reminder: ['button', title(V.reminders[0])],
-      doHead: ['button[aria-expanded]', 'Do this'],
-      todo: ['div[class*="rounded-2xl"][class*="overflow-hidden"]', head(ids[0])],
-      weekHead: ['button[aria-expanded]', 'This week'],
-      recap: ['div[class*="border-accent/25"]'],
-      recapHead: ['button[aria-expanded]', 'This week in Machina'],
+      // Home
+      videoCard: ['main article.surface-card', title(V.video)],
+      videoTitle: ['main article.surface-card h3', title(V.video)],
+      banner: ['button[aria-expanded]', 'This week in Machina'],
       recapTitle: ['div', V.synthesis.title],
       para1: ['p', 'Six saves this week'],
-      para2: ['p', 'Four Thousand Weeks says'],
-      theme1: ['section', V.synthesis.themes[0].title],
-      theme1Title: ['h3', V.synthesis.themes[0].title],
-      theme1Video: ['button', title(V.video)],
-      standout: ['button', 'Standout'],
+      phrase: ['::phrase', 'p', 'the smallest step you can take today'],
+      // Revisit
+      review: ['button', 'Review'],
+      remindersHead: ['button[aria-expanded]', 'Reminders'],
+      doHead: ['button[aria-expanded]', 'Do this'],
+      todo: ['div[class*="rounded-2xl"][class*="overflow-hidden"]', head(ids[1])],
+      allDone: ['p', 'All done.'],
+      doneBtn: ['button[aria-expanded]', 'Done'],
+      weekHead: ['button[aria-expanded]', 'This week'],
+      reminder: ['button', 'Yoga For Complete Beginners'],
       toast: ['[role=status]'],
       ...Object.fromEntries(
         ids.flatMap((id, k) => [
@@ -1178,51 +1185,53 @@ const takes = {
           [`tick${k}`, [`button[role=checkbox][aria-label*="${head(id)}"]`]],
         ]),
       ),
-      phrase: ['::phrase', 'p', 'the smallest step you can take today'],
     };
     const t = new Take(dev, OUT, 'clips/revisit/app');
-    const roll60 = (n) => t.roll(n, { rects: RV, step: 1000 / 60 });
+    const roll60 = (n, every) => t.roll(n, { rects: RV, step: 1000 / 60, every });
     t.mark('home');
     await t.snap({ rects: RV });
-    // the tab: its sections deal in (the app's own staggered entrance)
+    // this week's synthesis, tapped open on Home
+    await t.freeze();
+    await visible(page.locator(RV.banner[0]).filter({ hasText: 'This week in Machina' })).click();
+    t.mark('expand');
+    await roll60(40);
+    await t.thaw();
+    await page.waitForTimeout(400);
+    t.mark('read');
+    await t.snap({ rects: RV });
+    // the Revisit tab: its sections deal in (the app's staggered entrance)
     await t.freeze();
     await tab('Revisit').click();
     t.mark('open');
     await roll60(60);
     await t.thaw();
     await page.waitForTimeout(400);
-    t.mark('settled');
-    await t.snap({ rects: RV });
-    // this week's synthesis, tapped open in place
+    // "Do this" to the top of the screen, under the header
     await t.freeze();
-    await visible(page.getByText('This week in Machina')).click();
-    t.mark('expand');
-    await roll60(40);
-    await t.thaw();
-    await page.waitForTimeout(400);
-    // read down it to the first theme (its saves listed, the video first)
-    await t.freeze();
-    await tagScroller(V.synthesis.title);
-    t.mark('read');
-    await rollScroll(t, await scrollTargetFor(title(V.video), 700), 3, RV);
-    t.mark('read-end');
-    await t.snap({ rects: RV });
-    // back up to the top of the tab: "Do this"
-    t.mark('back');
-    await rollScroll(t, 0, 6, RV);
-    t.mark('top');
+    await tagScroller('Do this');
+    t.mark('scroll');
+    await rollScroll(t, await scrollTargetFor('Do this', 126), 4, RV);
+    t.mark('list');
     await t.snap({ rects: RV });
     await t.thaw();
     await page.waitForTimeout(300);
-    // the video's line, ticked: the circle fills (the app's spring), the line
-    // is struck and held 650ms, then the row folds away and the list closes
+    // the ticks, an 8th note (250ms, 15 frames at 60fps) apart
     await t.freeze();
-    await visible(page.locator(RV.tick0[0])).click();
     t.mark('tick');
-    await roll60(100);
+    await roll60(150, async (k) => {
+      if (k % 15 === 0 && k / 15 < ids.length) {
+        // (the tab renders a second, hidden copy for desktop: the visible one)
+        await visible(page.locator(RV[`tick${k / 15}`][0])).dispatchEvent('click');
+      }
+    });
     await t.thaw();
     await page.waitForTimeout(600);
     t.mark('after');
+    await t.snap({ rects: RV });
+    // the same tab once the five Undo toasts have timed out (8s each): the
+    // reel's last wide shot of Revisit
+    await page.waitForTimeout(9000);
+    t.mark('clean');
     await t.snap({ rects: RV });
     return t.save();
   },

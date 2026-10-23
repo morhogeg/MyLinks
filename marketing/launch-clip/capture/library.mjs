@@ -810,8 +810,10 @@ const DOSOMETHING = {
 };
 
 export const REVISIT = {
-  /** no cooking (owner, 2026-10-02); no Sam (FIND THE BOOK's device) */
-  without: ['marcella', 'chicken', 'piranesi', 'systems'],
+  /** no cooking (owner, 2026-10-02); no Sam (FIND THE BOOK's device); and
+   *  the one video on procrastination is Manson's (Tim Urban's TED talk
+   *  would make the reel's "a video on procrastination" two) */
+  without: ['marcella', 'chicken', 'piranesi', 'systems', 'procrastinator'],
   withoutCollections: ['cook'],
   /** this week is six saves: the video, The Tail End, the V60, Four
    *  Thousand Weeks, Cala Goloritzé and Perfect Days */
