@@ -44,9 +44,14 @@ const TYPED = takeOf(T).marks.typed - takeOf(T).marks.typing;
 const COMPOSER_Y = 791; // the composer's bottom line, where the text sits (points)
 const SEND = rectOf(T, at(T, 'typed'), 'send');
 const CITE = rectOf(T, at(T, 'sources', 40), 'cite1');
-/** what is pinged: the citation (a chip), or the video's minute (bold text in the answer) */
-const PING = rectOf(T, at(T, 'sources', 40), NEEDLE.ping);
-const PING_R = NEEDLE.ping === 'cite1' ? 12 : 6;
+/** what is pinged: the citation (a chip), or the video's minute (bold text
+ *  in the answer: small, so it rises further and its rings reach wider) */
+const MINUTE = NEEDLE.ping === 'time';
+const [px, py, pw, ph] = rectOf(T, at(T, 'sources', 40), NEEDLE.ping);
+// (the minute's box is its text's own: a little air around it, and the full
+// stop after it inside, not cut in half)
+const PING: typeof CITE = MINUTE ? [px - 2.5, py - 1, pw + 6.5, ph + 2] : [px, py, pw, ph];
+const PING_R = MINUTE ? 6 : 12;
 
 /** the take's frame for an output frame */
 export const frameAt = (f: number) => {
@@ -99,9 +104,9 @@ export const App: React.FC<{ f: number }> = ({ f }) => {
       <AppShot take={T} i={i} cam={cam} motion={{ x: v.x, y: v.y }} iris={iris} shadow={inAsk ? r : 1} opacity={1 - gone}>
         {inAnswer && (
           <>
-            <Ping rect={PING} t={prog(f, HITS.ping, HITS.ping + 16, linear)} radius={PING_R} reach={16} width={2.2} alpha={0.55} dy={-1.5 * up} />
-            <Ping rect={PING} t={prog(f, HITS.ping + 4, HITS.ping + 26, linear)} radius={PING_R} reach={28} width={1.5} alpha={0.3} dy={-1.5 * up} />
-            <Lift take={T} i={i} rect={PING} radius={PING_R} lift={Math.max(up, 0.002)} rise={1.5 + 1.5 * p} grow={0.02 + 0.03 * p} ring={0.6 * up + 0.35 * p} />
+            <Ping rect={PING} t={prog(f, HITS.ping, HITS.ping + 16, linear)} radius={PING_R} reach={MINUTE ? 22 : 16} width={2.2} alpha={0.55} dy={-1.5 * up} />
+            <Ping rect={PING} t={prog(f, HITS.ping + 4, HITS.ping + 26, linear)} radius={PING_R} reach={MINUTE ? 44 : 28} width={1.5} alpha={0.3} dy={-1.5 * up} />
+            <Lift take={T} i={i} rect={PING} radius={PING_R} lift={Math.max(up, 0.002)} rise={1.5 + 1.5 * p} grow={MINUTE ? 0.08 + 0.08 * p : 0.02 + 0.03 * p} ring={0.6 * up + 0.35 * p} />
           </>
         )}
         {/* the thumb sends it */}

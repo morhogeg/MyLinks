@@ -2637,6 +2637,24 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-23 — FIND THE BOOK round 3: a YouTube version beside the book
+  (owner: "replace a screenshot as the main thing with a YouTube video? …
+  a Mark Manson video", both versions to compare).** Branch
+  `claude/reel-find-the-book`. Same cut, camera and score; the needle is a
+  render's choice (`--props='{"needle":"video"}'`,
+  `src/reels/clips/needle/variant.ts`; the book stays the default and renders
+  as before). Sam's pick is a real YouTube save, Mark Manson's "Life is a
+  Video Game, Here Are the Cheat Codes" (his channel, 12:39), checked on
+  GitHub by a new `video-facts.yml` (YouTube oEmbed + the channel's upload
+  list; the card's summary, length and key moments are Machina's own
+  `analyze_youtube` run on it; the 3:16 key moment confirmed by a second
+  model's transcript of 3:05–3:50). Frame 0 hides it among famous videos with
+  Manson's other save, an article, over its corner; the real answer finds the
+  minute ("…skip the side quests, at **3:16**."), which pings as Sam's tip is
+  said. Four lines re-voiced (runs 60–62). No thumbnail (rights, and his face
+  reads as an endorsement), so it adds little color: frame 0 gets more red
+  YouTube marks, and the new wow is the minute. Key moments are Pro in the
+  app; the reel names no plan. 68 words, 28.0s.
 - **2026-10-23 — FIND THE BOOK round 2: Sam's book is Atomic Habits (owner:
   "maybe a more known book? Atomic Habits?", picked from three options).**
   Branch `claude/reel-find-the-book`. The needle is now a screenshot of Sam's

@@ -969,6 +969,44 @@ AAC-LC 48kHz 320k, 20.6MB; every frame pair scanned (no one-frame flash; the
 six range seams move like their neighbours); frame 839 against frame 0 under
 the type: 35.2dB PSNR. Nobody has listened to it on speakers.
 
+**The video needle (round 3).** Owner: a YouTube video as the needle, "a
+Mark Manson video", shown beside the book. Same cut, camera and score; the
+needle is a render's choice, `--props='{"needle":"video"}'`
+(`src/reels/clips/needle/variant.ts`; the book stays the default), and the
+audio scripts take `video` / `needle-video`. Sam's pick is a real YouTube
+save, Mark Manson's "Life is a Video Game, Here Are the Cheat Codes" (his
+own channel, 12:39), noted "Sam says the first cheat code is the one."
+Frame 0 hides it among videos people know (the TED talk, The Egg) with
+Manson's other save, an article, over its corner. Four lines change: the
+dare ("Find the video Sam told you to watch."), "Watched the videos, too.",
+the reveal ("Mark Manson.") and Sam's tip ("Sam's cheat code? Skip the side
+quests."), said over the real answer, which finds the minute ("…skip the
+side quests, at **3:16**.", bold as the model sets what matters); the
+minute lifts and rings as the tip is said. 68 words.
+
+Checked, and how: the title and channel against YouTube's own oEmbed and the
+channel's upload list, on GitHub (`.github/workflows/video-facts.yml` runs
+`capture/video-facts.py`: cloud sessions reach neither YouTube nor Google's
+API); the card's summary, length (13m) and key moments are Machina's own
+analysis of the video (`functions/ai_service.py` `analyze_youtube`, the call
+a Pro save makes: `capture/video-facts/Nxy6SIM11sA.json`; the title kept as
+YouTube has it), and the 3:16 moment against a second model's transcript of
+3:05–3:50 alone ("…this brings us to our first cheat code… side quests are
+fun distraction at best and waste years of your life at worst… the fewer
+side quests the better"). No thumbnail: a real frame is a rights problem,
+and his face on an ad reads as an endorsement. In the app a video's key
+moments are Pro (and the trial); the reel names no plan.
+
+```bash
+CAPTURE_ONLY=needleVideoCards,needleVideoClip node capture/shoot.mjs
+git checkout src/reels/data/takes.json && python3 scripts/needle-cards-sm.py
+python3 audio/synth-vo.py needle-video && python3 audio/vo-to-44k.py out/vo/needle-video && python3 audio/vo-deess.py out/vo/needle-video
+node audio/needle-score.mjs video && node audio/mix-vo.mjs needle-video && node audio/needle-verify.mjs video
+# render as above, with --props='{"needle":"video"}', into out/needle-video/;
+# mux public/clips/needle/score-video-vo.wav
+NEEDLE=video node scripts/needle-stills.mjs   # → out/needle-stills-video/
+```
+
 ## Motion language
 
 The rules every Machina video follows, and the kit component that implements
