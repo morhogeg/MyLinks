@@ -2650,7 +2650,12 @@ exact-match, capped.
   searches them all), and Sam's advice gives way to "No more 'wait, what was
   it called?'" over the real answer. Re-voiced (runs 22–23), both versions
   re-scored and re-mixed; gates pass (71/72 words, every line 10 to 24dB
-  over the music, −14.05/−14.01 LUFS, −1.20 dBTP).
+  over the music, −14.05/−14.01 LUFS, −1.20 dBTP). **Verified:** the encodes
+  (840 frames, 28.000s, H.264 High yuv420p BT.709, AAC 48kHz; 21.8/21.6MB),
+  every frame pair scanned (no one-frame flash), the loop seam under the type
+  35.3dB, a sheet of every changed beat. The heap costs memory: a browser
+  per range now takes 2–3GB, so at most ~6 ranges at once on this machine
+  (13 ran it out of memory). **Not verified:** listened to on speakers.
 - **2026-10-23 — FIND THE BOOK round 3: a YouTube version beside the book
   (owner: "replace a screenshot as the main thing with a YouTube video? …
   a Mark Manson video", both versions to compare).** Branch
