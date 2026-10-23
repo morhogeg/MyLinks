@@ -40,14 +40,23 @@ export const frameAt = (f: number) => {
   if (f < HITS.tapRecap + 20) return M.expand + Math.min(39, Math.round((f - HITS.tapRecap) * 2));
   if (f < HITS.land + 12) return M.read;
   if (f < HITS.tick) return M.list;
-  // the ticks: the 60fps roll, played at the app's speed
-  if (f < HITS.tick + 75) return M.tick + Math.min(149, Math.round((f - HITS.tick) * 2));
-  // (the clean frame cross-dissolves in over CLEAN_AT − 3 … + 5: App)
-  if (f < CLEAN_AT + 6) return M.after;
-  return M.clean;
+  // the ticks: the 60fps roll, played at the app's speed (the page does not
+  // move under them: round 3's Brews below "Do this" keep it from clamping)
+  if (f < REST_AT) return M.tick + Math.min(149, Math.round((f - HITS.tick) * 2));
+  if (f < UP_AT) return M.rest;
+  return upFrame(f);
 };
-/** where the wide shot swaps to the tab after the toasts timed out */
-export const CLEAN_AT = HITS.wide + 8;
+/**
+ * (round 3) The wide: the same tab, at the same scroll, once the Undo toasts
+ * have timed out (`rest`, cross-dissolved in over REST_AT − 5 … REST_AT,
+ * while the toasts are still off the bottom of the frame), then scrolled
+ * back to its top by the app itself (the take's `up` roll, 2pt a frame, eased
+ * here) as the camera pulls back.
+ */
+const REST_AT = HITS.wide + 4;
+const UP_AT = HITS.wide + 9;
+const UP_END = HITS.lockup - 6;
+export const upFrame = (f: number) => M.up + Math.round(prog(f, UP_AT, UP_END, EASE_IN_OUT) * (M.clean - M.up));
 
 /** the list frame's anchors (points) */
 const R = (k: string, i = M.list) => rectOf(T, i, k);
@@ -108,8 +117,9 @@ export const appKeys: Key[] = [
   // in to the video's line
   { f: HITS.push2 + 34, cx: 196.5, cy: LIST.rows[0].row[1] + 70, z: 2.9, fy: 1000, ease: EASE_MODAL },
   { f: HITS.tick, z: 2.96, ease: linear },
-  // the ripple: back out over the list as it ticks off (header-tracked)
-  { f: HITS.tick + 34, cy: LIST.doHead[1] + 150, z: 2.45, fy: 1000, ease: EASE_IN_OUT },
+  // the ripple: one slow drift over the list as it ticks off and folds
+  // toward its header, onto "All done." (round 3: a single move; the pull
+  // back and push in it replaced stopped dead between them)
   { f: HITS.allDone + 4, cy: LIST.doHead[1] + 70, z: 2.8, fy: 980, ease: EASE_IN_OUT },
 ];
 
@@ -161,7 +171,7 @@ export const App: React.FC<{ f: number }> = ({ f }) => {
   // the dissolve to the sign-off's paper
   const gone = prog(f, HITS.lockup - 12, HITS.lockup - 1, EASE_IN_OUT);
   // the swap to the tab after the toasts timed out: a short cross-dissolve
-  const clean = prog(f, CLEAN_AT - 3, CLEAN_AT + 5, EASE_IN_OUT);
+  const clean = prog(f, REST_AT - 5, REST_AT, EASE_IN_OUT);
   return (
     <AbsoluteFill>
       <AppShot take={T} i={i} cam={cam} motion={{ x: v.x, y: v.y }} opacity={1 - gone}>
@@ -257,9 +267,9 @@ export const App: React.FC<{ f: number }> = ({ f }) => {
             return <Tap key={r} x={tk[0] + tk[2] / 2} y={tk[1] + tk[3] / 2} t={prog(f, t0 - 4, t0 + 8, linear)} size={34} />;
           })}
       </AppShot>
-      {clean > 0 && clean < 1 && (
+      {clean > 0 && f < REST_AT && (
         <AbsoluteFill style={{ opacity: clean }}>
-          <AppShot take={T} i={M.clean} cam={cam} opacity={1 - gone} />
+          <AppShot take={T} i={M.rest} cam={cam} opacity={1 - gone} />
         </AbsoluteFill>
       )}
     </AbsoluteFill>

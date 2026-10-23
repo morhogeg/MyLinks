@@ -1099,15 +1099,20 @@ feed, this week's synthesis tapped open in place (the app's own unfolding,
 at 60fps), the Revisit tab (its review row, the reminder that came due,
 "Do this"), the five lines ticked an 8th apart (each circle's spring, the
 strike, the 650ms hold, the fold, the list closing up, the empty state), and
-the tab again once the five Undo toasts have timed out (the wide shot; until
-then a paper scrim sits between the list and the stacked toasts). The camera
-keeps "Do this" still while the page settles under it (the scroll clamps as
-rows fold; the camera follows the section header). Scripted, as in every
+the tab again once the five Undo toasts have timed out, scrolled back to its
+top by the app (the wide shot; until then the toasts stay below the frame
+and under a fixed paper fade at its foot). (Round 3, owner: the frame's foot
+"is jumpy" as the list ticks off.) The page used to end right under "Do
+this", so as the rows folded the browser re-clamped its scroll in uneven
+jumps, once even back up, and the camera's tracking of the list turned that
+into a jumping foot of the frame; the account now has nine days of past
+Daily Brews below the list, as a lived-in Revisit tab has, so the page never
+moves under the ticks and the rows fold up on their own. Scripted, as in every
 capture: the backend, so the account (`REVISIT` in `capture/library.mjs`):
 FIND THE BOOK's haystack without Sam's screenshot, the recipes or Tim Urban's
 procrastination talk (one video on procrastination, not two), plus the
 video; this week's six saves dated into the week; a reminder due ten minutes
-ago; the five open "Do this" lines (only saves that call for an action carry
+ago; nine past Daily Brews (round 3); the five open "Do this" lines (only saves that call for an action carry
 one, as in the app; Tail End's and the V60's are the house account's, Four
 Thousand Weeks' and Cala Goloritzé's are new and true to their summaries);
 and this week's synthesis, written from those six saves. The ink list, the

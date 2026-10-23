@@ -280,10 +280,32 @@ async function prepareRevisit(V = REVISIT) {
     const c = all.find((x) => x.id === id);
     return { id, title: c.title, category: c.category };
   });
+  // (round 3) the Daily Brews of the days before today: Revisit lists them
+  // under "This week", and the page needs that length: with nothing below
+  // "Do this", ticking the list off made the page re-clamp its scroll in
+  // jumps as the rows folded (the owner saw the foot of the frame jump)
+  const older = all.filter((c) => !V.without.includes(c.id) && (c.age ?? 0) > 30);
+  const brews = Array.from({ length: 9 }, (_, k) => ({
+    days: k + 1,
+    cards: [0, 1, 2, 3, 4].map((j) => older[(k * 5 + j * 3) % older.length]).map((c) => ({
+      id: c.id,
+      title: c.title,
+      category: c.category,
+      summary: c.summary,
+      sourceName: c.youtubeChannel ?? c.sourceName ?? null,
+      url: c.url,
+    })),
+  }));
   await page.evaluate(
-    ([uid, v, syn]) => {
+    ([uid, v, syn, brews]) => {
       const C = window.__capture;
       const now = Date.now();
+      for (const b of brews) {
+        const d = new Date(now - b.days * 86_400_000);
+        const id = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        const at = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 8, 0).getTime();
+        C.set(`users/${uid}/digests/${id}`, { createdAt: at, mode: 'smart', frequency: 'daily', title: 'Your Daily Brew', topics: [], cardCount: b.cards.length, cards: b.cards });
+      }
       C.set(`users/${uid}/syntheses/${syn.weekId}`, { ...syn, createdAt: now - 3_600_000 });
       for (const [id, text] of Object.entries(v.takeaways)) {
         const p = `users/${uid}/links/${id}`;
@@ -298,7 +320,7 @@ async function prepareRevisit(V = REVISIT) {
         C.set(p, { ...cur, reminderStatus: 'pending', reminderDue: true, reminderDueAt: now - 600_000, nextReminderAt: now - 600_000, reminderCount: 1 });
       }
     },
-    [UID, V, { ...V.synthesis, weekId: isoWeekId(new Date()), cards: refs }],
+    [UID, V, { ...V.synthesis, weekId: isoWeekId(new Date()), cards: refs }, brews],
   );
 }
 
@@ -1215,6 +1237,9 @@ const takes = {
     await t.snap({ rects: RV });
     await t.thaw();
     await page.waitForTimeout(300);
+    // (the mouse off the foot of the screen: a toast under the pointer holds
+    // itself open, and the wide shot waits for all five to time out)
+    await page.mouse.move(200, 40);
     // the ticks, an 8th note (250ms, 15 frames at 60fps) apart
     await t.freeze();
     t.mark('tick');
@@ -1228,11 +1253,21 @@ const takes = {
     await page.waitForTimeout(600);
     t.mark('after');
     await t.snap({ rects: RV });
-    // the same tab once the five Undo toasts have timed out (8s each): the
-    // reel's last wide shot of Revisit
+    // the same tab once the five Undo toasts have timed out (8s each), then
+    // scrolled back to its top: the reel's last wide shot of Revisit (the
+    // review row, the reminder, "All done.", this week's synthesis)
     await page.waitForTimeout(9000);
+    // the same scroll as `after`, the toasts gone (the reel dissolves to it)
+    t.mark('rest');
+    await t.snap({ rects: RV });
+    await t.freeze();
+    await tagScroller('Do this');
+    t.mark('up');
+    // 2pt a frame: the reel eases this scroll, and coarser steps stuttered
+    await rollScroll(t, 0, 2, RV);
     t.mark('clean');
     await t.snap({ rects: RV });
+    await t.thaw();
     return t.save();
   },
 

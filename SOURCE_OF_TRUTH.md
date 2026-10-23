@@ -2637,6 +2637,29 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-23 — TICK IT OFF round 3: the foot of the frame no longer
+  jumps while the list ticks off (owner: "The final second of the frame
+  shown while narration finished 'even the procrastination one' is jumpy at
+  the bottom").** Branch `claude/reel-revisit`. The cause was the real app's
+  page: it ended right under "Do this", so as the five rows folded the
+  browser re-clamped the scroll in uneven jumps (once back up 54pt), the
+  camera's tracking of the list moved everything else with them, and the
+  paper at the frame's foot was recomputed from the stacking Undo toasts each
+  frame. Fixed at the source: the demo account has nine days of past Daily
+  Brews under the list (a lived-in Revisit tab), so the page never moves
+  under the ticks (the list header sits at the same point on all 150
+  captured frames) and the rows fold up on their own; the camera makes one
+  slow drift onto "All done." instead of a pull-back and push-in that
+  stopped dead between them; the foot's paper is a fixed fade; the mouse is
+  moved off the toasts (a hovered toast holds itself open); the wide shot is
+  the app scrolling itself back to the top in 2pt steps after the toasts
+  time out, not a cross-dissolve to a later frame. Re-captured, re-rendered
+  240–699. **Verified:** gates; the encode (840 frames, 28.000s, −13.9 LUFS,
+  −1.3 dBTP), no one-frame flash, no isolated jump at the foot of the frame
+  from the tick to the sign-off (the bottom third's frame-to-frame change
+  follows the folds and the scroll, never a lone spike), the range seams
+  clean, the last frame the logo and the tagline. **Not verified:** watched
+  on a phone; listened to on speakers.
 - **2026-10-23 — TICK IT OFF round 2: the reel ends on the logo (owner:
   "The final frame is the to do list again - it should be the Machina logo
   and tagline").** Branch `claude/reel-revisit`. The lockup (the app's own

@@ -6,9 +6,8 @@ import { clearOf } from '../../kit/Captions';
 import { CLOCK } from '../../kit/camera';
 import { EASE_IN_OUT, EASE_MODAL, EASE_SPRING, prog } from '../../kit/curves';
 import { Dither, Lens } from '../../kit/Paper';
-import { rectOf } from '../../kit/takes';
 import { INK, KineticLine } from '../../kit/Type';
-import { App, LIST, T, frameAt, rowAt, toFrame } from './App';
+import { App, LIST, rowAt, toFrame } from './App';
 import { EndCard, signOffPaper } from './Brand';
 import { InkList, InkRow, SHEET, SHEET_BG, listGeo, type RowGeo } from './Ink';
 import { ACTS, ITEMS, L, LIST_H, STOP_Y, TOPS, VIDEO, heightOf, linesOf, scrollAt, speedAt, type Item } from './list';
@@ -406,36 +405,20 @@ const PullOut: React.FC<{ f: number }> = ({ f }) => {
   );
 };
 
-/** the paper over the frame's foot while the list ticks off: it sits between
- *  the list and the app's Undo toasts, which stack up under it */
-const footAt = (f: number) => {
-  if (f < HITS.tick + 10 || f >= HITS.lockup) return null;
-  const i = Math.min(frameAt(f), 328);
-  let toastTop = 852;
-  try {
-    toastTop = rectOf(T, i, 'toast')[1];
-  } catch {
-    /* none yet */
-  }
-  let listBottom = LIST.doHead[1] + 30;
-  for (const k of ['row4', 'row3', 'row2', 'row1', 'row0', 'allDone']) {
-    try {
-      const r = rectOf(T, i, k);
-      listBottom = Math.max(listBottom, r[1] + r[3] + (k === 'allDone' ? 48 : 6));
-      break;
-    } catch {
-      /* folded away */
-    }
-  }
-  const mid = toFrame(f, 0, Math.min(toastTop - 6, (listBottom + toastTop) / 2)).y;
-  return { y: Math.max(900, mid), o: 1 - prog(f, HITS.wide + 6, HITS.wide + 18, EASE_IN_OUT) };
-};
+/**
+ * The paper over the frame's foot while the list ticks off: fixed (round 3:
+ * it followed the gap between the list and the app's Undo toasts, and jumped
+ * each time a toast stacked up), low enough to leave the list alone, and
+ * gone once the wide shot's toast-free frames take over.
+ */
+const FOOT = { clear: 1480, solid: 1640 };
+const footAt = (f: number) => (f < HITS.tick + 10 || f >= HITS.lockup ? 0 : 1 - prog(f, HITS.wide + 4, HITS.wide + 16, EASE_IN_OUT));
 
 export const Revisit: React.FC<{ withAudio?: boolean; withCaptions?: boolean }> = ({ withAudio = true, withCaptions = true }) => {
   const f = useCurrentFrame();
   CLOCK.perFrame = 1;
   const paper = signOffPaper(f);
-  const foot = footAt(f);
+  const foot = eased(f, footAt);
   const listShot = f >= HITS.land + 13 && f < HITS.push2;
   return (
     <AbsoluteFill style={{ fontFamily: sans, background: SET_BG }}>
@@ -444,12 +427,12 @@ export const Revisit: React.FC<{ withAudio?: boolean; withCaptions?: boolean }> 
       <Dither />
       {/* the real app: the card, the synthesis, the list, the ticks, the tab */}
       <App f={f} />
-      {foot && (
+      {foot > 0.001 && (
         <AbsoluteFill
           style={{
             pointerEvents: 'none',
-            opacity: foot.o,
-            background: `linear-gradient(180deg, ${clearOf(TONE)} ${foot.y - 70}px, ${TONE} ${foot.y + 30}px, ${TONE} 1920px)`,
+            opacity: foot,
+            background: `linear-gradient(180deg, ${clearOf(TONE)} ${FOOT.clear}px, ${TONE} ${FOOT.solid}px, ${TONE} 1920px)`,
           }}
         />
       )}
