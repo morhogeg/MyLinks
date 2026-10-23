@@ -93,11 +93,13 @@ ai = None
 
 
 def gemini():
+    """functions/ai_service.py and ONE GeminiService, kept: its client closes
+    when the service is collected"""
     global ai
     if ai is None:
         sys.path.insert(0, os.path.join(REPO, "functions"))
         import ai_service
-        ai = ai_service
+        ai = (ai_service, ai_service.GeminiService())
     return ai
 
 
@@ -126,14 +128,14 @@ for url in dict.fromkeys([*req.get("videos", []), *analyze, *clips]):
         }
     if url in analyze:
         try:
-            m = gemini()
-            facts["analysis"] = {"model": m.GEMINI_ANALYSIS_MODEL, **m.GeminiService().analyze_youtube(watch)}
+            m, service = gemini()
+            facts["analysis"] = {"model": m.GEMINI_ANALYSIS_MODEL, **service.analyze_youtube(watch)}
         except Exception as e:
             ok = False
             facts["analysis"] = {"error": f"{type(e).__name__}: {e}"[:600]}
     for start, end in clips.get(url, []):
         try:
-            m = gemini()
+            m, service = gemini()
             from google.genai import types
 
             model = req.get("clip_model") or m.GEMINI_FALLBACK_MODEL
@@ -141,7 +143,7 @@ for url in dict.fromkeys([*req.get("videos", []), *analyze, *clips]):
                 file_data=types.FileData(file_uri=watch),
                 video_metadata=types.VideoMetadata(start_offset=f"{seconds(start)}s", end_offset=f"{seconds(end)}s"),
             )
-            r = m.GeminiService().client.models.generate_content(
+            r = service.client.models.generate_content(
                 model=model,
                 contents=[part, "Transcribe verbatim everything said in this clip, in order. No commentary, no timestamps."],
             )
