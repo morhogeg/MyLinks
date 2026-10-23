@@ -229,6 +229,27 @@ export const App: React.FC<{ f: number }> = ({ f }) => {
             );
           })}
         {/* the thumb on the video's circle (the rest tick on the beat after) */}
+        {/* the beat before the tick: an ink ring closes in on the video's
+            circle as the voice reaches "one" */}
+        {f >= HITS.tick - 20 && f < HITS.tick + 3 && (() => {
+          const [x, y, w, h] = LIST.rows[0].tick;
+          const t = prog(f, HITS.tick - 20, HITS.tick, EASE_IN_OUT);
+          const r = 11 + 30 * (1 - t);
+          const a = 0.5 * prog(f, HITS.tick - 20, HITS.tick - 12, EASE_IN_OUT) * (1 - prog(f, HITS.tick - 1, HITS.tick + 3, linear));
+          return (
+            <div
+              style={{
+                position: 'absolute',
+                left: x + w / 2 - r,
+                top: y + h / 2 - r,
+                width: 2 * r,
+                height: 2 * r,
+                borderRadius: r,
+                boxShadow: `0 0 0 ${(1.1 + 0.9 * t).toFixed(2)}px rgba(20,20,27,${a.toFixed(3)})`,
+              }}
+            />
+          );
+        })()}
         {f >= HITS.tick - 4 && f < HITS.tick + 40 &&
           [0, 1, 2, 3, 4].map((r) => {
             const tk = rectOf(T, M.tick + r * 15, `tick${r}`);

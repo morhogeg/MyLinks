@@ -1007,6 +1007,143 @@ node audio/needle-score.mjs video && node audio/mix-vo.mjs needle-video && node 
 NEEDLE=video node scripts/needle-stills.mjs   # → out/needle-stills-video/
 ```
 
+## TICK IT OFF (the revisit reel)
+
+`MachinaRevisit` is a 28s vertical Reel about the side of Machina that comes
+back to you (2026-10-23): the weekly synthesis, the "Do this" list and the
+rest of the Revisit tab. **The idea: your saves are a to-do list you never
+get to, and Machina turns them into a Sunday read and a few things to
+actually do.** Frame 0 says it, "Your saves are a to-do list.", over an ink
+list of this account's real saves, each waiting on an empty circle (Watch …,
+Read …, Try …, Visit …). The list ratchets on, "later" after "later", spins
+like a slot reel and stops dead on the save that gives the game away: a video
+on procrastination (Mark Manson's, real, on his own channel). "Relax. Machina
+watched it.": the sheet tears off the pad, and under it is the real app, that
+save's card, summed up. "Every Sunday, it writes up your week": the real
+synthesis, tapped open, its first paragraph on that video and "the smallest
+step you can take today", underlined in ink. "And pulls out what to actually
+do": a new sheet lands with the whole list on it, the five saves that call
+for an action light up and fly onto the real "Do this" rows, and each
+"Watch …" is struck out, its title dropping into the row's grey line while
+the real task is written in. The payoff (70%): "Even the procrastination
+one.", the video's line ticked, the other four following on the beat, the
+rows folding away to the app's own "All done. New tasks arrive with your
+saves."; the whole tab; the sign-off; then a fresh sheet lands with the list
+on it, exactly frame 0, and the loop reads as new saves, new list. The device
+is the pad and its circle (sheets tear off and land; the circle you never
+fill is the app's own "Do this" circle, and in the end it fills), none of
+FIND THE BOOK's (no dare, no hidden object, no 3D field, no tunnel, no P.S.).
+
+Pitched against two others (the owner can ask for either): THE RECEIPT (a
+till receipt of the week's saves printing on the beat, totting up the hours
+you meant to spend, torn off into a Sunday read and a five-line list) and
+SUNDAY MORNING (a week of saves piling up day by day on a calendar strip,
+folding like a paper map into one page on Sunday). This one won because its
+frame 0 is a truth people recognise, its payoff is the app's own tick rather
+than a metaphor, and one save (the procrastination video) runs through every
+beat.
+
+```bash
+# today's app (a video branch's own web/ can be weeks old: capture main's)
+git worktree add --detach <dir> origin/main && (cd <dir>/web && npm ci)
+CAPTURE_WEB=<dir>/web node capture/build-app.mjs
+CAPTURE_ONLY=revisitClip node capture/shoot.mjs
+git checkout src/reels/data/takes.json   # shoot.mjs rewrites it from the takes present
+python3 audio/synth-vo.py revisit && python3 audio/vo-to-44k.py out/vo/revisit && python3 audio/vo-deess.py out/vo/revisit
+node audio/revisit-score.mjs && node audio/mix-vo.mjs revisit
+node audio/revisit-verify.mjs          # bans, the list is the account's, the video's facts, windows, safe area, voice over music, −14 LUFS, the loop
+# render in parallel frame ranges (one browser composites on ONE core); the
+# tear (288–305) is the heavy stretch
+for r in a:0-149 b:150-239 c1:240-339 c2:340-439 d:440-559 e:560-699 f:700-839; do
+  npx remotion render src/index.ts MachinaRevisit out/revisit/seg-${r%%:*}.mp4 --frames=${r#*:} --concurrency=1 --muted --crf=14 &
+done; wait
+printf "file 'seg-%s.mp4'\n" a b c1 c2 d e f > out/revisit/concat.txt
+ffmpeg -f concat -safe 0 -i out/revisit/concat.txt -c copy out/revisit/joined.mp4
+# the posting file: full-range BT.601 frames → limited-range BT.709 yuv420p, AAC 48kHz
+ffmpeg -i out/revisit/joined.mp4 -i public/clips/revisit/score-vo.wav -map 0:v -map 1:a \
+  -vf "scale=in_range=full:out_range=tv:in_color_matrix=bt601:out_color_matrix=bt709,format=yuv420p" \
+  -c:v libx264 -preset slow -crf 15 -profile:v high -level 4.1 \
+  -color_primaries bt709 -color_trc bt709 -colorspace bt709 -color_range tv \
+  -c:a aac -b:a 320k -ar 48000 -ac 2 -shortest -movflags +faststart out/revisit/final_reel.mp4
+node scripts/revisit-stills.mjs        # review stills → out/revisit-stills/
+```
+
+| Time | Picture | On screen | Voice | Sound |
+|---|---|---|---|---|
+| 0:00 | Frame 0 (also the cover): the hook over the ink list, nine real saves in view, each on an empty circle | Your saves are / a to-do list. | "Your saves are a to-do list." | a chord stab and a kick (where the loop lands) |
+| 0:01.9 | The hook rolls out; the list ratchets one save, then two, then three, each step on its verb (the app's spring) | Watch later. / Read later. / Try later. | "Watch later. Read later. Try later." | a ratchet click and a rising pluck a step; the half-time beat |
+| 0:05.0 | The slot spin: accelerating, real motion blur, braking with a small overshoot | You even saved a video / on procrastination. | "You even saved a video on procrastination." | four on the floor, a riser, the reel's own clicks |
+| 0:07.9 | It stops dead on the video, "Watch How to Beat Procrastination Like It Owes You Money · Mark Manson · 11:45", set apart in an ink ring; the rest recede; two rings out; a slow push | | | a clunk; the band stops; one hushed note for the comic beat |
+| 0:09.6 | After "Relax.": the sheet rips along the binding and is yanked away (its own shutter) | Relax. / Machina watched it. | "Relax. Machina watched it." | a paper rip, a whoosh |
+| 0:10.0 | Under it, the real app: Home, the video's card on top of the feed, summed up (12m), its title where the ink one was; a slow push | | | on I, warm; a bell |
+| 0:11.2 | Up to this week's synthesis, waiting above the card; the thumb taps it open; the app unfolds it in place | Every Sunday, / it writes up your week, | "Every Sunday, it writes up your week," | a tap, the half-time groove |
+| 0:12.7 | Its first paragraph: "Six saves this week, and the loudest one is a video on procrastination… the way out is the smallest step you can take today." The phrase is underlined in ink | | | a pen stroke |
+| 0:14.7 | A new sheet lands with the whole list on it, in two columns; the five saves that call for an action light up a 16th apart | and pulls out / what to actually do. | "and pulls out what to actually do." | a sheet's pat, five plucks |
+| 0:15.5 | The five fly onto the real Revisit tab's "Do this" rows as the sheet gives way | | | a whoosh |
+| 0:16.2 | A row every 6 frames: the verb struck out, the save's title dropping into the row's grey title line, the real task written in where it stood | | | a pen stroke a row |
+| 0:17.1 | In to the video's line ("When you feel stuck, identify the smallest, simplest action you can take today…"); an ink ring closes on its circle | Even the / procrastination one. | "Even the procrastination one." | the drums fall away; a riser |
+| 0:19.7 | **The payoff (70%)**: the video's line ticked on "one", the other four an 8th apart: each circle fills, each line is struck, "Do this" held still as the page settles | | | five rising pings home on I, the band in full |
+| 0:21.7 | The rows fold away: "All done. New tasks arrive with your saves." | | | a bell |
+| 0:21.9 | Back out to the whole tab: the review row, the reminder that came due, "Do this: All done.", this week's synthesis | | | |
+| 0:23.1 | The app dissolves into paper; the app's own launch mark draws in, the wordmark on the spoken name, the tagline word by word | MACHINA / Everything you save, finally useful. | "Machina. Everything you save, finally useful." | the brand's impact, lighter; a bell |
+| 0:27.0 | A fresh sheet lands with the list on it: frame 0 | | | a whoosh and a pat into the loop's downbeat |
+
+**What is real and what is not.** Every app pixel is the shipped app on
+`main` (2026-10-23), one continuous use of it captured by
+`capture/shoot.mjs revisitClip`: Home with the video's card on top of the
+feed, this week's synthesis tapped open in place (the app's own unfolding,
+at 60fps), the Revisit tab (its review row, the reminder that came due,
+"Do this"), the five lines ticked an 8th apart (each circle's spring, the
+strike, the 650ms hold, the fold, the list closing up, the empty state), and
+the tab again once the five Undo toasts have timed out (the wide shot; until
+then a paper scrim sits between the list and the stacked toasts). The camera
+keeps "Do this" still while the page settles under it (the scroll clamps as
+rows fold; the camera follows the section header). Scripted, as in every
+capture: the backend, so the account (`REVISIT` in `capture/library.mjs`):
+FIND THE BOOK's haystack without Sam's screenshot, the recipes or Tim Urban's
+procrastination talk (one video on procrastination, not two), plus the
+video; this week's six saves dated into the week; a reminder due ten minutes
+ago; the five open "Do this" lines (only saves that call for an action carry
+one, as in the app; Tail End's and the V60's are the house account's, Four
+Thousand Weeks' and Cala Goloritzé's are new and true to their summaries);
+and this week's synthesis, written from those six saves. The ink list, the
+sheets, the underline, the pull-out and the rewrite are the reel's: the
+rewrite covers each real line in the row's own white and wipes it in (the app
+shows the list already written). The iOS share sheet is not shown.
+
+**The video.** Mark Manson's "How to Beat Procrastination Like It Owes You
+Money" (his channel, 11:45). Checked on GitHub by `video-facts.yml`: title
+and channel are YouTube's oEmbed, the length is the channel's upload list;
+the card's summary, its 12m, its key moments and its "Do this" line ("When
+you feel stuck, identify the smallest, simplest action you can take today to
+move toward your goal and do it immediately to trigger the do something
+principle.", verbatim) are Machina's own `analyze_youtube` run on it
+(`capture/video-facts/-Feev1ZK6L4.json`), and a second model's transcript of
+its first 45 seconds ("Every problem of inaction is ultimately a problem of
+emotion. You procrastinate not because you don't know what to do, but
+because you don't feel like doing it.") and its last two minutes ("…just by
+doing anything, you learn something.") backs the synthesis' paraphrase. No
+thumbnail (rights; his face would read as an endorsement); the reel never
+plays the video (its opening has a swear word). In the app the full weekly
+synthesis and a video's understanding are Pro (and the 14-day trial); the
+reel names no plan.
+
+**Voice.** Gemini TTS (`gemini-3.8-flash-tts`), Sulafat, per-line direction
+in the timeline (a friend catching you out and laughing with you, then
+showing you the trick), voiced on GitHub by `narration-tts.yml` (run 22);
+the sign-off is FIND THE BOOK's take, the same key. Resampled to 44.1kHz,
+de-essed. 47 words. The cut is timed to the takes: the spin stops on
+"procrastination", the sheet tears between "Relax." and "Machina", the tick
+lands on "one".
+
+**The score.** `audio/revisit-score.mjs`, 120 BPM, with four synthesized
+foley voices of its own (a ratchet click, a paper rip, a sheet landing, a pen
+stroke). The slot reel's clicks are not a pattern: one per save crossing the
+middle of the frame, read off the same scroll the picture uses
+(`clips/revisit-list.mjs` `CLICKS`), so they speed up and brake with it.
+
+<!-- MEASURED -->
+
 ## Motion language
 
 The rules every Machina video follows, and the kit component that implements

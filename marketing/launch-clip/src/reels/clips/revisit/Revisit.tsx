@@ -163,7 +163,7 @@ const Scrim: React.FC<{ tone: string; solid: number; clear: number; o: number }>
 /** act one's scrim is drawn ON the sheet (it leaves with it when it tears) */
 const sheetScrimAt = (f: number) => (f < HITS.hookOut ? 0 : 1);
 /** the app's: short, since the picture starts right under the band */
-const appScrimAt = (f: number) => (f >= HITS.tear && lineUp(f) ? 1 : 0);
+const appScrimAt = (f: number) => (f >= HITS.tear - 8 && lineUp(f) ? 1 : 0);
 
 const Lines: React.FC<{ f: number }> = ({ f }) => (
   <AbsoluteFill style={{ pointerEvents: 'none' }}>
@@ -188,26 +188,42 @@ const PadSheet: React.FC<{ f: number; pose: SheetPose; captions: boolean }> = ({
   </Sheet>
 );
 
-/** the tear, with its own shutter: the sheet is yanked fast */
-const TornPad: React.FC<{ f: number; captions: boolean }> = ({ f, captions }) => {
-  const pose = tearAt(f, HITS.tear);
+/**
+ * A sheet in motion, with its own shutter: drawn at up to eight moments
+ * inside a 180° shutter and averaged (each sample opaque paper, sample k
+ * laid over the first k at 1/k), the average softened by about the distance
+ * between samples so the copies melt into one smear; at rest, drawn once.
+ */
+const MotionSheet: React.FC<{ f: number; at: (t: number) => SheetPose; draw: (pose: SheetPose) => React.ReactNode }> = ({ f, at, draw }) => {
+  const pose = at(f);
   if (pose.gone) return null;
-  const v = Math.abs(tearAt(f + 0.5, HITS.tear).y - tearAt(f - 0.5, HITS.tear).y);
-  const n = Math.min(6, Math.max(1, Math.round(v / 40)));
-  if (n === 1) return <PadSheet f={f} pose={pose} captions={captions} />;
+  const a = at(f - 0.25);
+  const b = at(f + 0.25);
+  // the shutter's travel, in px, at the frame's middle (the turn moves it too)
+  const travel = Math.hypot(b.x - a.x, b.y - a.y) + Math.abs(b.rot - a.rot) * (Math.PI / 180) * 1100;
+  const n = Math.min(8, Math.max(1, Math.round(travel / 16)));
+  if (n === 1) return <>{draw(pose)}</>;
+  // one blur over the averaged samples (a blur per sample cost minutes a
+  // frame in the render's software compositor)
+  const soft = n < 3 ? 0 : Math.min(9, travel / n / 2.5);
   return (
-    <AbsoluteFill>
+    <AbsoluteFill style={{ filter: soft > 0.6 ? `blur(${soft.toFixed(1)}px)` : undefined }}>
       {Array.from({ length: n }, (_, k) => {
-        const p = tearAt(f + (k / (n - 1) - 0.5) * 0.5, HITS.tear);
+        const p = at(f + (k / (n - 1) - 0.5) * 0.5);
         return (
           <AbsoluteFill key={k} style={{ opacity: 1 / (k + 1) }}>
-            <PadSheet f={f} pose={{ ...p, gone: false }} captions={captions} />
+            {draw({ ...p, gone: false })}
           </AbsoluteFill>
         );
       })}
     </AbsoluteFill>
   );
 };
+
+/** the tear: the pad's sheet, yanked off */
+const TornPad: React.FC<{ f: number; captions: boolean }> = ({ f, captions }) => (
+  <MotionSheet f={f} at={(t) => tearAt(t, HITS.tear)} draw={(pose) => <PadSheet f={f} pose={pose} captions={captions} />} />
+);
 
 // ─────────────────────────────────────────────────── act three: the pull-out
 
@@ -361,9 +377,15 @@ const PullOut: React.FC<{ f: number }> = ({ f }) => {
     <AbsoluteFill style={{ pointerEvents: 'none' }}>
       {away < 1 && (
         <AbsoluteFill style={{ opacity: 1 - away }}>
-          <Sheet pose={pose}>
-            {ITEMS.map((it, k) => (picked(k) && f >= pickAt(k) ? null : <InkRow key={it.id} it={it} g={pullGeo(k)} opacity={picked(k) ? 1 : dim} />))}
-          </Sheet>
+          <MotionSheet
+            f={f}
+            at={(t) => landAt(t, HITS.land, 12)}
+            draw={(p) => (
+              <Sheet pose={p}>
+                {ITEMS.map((it, k) => (picked(k) && f >= pickAt(k) ? null : <InkRow key={it.id} it={it} g={pullGeo(k)} opacity={picked(k) ? 1 : dim} />))}
+              </Sheet>
+            )}
+          />
         </AbsoluteFill>
       )}
       {/* the five, picked out (a 16th apart) and flown onto their rows */}
@@ -413,7 +435,6 @@ export const Revisit: React.FC<{ withAudio?: boolean; withCaptions?: boolean }> 
   CLOCK.perFrame = 1;
   const paper = signOffPaper(f);
   const foot = footAt(f);
-  const loop = landAt(f, HITS.landLoop, 24);
   const listShot = f >= HITS.land + 13 && f < HITS.push2;
   return (
     <AbsoluteFill style={{ fontFamily: sans, background: SET_BG }}>
@@ -439,10 +460,16 @@ export const Revisit: React.FC<{ withAudio?: boolean; withCaptions?: boolean }> 
       <TornPad f={f} captions={withCaptions} />
       {/* the loop: a fresh sheet lands with the list on it, exactly frame 0 */}
       {f >= HITS.landLoop && (
-        <Sheet pose={loop}>
-          <ListAt t={0} />
-          {withCaptions && <HookType />}
-        </Sheet>
+        <MotionSheet
+          f={f}
+          at={(t) => landAt(t, HITS.landLoop, 24)}
+          draw={(p) => (
+            <Sheet pose={p}>
+              <ListAt t={0} />
+              {withCaptions && <HookType />}
+            </Sheet>
+          )}
+        />
       )}
       {withCaptions && <Lines f={f} />}
       <Lens vignette={0.35} grain={0.035} />
