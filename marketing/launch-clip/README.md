@@ -1142,7 +1142,29 @@ stroke). The slot reel's clicks are not a pattern: one per save crossing the
 middle of the frame, read off the same scroll the picture uses
 (`clips/revisit-list.mjs` `CLICKS`), so they speed up and brake with it.
 
-<!-- MEASURED -->
+**Measured, not listened to.** `node audio/revisit-verify.mjs`: brand bans
+on 326 strings (captions, the added saves, the synthesis, the "Do this"
+lines, the ink list, every captured frame) and no plan, price or store words
+in the script; all 42 list items are saves in the account, titled as saved;
+the five picked are the five "Do this" lines, in Revisit's order; the
+video's title, channel, 11:45, key moments and "Do this" line match YouTube
+and Machina's analysis; every line inside its window; the type inside the
+feeds' safe area; every line 11.8 to 22.6dB over the music in the speech
+band; −14.01 LUFS, −1.27 dBTP; the loop's audio seam inside the score's own
+steps. The score's energy per half second: the spin −16 to −17dB, the stop
+−30 to −35dB, the breath before the payoff −21 to −26dB, the ticks −13dB.
+The encode: 840 frames, 28.000s, H.264 High 4.1 yuv420p BT.709 limited
+range, AAC-LC 48kHz 320k, 23.6MB, −13.9 LUFS and −1.3 dBTP after the AAC
+encode; every frame pair scanned (no one-frame flash; the seven range seams
+move like their neighbours; the largest steps are the spin, the synthesis
+unfolding and the landing sheet); frame 839 against frame 0: 42.3dB PSNR
+(62.6dB in the stills; the rest is the encoder). Nobody has listened to it
+on speakers.
+
+**Rendering note.** A sheet in motion (the tear, the landings) has its own
+shutter: up to eight poses averaged, then ONE blur over the average. A blur
+on each sample cost about four minutes a frame in the render's software
+compositor; one blur costs seconds.
 
 ## Motion language
 

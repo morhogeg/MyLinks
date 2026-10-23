@@ -2637,6 +2637,48 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-23 — TICK IT OFF, a new organic Reel about Revisit (owner:
+  "another video, but a different idea and way of showing the apps abilities
+  … focus on the revisit aspects - the weekly synthesis, the to do items etc.
+  also with a youtube video").** Branch `claude/reel-revisit` (built on
+  `claude/reel-find-the-book`'s kit; the capture is today's `main`). The idea:
+  your saves are a to-do list you never get to, and Machina turns them into a
+  Sunday read and a few things to actually do. Frame 0: "Your saves are a
+  to-do list." over an ink list of the account's real saves (Watch, Read, Try,
+  Visit), each with an empty circle; it ratchets, spins like a slot reel and
+  stops on Mark Manson's "How to Beat Procrastination Like It Owes You Money"
+  ("You even saved a video on procrastination."); "Relax. Machina watched
+  it.": the sheet tears off the pad onto the real card; the real synthesis
+  tapped open ("Every Sunday, it writes up your week,"); "and pulls out what
+  to actually do": a new sheet lands, five saves fly onto the real "Do this"
+  rows and are rewritten as their tasks; the payoff at 70%, "Even the
+  procrastination one.": the real ticks, an 8th apart, folding to "All done.
+  New tasks arrive with your saves."; the whole Revisit tab; the sign-off; a
+  fresh sheet lands as frame 0 (the loop). Pitched against THE RECEIPT and
+  SUNDAY MORNING (README). The video is checked on GitHub (`video-facts.yml`
+  run 6: oEmbed title and channel, the channel's 11:45, Machina's own
+  `analyze_youtube` summary, key moments and "Do this" line, verbatim, and two
+  transcribed spans); no thumbnail. New: `REVISIT` in `capture/library.mjs`
+  and `revisitClip` in `capture/shoot.mjs` (plus a phrase measure in
+  `capture/recorder.mjs`), `clips/revisit-timeline.mjs`,
+  `clips/revisit-list.mjs` (the ink list and its scroll, shared by picture,
+  score and gates), `src/reels/clips/revisit/`, `audio/revisit-score.mjs`
+  (the slot clicks read off the picture's scroll; synthesized foley: ratchet,
+  rip, sheet, pen), `audio/revisit-verify.mjs`, `scripts/revisit-stills.mjs`;
+  one-line entries in `Root.tsx`, `synth-vo.py`, `mix-vo.mjs`. Voice: Gemini
+  TTS, Sulafat, run 22 (the sign-off reuses FIND THE BOOK's take). 47 words,
+  28.0s. Pro note for the owner: the full weekly synthesis and video
+  understanding are Pro (and the 14-day trial); the reel names no plan.
+  **Verified:** gates (brand bans on 326 strings; the 42 list items are the
+  account's saves, titled as saved; the video's title, channel, 11:45, key
+  moments and "Do this" line match YouTube and Machina's analysis; windows;
+  safe area; every line 11.8 to 22.6dB over the music; −14.01 LUFS, −1.27
+  dBTP; the loop's audio seam); stills of every beat; the encode (840 frames,
+  28.000s, H.264 High yuv420p BT.709, AAC 48kHz 320k, 23.6MB, −13.9 LUFS and
+  −1.3 dBTP after AAC), every frame pair scanned (no one-frame flash, the
+  range seams clean), frame 839 against frame 0 at 42.3dB PSNR. **Not
+  verified:** listened to on speakers; seen in the Instagram app; the owner
+  has not seen it. Nothing merges to `main` until the owner reviews.
 - **2026-10-23 — FIND THE BOOK round 3: a YouTube version beside the book
   (owner: "replace a screenshot as the main thing with a YouTube video? …
   a Mark Manson video", both versions to compare).** Branch
