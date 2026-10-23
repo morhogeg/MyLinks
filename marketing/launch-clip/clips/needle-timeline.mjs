@@ -5,7 +5,8 @@
  * file.
  *
  * ONE IDEA: the answer was in your saves all along. The hook is a dare,
- * readable on frame 0: "Find the book Sam told you to read." Behind it,
+ * readable on frame 0: "Bet you can't find the book Sam told you to read."
+ * Behind it,
  * a field of the demo account's REAL saves (each one a card the shipped app
  * rendered) and, in plain sight, the card it means: a screenshot of Sam's
  * text, "Read Atomic Habits, start small". Nobody spots it. The camera flies
@@ -93,8 +94,11 @@ export const SCENES = [
 const PACE = 'Quick, playful and conversational, about 180 words a minute; pauses short and light, never a dramatic beat.';
 
 export const CAPTIONS = [
-  // the dare, on screen from frame 0 (the scene sets it big)
-  { at: 6, to: 72, place: 'scene', text: 'Find the book\nSam told you\nto read.', duck: 0.4, style: 'A playful dare to a friend, quick and bright, with a grin; one breath, no pause inside the line; landing lightly on "read".', pace: PACE },
+  // the dare, on screen from frame 0 (the scene sets it big); (round 4,
+  // owner: "it takes a while to grasp that it's a dare") it says so: its
+  // first line is a kicker, BET YOU CAN'T, over the big type, and a timer
+  // runs out under it until the camera dives in (Needle.tsx `Hook`)
+  { at: 6, to: 72, place: 'scene', kicker: true, text: 'Bet you can’t\nfind the book\nSam told you\nto read.', duck: 0.4, style: 'A playful, teasing dare to a friend, grinning: "Bet you can\'t" with a cheeky lift, then the rest quick and bright in one breath; landing lightly on "read".', pace: PACE },
   { at: 75, to: 128, text: 'It’s in your saves\nsomewhere.', style: 'Teasing and knowing, a little conspiratorial, as if waving at a huge messy pile; quick and light.', pace: PACE },
   // the list: each item swings past as it is named
   { at: 135, to: 194, text: 'Past the beach\nyou swore you’d visit,', style: 'Starting a list with amusement, a wry nod; quick, flowing straight on, the sentence is not finished.', pace: PACE },
@@ -127,7 +131,7 @@ export const CAPTIONS = [
  * moment, 3:16), pinged on screen as the tip is said.
  */
 const VIDEO_LINES = {
-  6: { text: 'Find the video\nSam told you\nto watch.', style: 'A playful dare to a friend, quick and bright, with a grin; one breath, no pause inside the line; landing lightly on "watch".' },
+  6: { text: 'Bet you can’t\nfind the video\nSam told you\nto watch.', style: 'A playful, teasing dare to a friend, grinning: "Bet you can\'t" with a cheeky lift, then the rest quick and bright in one breath; landing lightly on "watch".' },
   525: { text: 'Watched the videos, too.', style: 'A delighted, quick aside with a small laugh in the voice, as if it is a little ridiculous how thorough it is.' },
   // the name, as the book's is named, so Sam's tip (the longer line) can
   // start just after the camera lands in the answer
