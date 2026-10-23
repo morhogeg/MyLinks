@@ -1021,9 +1021,11 @@ on procrastination (Mark Manson's, real, on his own channel). "Relax. Machina
 watched it.": the sheet tears off the pad, and under it is the real app, that
 save's card, summed up. "Every Sunday, it writes up your week": the real
 synthesis, tapped open, its first paragraph on that video and "the smallest
-step you can take today", underlined in ink. "And pulls out what to actually
-do": a new sheet lands with the whole list on it, the five saves that call
-for an action light up and fly onto the real "Do this" rows, and each
+step you can take today", underlined in ink. "And the moment you save, it
+pulls out what to actually do" (round 5, owner: the to-dos come with each
+saved card, not once a week; the line used to hang them on the Sunday
+write-up): a new sheet lands with the whole list on it, the five saves that
+call for an action light up and fly onto the real "Do this" rows, and each
 "Watch …" is struck out, its title dropping into the row's grey line while
 the real task is written in. The payoff (68%, played at half speed): "Even
 the procrastination one.", the video's line ticked, the other four following
@@ -1078,13 +1080,13 @@ node scripts/revisit-stills.mjs        # review stills → out/revisit-stills/
 | 0:00 | Frame 0 (also the cover): the hook over the ink list, nine real saves in view, each on an empty circle | Your saves are / a to-do list. | "Your saves are a to-do list." | a chord stab and a kick (where the loop lands) |
 | 0:01.9 | The hook rolls out; the list ratchets one save, then two, then three, each step on its verb (a spring from rest, round 4), under one slow push that runs to the tear | Watch later. / Read later. / Try later. | "Watch later. Read later. Try later." | a ratchet click and a rising pluck a step; the half-time beat |
 | 0:05.0 | The slot spin: one speed curve, up from rest and braking firmly to a stop, real motion blur | You even saved a video / on procrastination. | "You even saved a video on procrastination." | four on the floor, a riser, the reel's own clicks |
-| 0:07.9 | It stops dead on the video, "Watch How to Beat Procrastination Like It Owes You Money · Mark Manson · 11:45", set apart in an ink ring; the rest recede; two rings out; a slow push | | | a clunk; the band stops; one hushed note for the comic beat |
+| 0:08.0 | It stops dead on the video, "Watch How to Beat Procrastination Like It Owes You Money · Mark Manson · 11:45", set apart in an ink ring; the rest recede; two rings out; a slow push | | | a clunk; the band stops; one hushed note for the comic beat |
 | 0:09.6 | After "Relax.": the sheet rips along the binding, sags off its last corner and is pulled away, picking up speed (its own shutter) | Relax. / Machina watched it. | "Relax. Machina watched it." | a paper rip, a whoosh |
 | 0:10.0 | Under it, the real app: Home, the video's card on top of the feed, summed up (12m), its title where the ink one was; a slow push | | | on I, warm; a bell |
 | 0:11.2 | Up to this week's synthesis, waiting above the card; the thumb taps it open and its page unrolls down over the card (round 4) as the camera moves on in | Every Sunday, / it writes up your week, | "Every Sunday, it writes up your week," | a tap, the half-time groove |
 | 0:12.7 | Its first paragraph: "Six saves this week, and the loudest one is a video on procrastination… the way out is the smallest step you can take today." The phrase is underlined in ink | | | a pen stroke |
-| 0:14.7 | A new sheet drops onto the pad with the whole list on it, in two columns; the five saves that call for an action light up a 16th apart | and pulls out / what to actually do. | "and pulls out what to actually do." | a sheet's pat, five plucks |
-| 0:15.5 | The five fly onto the real Revisit tab's "Do this" rows as the sheet gives way | | | a whoosh |
+| 0:13.5 | A new sheet drops onto the pad with the whole list on it, in two columns; on "pulls" (0:14.8) the five saves that call for an action light up a 16th apart | and the moment you save, / it pulls out what to actually do. | "and the moment you save, it pulls out what to actually do." (round 5) | a sheet's pat, five plucks |
+| 0:15.2 | On "what", the five fly onto the real Revisit tab's "Do this" rows as the sheet gives way | | | a whoosh |
 | 0:16.2 | A row every 6 frames: the verb struck out, the save's title dropping into the row's grey title line, the real task written in where it stood | | | a pen stroke a row |
 | 0:17.1 | In to the video's line ("When you feel stuck, identify the smallest, simplest action you can take today…"); an ink ring closes on its circle | Even the / procrastination one. | "Even the procrastination one." | the drums fall away; a riser |
 | 0:19.7 | **The payoff (68%), at half speed (round 4)**: the video's line ticked on "one", the other four an 8th apart: each circle fills, each line is struck, "Do this" held still | | | five rising pings home on I, the band in full |
@@ -1192,9 +1194,20 @@ reel names no plan.
 
 **Voice.** Gemini TTS (`gemini-3.8-flash-tts`), Sulafat, per-line direction
 in the timeline (a friend catching you out and laughing with you, then
-showing you the trick), voiced on GitHub by `narration-tts.yml` (run 22);
-the sign-off is FIND THE BOOK's take, the same key. Resampled to 44.1kHz,
-de-essed. 47 words. The cut is timed to the takes: the spin stops on
+showing you the trick), voiced on GitHub by `narration-tts.yml` (run 22;
+run 23 for round 5's corrected to-do line); the sign-off is FIND THE BOOK's
+take, the same key. Resampled to 44.1kHz, de-essed. 52 words. (Round 5,
+owner: "the you word is barely audible".) It was not quiet, it was gone: the
+take's quick "You" is set off from "even" by about 50ms of silence, and
+`to_the_words` (audio/gemini_tts.py), which keeps a soft first word only
+while it runs on unbroken, took it for a breath in and trimmed the line to
+"even saved…". It now reaches back across a pause of up to 80ms to anything
+word-loud (a breath never comes within 14dB of the line's typical level);
+of the 87 committed takes only four trim differently, and this is the only
+one any current script uses. The "You" is the line's softest word, so it
+is also lifted 3dB (`lift` on its caption, applied by synth-vo.py), and in
+the score the spin's clicks step back under the voice and the kick two
+frames before it is softened. The cut is timed to the takes: the spin stops on
 "procrastination", the sheet tears between "Relax." and "Machina", the tick
 lands on "one".
 
@@ -1211,11 +1224,12 @@ in the script; all 42 list items are saves in the account, titled as saved;
 the five picked are the five "Do this" lines, in Revisit's order; the
 video's title, channel, 11:45, key moments and "Do this" line match YouTube
 and Machina's analysis; every line inside its window; the type inside the
-feeds' safe area; (round 4) every line 12.4 to 23.1dB over the music in the
-speech band; −14.01 LUFS, −1.27 dBTP; the loop's audio seam inside the
-score's own steps. The encode (round 4): 870 frames, 29.000s, H.264 High 4.1
-yuv420p BT.709 limited range, AAC-LC 48kHz 320k, 22.0MB, −13.9 LUFS and −1.3
-dBTP after the AAC encode; every frame pair scanned: no one-frame flash, no
+feeds' safe area; (round 5) every line 11.8 to 22.4dB over the music in the
+speech band ("You even saved…" 19.8dB, its "You" now level with "even");
+−14.01 LUFS, −1.25 dBTP; the loop's audio seam inside the score's own steps.
+The encode (round 5): 870 frames, 29.000s, H.264 High 4.1 yuv420p BT.709
+limited range, AAC-LC 48kHz 320k, 21.7MB, −13.9 LUFS and −1.3 dBTP after the
+AAC encode; every frame pair scanned: no one-frame flash, no
 frame that stalls inside a move, no lone jump, no run of alternating speeds,
 the eight range seams moving like their neighbours; the largest
 frame-to-frame changes are the spin's own blur. Against round 3, the largest

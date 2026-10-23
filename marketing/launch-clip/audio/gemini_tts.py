@@ -277,6 +277,26 @@ def to_the_words(samples, sr, before=0.06, after=0.15, fade=0.03):
     # and its "S" was cut; a breath in, set off by a pause, stays out
     while i > 0 and some[i - 1]:
         i -= 1
+    # (2026-10-23, TICK IT OFF: "the 'You' word is barely audible") …and back
+    # across a pause of up to 80ms to a whole word before it: "You even
+    # saved…" opens on a quick "You" set off from "even" by about 50ms of
+    # silence, the walk stopped at that gap, and the line began on "even". A
+    # breath in still stays out: it never comes within 14dB of the line's
+    # typical loud level for 30ms
+    word = rms >= np.percentile(rms, 95) * 0.2
+    while i > 0:
+        g = i
+        while g > 0 and not some[g - 1] and (i - g + 1) * hop <= 0.08 * sr:
+            g -= 1
+        if g == 0 or not some[g - 1]:
+            break
+        k = g
+        while k > 0 and some[k - 1]:
+            k -= 1
+        w = word[k:g].astype(int)
+        if len(w) < 3 or np.convolve(w, np.ones(3, int), "valid").max() < 3:
+            break
+        i = k
     a = max(0, i - 2) * hop
     j = b // hop
     while j < n and peak[j] > quiet and (j * hop - b) < 0.3 * sr:

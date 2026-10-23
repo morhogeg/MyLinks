@@ -241,7 +241,11 @@ const arrange = (o) => {
       if (inBar === 0 || inBar === 2) kick(t(fr), 0.34 + 0.1 * e);
       if (inBar === 2) clap(t(fr), 0.1);
     } else {
-      kick(t(fr), g === 'drop' ? 0.6 : 0.4 + 0.14 * e);
+      // (round 5) a kick just before a line's first word steps back: the
+      // spin's beat landed two frames before the quick "You" of "You even
+      // saved…" and swallowed it
+      const entry = spoken.some(([a]) => fr > a - 5 && fr <= a);
+      kick(t(fr), (g === 'drop' ? 0.6 : 0.4 + 0.14 * e) * (entry ? 0.4 : 1));
       if (inBar % 2) clap(t(fr), g === 'drop' ? 0.19 : 0.12 + 0.05 * e);
       if (g === 'drop' && inBar === 3) rim(t(fr + 0.5 * BEAT_FRAMES), 0.1);
     }
@@ -256,9 +260,13 @@ const arrange = (o) => {
   }
 
   // ── the ratchet and the spin: one click per save crossing the frame's middle
+  // (round 5) in the spin they step back under the voice and leave a line's
+  // first word clear (one sat right on "You", the rest came every 70ms)
   CLICKS.forEach((fr, k) => {
     const inSpin = fr > H.spin;
-    clack(t(fr), inSpin ? 0.075 : 0.12, inSpin ? 1 + 0.002 * k : 0.95);
+    const onset = inSpin && spoken.some(([a]) => fr >= a - 1 && fr < a + 8);
+    const under = inSpin && voiced(fr);
+    clack(t(fr), (inSpin ? 0.075 : 0.12) * (onset ? 0.15 : under ? 0.45 : 1), inSpin ? 1 + 0.002 * k : 0.95);
   });
   // each ratchet step: a rising pluck on its verb
   [

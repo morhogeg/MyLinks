@@ -2637,6 +2637,43 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-23 — TICK IT OFF round 5: the to-dos come with each save, a
+  gap closed, "You" restored (owner: "To do items are actually added
+  automatically immediately with an added card, not once a week"; "a weird
+  gap between every Sunday it writes up your week and the pulls out what";
+  "the you word is barely audible").** Branch `claude/reel-revisit`.
+  - **The facts.** The line "Every Sunday, it writes up your week, and pulls
+    out what to actually do." said the to-dos were weekly. Checked:
+    `actionableTakeaway` is written by the analysis that makes the card
+    (`_build_link_data`, functions/main.py), and Revisit's "Do this" lists the
+    open ones. The second half is now "and the moment you save, it pulls out
+    what to actually do." (Gemini TTS via narration run 23; the session holds
+    no key.) The Instagram caption is corrected the same way.
+  - **The gap.** It was that sentence split around 1.4 s of silence. The new
+    line follows "your week," after a 0.3 s comma pause. The picture is
+    re-timed to it: the sheet lands on "and the moment you save," the five
+    light up on "pulls" and fly on "what", and the underline finishes as
+    "your week" ends.
+  - **"You".** It was missing, not quiet. `to_the_words`
+    (audio/gemini_tts.py) took the take's quick "You", 50 ms of silence before
+    "even", for a breath in and trimmed it. It now reaches back across a pause
+    of up to 80 ms to anything word-loud. Only four of the 87 committed takes
+    trim differently, and only this one is used by a current script. The word
+    is lifted 3 dB (`lift`, synth-vo.py). In the score, the spin's clicks step
+    back under the voice and the kick before "You" is softened. The spin's stop
+    moves to 241 so it still lands on "procrastination".
+
+  52 words. Re-rendered whole.
+
+  **Verified:**
+  - gates: every line 11.8 to 22.4 dB over the music, −14.01 LUFS,
+    −1.25 dBTP, the loop seam;
+  - the encode: 870 frames, 29.000 s, 21.7 MB, −13.9 LUFS and −1.3 dBTP after
+    AAC;
+  - no one-frame flash, stall, jump or jitter run; "You" sits about 10 dB over
+    the music around it in the speech band.
+
+  **Not verified:** listened to on speakers or a phone.
 - **2026-10-23 — TICK IT OFF round 4: the polish (owner: "it needs a full
   round of refinements and polishes to make Apple grade … fix lags,
   bitterness, abrupt cuts etc").** Branch `claude/reel-revisit`. Measured

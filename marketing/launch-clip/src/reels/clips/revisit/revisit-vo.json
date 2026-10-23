@@ -27,13 +27,13 @@
   "frame": 182,
   "text": "You even saved a video on procrastination.",
   "words": [
-   0.05,
-   0.303,
-   0.619,
-   0.999,
-   1.125,
-   1.605,
-   1.795
+   0.02,
+   0.29,
+   0.627,
+   1.032,
+   1.167,
+   1.671,
+   1.873
   ]
  },
  {
@@ -60,16 +60,21 @@
   ]
  },
  {
-  "frame": 446,
-  "text": "and pulls out what to actually do.",
+  "frame": 412,
+  "text": "and the moment you save, it pulls out what to actually do.",
   "words": [
-   0.08,
-   0.227,
-   0.449,
-   0.596,
-   0.78,
-   0.891,
-   1.223
+   0.03,
+   0.175,
+   0.32,
+   0.574,
+   0.719,
+   0.937,
+   1.046,
+   1.263,
+   1.408,
+   1.59,
+   1.698,
+   2.025
   ]
  },
  {

@@ -12,10 +12,12 @@
  * (Mark Manson's, real, on his own channel). "Relax. Machina watched it.": the
  * sheet tears off the pad and under it is the real app, that save's card,
  * summed up. Every Sunday it writes up your week (the real synthesis, tapped
- * open) and pulls out what to actually do: the ink list comes back, folds
- * down to the five saves that call for an action and lands on the real "Do
- * this" list, where each "Watch …" is rewritten as the thing to do. The
- * payoff (75%): "Even the procrastination one." The video's line is ticked,
+ * open), and the moment you save, it pulls out what to actually do (round 5:
+ * a save's "Do this" line comes with its card, not with the Sunday write-up):
+ * the ink list comes back, folds down to the five saves that call for an
+ * action and lands on the real "Do this" list, where each "Watch …" is
+ * rewritten as the thing to do. The payoff (68%, at half speed): "Even the
+ * procrastination one." The video's line is ticked,
  * the rest follow on the beat, and the real list folds away to "All done.
  * New tasks arrive with your saves." The tagline, held on the logo to the
  * last frame (round 2, owner: the final frame is the logo and the tagline);
@@ -58,16 +60,16 @@ export const HITS = {
   step2: 99, // "Read later.": two more
   step3: 137, // "Try later.": three more
   spin: 150, // the list spins like a slot reel…
-  stop: 236, // …and stops dead on "procrastination": Manson's video (the ink ring)
+  stop: 241, // …and stops dead on "procrastination": Manson's video (the ink ring) (round 5: the take's whole "You" back, the word 5 frames later)
   tear: 288, // after "Relax.": the sheet tears off the pad
   card: 300, // under it, the real app: that video's card, summed up ("Machina watched it.")
   glide: 336, // up to this week's synthesis, waiting above the card
   tapRecap: 360, // "Every Sunday…": tapped open (the app's own unfolding)
   read: 381, // its first paragraph: the video, the smallest step
-  underline: 418, // "the smallest step you can take today", underlined in ink
-  land: 440, // the list comes back: a sheet lands, every save on it, small
-  pick: 452, // the five that call for an action light up, a 16th apart
-  fly: 464, // and fly out of the list onto the real "Do this" rows
+  underline: 388, // "the smallest step you can take today", underlined in ink (as "…your week," ends)
+  land: 406, // "and the moment you save,": a sheet lands, every save on it, small
+  pick: 443, // "it pulls out…": the five that call for an action light up, a 16th apart
+  fly: 455, // "…what to actually do": they fly out of the list onto the real "Do this" rows
   rewrite: 486, // each "Watch …" becomes the thing to do, a row every 6 frames
   push2: 512, // in to the video's line
   tick: 592, // "…one.": the video's line ticked; the rest follow an 8th apart, at half speed
@@ -104,13 +106,16 @@ export const CAPTIONS = [
   // the hook, on screen from frame 0 (the scene sets it big)
   { at: 6, to: 56, place: 'scene', text: 'Your saves are\na to-do list.', duck: 0.4, style: 'A wry, friendly observation, catching a friend out with a grin; quick and bright, one breath, no pause inside the line; landing lightly on "list".', pace: PACE },
   { at: 64, to: 172, text: 'Watch later.\nRead later.\nTry later.', style: 'A teasing little list in three quick beats, each "later" a touch more knowing and amused, like rolling your eyes at a friend; light, no long pauses.', pace: PACE },
-  { at: 182, to: 272, text: 'You even saved a video\non procrastination.', style: 'Delighted, catching a friend out, quick, a laugh building toward "procrastination" and landing on it with a grin.', pace: PACE },
+  // (round 5, owner: "the you word is barely audible") the take's "You" had
+  // been trimmed off as a breath (audio/gemini_tts.py to_the_words); back, it
+  // is the line's softest word, so it is lifted 3dB (audio/synth-vo.py `lift`)
+  { at: 182, to: 274, lift: [0.14, 3], text: 'You even saved a video\non procrastination.', style: 'Delighted, catching a friend out, quick, a laugh building toward "procrastination" and landing on it with a grin.', pace: PACE },
   { at: 276, to: 338, text: 'Relax.\nMachina watched it.', duck: 0.4, style: '"Relax." warm and reassuring, then straight on, conspiratorial and pleased, the name with a smile; quick and light, no drawn-out words.', pace: PACE },
   { at: 352, to: 408, text: 'Every Sunday,\nit writes up your week,', style: 'Warm and inviting, like describing a lovely little ritual; quick, flowing straight on, the sentence is not finished.', pace: PACE },
   // (round 5, owner: "To do items are actually added automatically immediately
   // with an added card, not once a week") the to-dos are not part of the
   // Sunday write-up: each save's "Do this" line comes with its card
-  { at: 410, to: 494, text: 'and the moment you save,\nit pulls out what to actually do.', style: 'The same sentence continuing, bright and confident: "the moment you save" quick and easy, as if it is nothing, then landing softly on "do" with a smile; quick.', pace: PACE },
+  { at: 412, to: 494, text: 'and the moment you save,\nit pulls out what to actually do.', style: 'The same sentence continuing, bright and confident: "the moment you save" quick and easy, as if it is nothing, then landing softly on "do" with a smile; quick.', pace: PACE },
   { at: 548, to: 604, text: 'Even the\nprocrastination one.', style: 'A delighted, teasing callback with a laugh in the voice, quick and light; landing on "one" with a grin.', pace: PACE },
   // the sign-off: FIND THE BOOK's take, word for word (the same key, so the
   // same voice and the same read: the house sign-off)

@@ -242,6 +242,7 @@ def revisit_script():
             "tempo": c.get("tempo"),
             "run_gap": c.get("runGap"),
             "pace": c.get("pace"),
+            "lift": c.get("lift"),
         }
         for c in data["captions"]
     ]
@@ -448,6 +449,18 @@ def main():
     ok = True
     for i, line in enumerate(make()):
         samples, sr = speak(line)
+        if line.get("lift"):
+            # (2026-10-23, TICK IT OFF round 5) a line's quiet first word
+            # brought up by `db` over its first `sec` seconds, easing back over
+            # 30ms (inside the pause after it): "You even saved…" opens on an
+            # unstressed "You" that the spin's beat buried
+            sec, db = line["lift"]
+            k = int(sec * sr)
+            r = min(int(0.03 * sr), max(0, len(samples) - k))
+            g = 10 ** (db / 20)
+            samples = samples.copy()
+            samples[:k] *= g
+            samples[k:k + r] *= [g + (1 - g) * j / r for j in range(r)]
         path = os.path.join(out_dir, f"line-{i:02d}.wav")
         sf.write(path, samples, sr)
         dur = len(samples) / sr
