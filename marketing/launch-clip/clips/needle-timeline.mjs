@@ -8,7 +8,7 @@
  * readable on frame 0: "Find the book Sam told you to read." Behind it,
  * a field of the demo account's REAL saves (each one a card the shipped app
  * rendered) and, in plain sight, the card it means: a screenshot of Sam's
- * text, "Read Piranesi, and go in blind". Nobody spots it. The camera flies
+ * text, "Read Atomic Habits, start small". Nobody spots it. The camera flies
  * past the beach you swore you'd visit, the talk you'll finish later, the
  * coffee trick you'll never try; "Give up?" stops it dead; "Or just ask
  * Machina" gathers the field into the mark, which is Ask's own mark on the
@@ -105,8 +105,10 @@ export const CAPTIONS = [
   // the warp: through every save at speed
   { at: 452, to: 510, text: 'It’s read every\nsingle one.', style: 'Impressed and warm, quick, a little awed, as if watching it happen right now; no drawn-out words.', pace: PACE },
   { at: 525, to: 572, text: 'Even that screenshot.', style: 'A delighted, quick aside with a small laugh in the voice, pointing at one thing.', pace: PACE },
-  // the payoff, read off the real answer
-  { at: HITS.answer, to: 674, text: 'Piranesi.\nSam said go in blind.', style: 'The reveal: "Piranesi" said clearly the Italian way (pee-rah-NAY-zee) with a satisfied smile, then the rest warm and quick, like passing on a friend\'s advice.', pace: PACE },
+  // (round 2, owner: a book everyone knows) the payoff in two: the voice
+  // names the book on the find, then reads Sam's advice off the real answer
+  { at: HITS.found + 6, to: HITS.answer - 2, text: 'Atomic Habits.', style: 'The reveal, recognizing it: "Atomic Habits" said clearly, with a delighted, satisfied smile, like spotting a friend across a crowded room; quick and light, one breath.', pace: PACE },
+  { at: HITS.answer + 4, to: 676, text: 'Sam said start with\nthe two-minute rule.', style: 'Warm and quick, passing on a friend\'s advice with a smile; light, no drawn-out words, landing softly on "rule".', pace: PACE },
   { at: HITS.lockup, to: 776, place: 'scene', text: 'Machina.\nEverything you save, finally useful.', duck: 0.4, style: 'A confident, warm sign-off; the name with a smile, then the tagline sincere but brisk, no drawn-out words.', pace: PACE },
   // the rewatch: the needle was on frame 0
   { at: HITS.ps, to: TOTAL_FRAMES + 6, text: 'P.S. It was in\nthe first frame.', duck: 0.4, style: 'A quick, playful aside, close and conspiratorial, like letting the listener in on a secret; light, no drawn-out words.', pace: PACE },
