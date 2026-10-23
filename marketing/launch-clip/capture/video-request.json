@@ -1,24 +1,19 @@
 {
   "_": "Look up real YouTube videos on GitHub (.github/workflows/video-facts.yml, capture/video-facts.py). Edit, commit, push: results land in capture/video-facts/. `channels`: channel video tabs to list; `videos`: watch URLs to check (title, channel, length, chapters); `analyze`: watch URLs to run through Machina's own video analysis (costs Gemini quota); `clips`: [url, \"M:SS\", \"M:SS\"] spans to transcribe, to check a key moment. Bump `run` to re-run with no other change.",
-  "run": 5,
+  "run": 6,
   "channels": [],
   "videos": [],
   "analyze": [],
   "clips": [
     [
-      "https://www.youtube.com/watch?v=Nxy6SIM11sA",
-      "3:05",
-      "3:50"
-    ],
-    [
-      "https://www.youtube.com/watch?v=Nxy6SIM11sA",
+      "https://www.youtube.com/watch?v=-Feev1ZK6L4",
       "0:00",
-      "0:40"
+      "0:45"
     ],
     [
-      "https://www.youtube.com/watch?v=KJ2Lvi9kG2Q",
-      "2:40",
-      "3:15"
+      "https://www.youtube.com/watch?v=-Feev1ZK6L4",
+      "10:00",
+      "11:45"
     ]
   ]
 }
