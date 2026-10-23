@@ -101,6 +101,8 @@ export const SCENES = [
  * NO em dashes, no literal "AI", no "second brain", no "library" (verify).
  */
 const PACE = 'Quick, playful and conversational, about 180 words a minute; pauses short and light, never a dramatic beat.';
+/** (round 6) the two lines that explain the app, at an easy, natural pace */
+const NATURAL = 'Natural and conversational, about 160 words a minute; relaxed and clear, every word given its room, no rushing.';
 
 export const CAPTIONS = [
   // the hook, on screen from frame 0 (the scene sets it big)
@@ -111,12 +113,18 @@ export const CAPTIONS = [
   // is the line's softest word, so it is lifted 3dB (audio/synth-vo.py `lift`)
   { at: 182, to: 274, lift: [0.14, 3], text: 'You even saved a video\non procrastination.', style: 'Delighted, catching a friend out, quick, a laugh building toward "procrastination" and landing on it with a grin.', pace: PACE },
   { at: 276, to: 338, text: 'Relax.\nMachina watched it.', duck: 0.4, style: '"Relax." warm and reassuring, then straight on, conspiratorial and pleased, the name with a smile; quick and light, no drawn-out words.', pace: PACE },
-  { at: 352, to: 408, text: 'Every Sunday,\nit writes up your week,', style: 'Warm and inviting, like describing a lovely little ritual; quick, flowing straight on, the sentence is not finished.', pace: PACE },
-  // (round 5, owner: "To do items are actually added automatically immediately
-  // with an added card, not once a week") the to-dos are not part of the
-  // Sunday write-up: each save's "Do this" line comes with its card
-  { at: 412, to: 494, text: 'and the moment you save,\nit pulls out what to actually do.', style: 'The same sentence continuing, bright and confident: "the moment you save" quick and easy, as if it is nothing, then landing softly on "do" with a smile; quick.', pace: PACE },
+  // (round 6, owner: "it should be clear to the user that Machina creates an
+  // action item or to do from each card, and then we have the weekly
+  // synthesis") the to-dos come straight after the card, said outright; the
+  // analysis writes one only when a save supports a concrete action
+  // (functions/ai_service.py: "include only when genuine"), so: every save
+  // you can act on. Voiced at a natural pace (round 5's line was directed
+  // "quick" twice and came out rushed)
+  { at: 343, to: 440, text: 'For every save you can act on,\nit writes you a to-do.', style: 'Clear and warm, explaining the trick to a friend at an easy, natural pace, never rushed: a small breath after "act on", then "it writes you a to-do" with a smile, landing on "to-do".', pace: NATURAL },
   { at: 548, to: 604, text: 'Even the\nprocrastination one.', style: 'A delighted, teasing callback with a laugh in the voice, quick and light; landing on "one" with a grin.', pace: PACE },
+  // (round 6) and then the week: this week's synthesis, opened in Revisit
+  // right under "All done."
+  { at: 628, to: 700, text: 'And every Sunday,\nit writes up your week.', style: 'Warm and inviting, like describing a lovely little ritual: an easy, natural pace, a light lift on "Sunday", the sentence finished and settled on "week".', pace: NATURAL },
   // the sign-off: FIND THE BOOK's take, word for word (the same key, so the
   // same voice and the same read: the house sign-off)
   { at: 726, to: 828, place: 'scene', text: 'Machina.\nEverything you save, finally useful.', duck: 0.4, style: 'A confident, warm sign-off; the name with a smile, then the tagline sincere but brisk, no drawn-out words.', pace: PACE },
