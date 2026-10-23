@@ -658,27 +658,33 @@ export const SAVETHIS = {
  * FIND THE BOOK (clips/needle-timeline.mjs): the needle in your saves. The
  * hook dares the viewer to find "the book Sam told you to read" in a field
  * of this account's saves, every one a card the real app rendered; the one it
- * means is `piranesi` (a screenshot of Sam's text), in plain sight on frame
- * 0. Ask then finds it from the half-remembered question.
+ * means is `atomichabits` (a screenshot of Sam's text), in plain sight on
+ * frame 0. Ask then finds it from the half-remembered question.
  *
- * A haystack needs hay: `extra` adds 31 more saves for this take only (the
+ * A haystack needs hay: `extra` adds 32 more saves for this take only (the
  * other videos keep the 24). Same rules as CARDS: real things, published
  * titles, summaries true to the source, invented Instagram handles, no
  * third-party images, nothing on "AI". Several are BOOKS on purpose: they
  * are the decoys the dare is played against.
  */
 export const NEEDLE = {
-  /** no cooking content (owner, 2026-10-02) */
-  without: ['marcella', 'chicken'],
+  /** no cooking content (owner, 2026-10-02); (round 2, owner: a book
+   *  everyone knows) Sam's book is Atomic Habits, so Piranesi goes (one
+   *  "Sam's pick" only) and so do the two James Clear saves (the "systems"
+   *  post is a line from the book, and the 2-minute rule is its chapter),
+   *  which would read as near-twins of the needle */
+  without: ['marcella', 'chicken', 'piranesi', 'systems'],
   withoutCollections: ['cook'],
-  /** Sam's screenshot was saved months ago, which is why nobody remembers it */
-  ages: { piranesi: 142 },
+  /** (moves an existing save's date; the needle carries its own `age`) */
+  ages: {},
+  /** the needle: Sam's screenshot, saved months ago */
+  needle: 'atomichabits',
   ask: {
     question: 'What was the book Sam told me to read?',
     // every claim is on the card: its title, its summary, its note
     answer:
-      'Piranesi, by Susanna Clarke. It’s Sam’s pick, from a screenshot you saved: a short, strange novel about a man who lives in a house of endless halls and tides. Sam’s advice: go in blind, and don’t read the back cover.',
-    sources: ['piranesi'],
+      'Atomic Habits, by James Clear. It’s Sam’s pick, from a screenshot you saved: tiny habits, repeated every day, compound into remarkable results. Sam’s advice: start with the two-minute rule.',
+    sources: ['atomichabits'],
   },
   extra: [
     { id: 'robinson', url: 'https://www.youtube.com/@TED', title: 'Do schools kill creativity?', summary: 'Sir Ken Robinson’s funny, moving case that schools educate children out of their creativity, and that it deserves the same status as literacy.', category: 'Education', tags: ['creativity', 'school'], concepts: ['creativity', 'education'], sourceType: 'youtube', sourceName: 'YouTube', youtubeChannel: 'TED', readTime: 20, age: 88 },
@@ -698,7 +704,6 @@ export const NEEDLE = {
     { id: 'makers', url: 'https://paulgraham.com/makersschedule.html', title: 'Maker’s Schedule, Manager’s Schedule', summary: 'Why one meeting can wreck a maker’s afternoon: makers work in units of half a day, managers in hours.', category: 'Work', tags: ['focus', 'meetings'], concepts: ['work', 'attention'], sourceType: 'web', sourceName: 'Paul Graham', readTime: 6, age: 140 },
     { id: 'sivers', url: 'https://sive.rs/hellyeah', title: 'Hell Yeah or No', summary: 'If you’re not saying “hell yeah” about something, say no. Saying no to almost everything leaves room for the few things that matter.', category: 'Decisions', tags: ['decisions', 'focus'], concepts: ['decisions', 'attention'], sourceType: 'web', sourceName: 'Derek Sivers', readTime: 2, age: 115 },
     { id: 'truefans', url: 'https://kk.org/thetechnium/1000-true-fans/', title: '1,000 True Fans', summary: 'To make a living as a creator you don’t need millions of fans, only about a thousand true fans who will buy whatever you make.', category: 'Creativity', tags: ['creators', 'audience'], concepts: ['creativity', 'work'], sourceType: 'web', sourceName: 'Kevin Kelly', readTime: 12, age: 150 },
-    { id: 'twominute', url: 'https://jamesclear.com/how-to-stop-procrastinating', title: 'How to Stop Procrastinating by Using the “2-Minute Rule”', summary: 'When you start a new habit, it should take less than two minutes to do. Master showing up first, then get better.', category: 'Habits', tags: ['habits', 'procrastination'], concepts: ['habits', 'procrastination'], sourceType: 'web', sourceName: 'James Clear', readTime: 6, age: 72 },
     { id: 'hailmary', url: 'https://www.andyweirauthor.com/', title: 'Project Hail Mary', summary: 'A science teacher wakes up alone on a spaceship with no memory of how he got there, and has to work out how to save Earth.', category: 'Books', tags: ['novels', 'sci-fi'], concepts: ['fiction', 'space'], sourceType: 'web', sourceName: 'Andy Weir', readTime: 3, age: 66 },
     { id: 'kahneman', url: 'https://www.goodreads.com/', title: 'Thinking, Fast and Slow', summary: 'Daniel Kahneman on the two systems behind how we think, one fast and intuitive, one slow and deliberate, and the errors that come from trusting the first.', category: 'Books', tags: ['psychology', 'decisions'], concepts: ['psychology', 'decisions'], sourceType: 'web', sourceName: 'Goodreads', readTime: 3, age: 106 },
     { id: 'range', url: 'https://davidepstein.com/range/', title: 'Range: Why Generalists Triumph in a Specialized World', summary: 'David Epstein’s case for breadth: people who sample widely and specialize late often go further than early specialists.', category: 'Books', tags: ['careers', 'learning'], concepts: ['work', 'curiosity'], sourceType: 'web', sourceName: 'David Epstein', readTime: 4, age: 124 },
@@ -711,6 +716,11 @@ export const NEEDLE = {
     { id: 'butterick', url: 'https://practicaltypography.com/', title: 'Butterick’s Practical Typography', summary: 'A free online book on typography for everyday writers. The first rule: get the body text right, then everything else.', category: 'Design', tags: ['typography', 'writing'], concepts: ['design', 'writing'], sourceType: 'web', sourceName: 'Matthew Butterick', readTime: 10, age: 118 },
     { id: 'paleblue', url: 'https://science.nasa.gov/', title: 'Pale Blue Dot', summary: 'Voyager 1’s 1990 photo of Earth from about six billion kilometers away, a speck in a sunbeam, and Carl Sagan’s reflection on it.', category: 'Space', tags: ['voyager', 'perspective'], concepts: ['space', 'perspective'], sourceType: 'web', sourceName: 'NASA', readTime: 3, age: 112 },
     { id: 'pomodoro', url: 'https://www.pomodorotechnique.com/', title: 'The Pomodoro Technique', summary: 'Work for 25 minutes, take a 5-minute break, and after four rounds take a longer one. A kitchen timer is the whole system.', category: 'Productivity', tags: ['focus', 'timers'], concepts: ['attention', 'work'], sourceType: 'web', sourceName: 'Francesco Cirillo', readTime: 4, age: 131 },
+    // the needle: a screenshot of Sam's text, as the app files it (its note
+    // is the advice Sam added; Weekend plans is where it was collected)
+    { id: 'atomichabits', url: 'capture://screenshot/atomic-habits.png', title: 'Read Atomic Habits, start small', summary: 'Sam’s pick: James Clear on how tiny habits, repeated every day, compound into remarkable results. Make them obvious, attractive, easy and satisfying.', category: 'Books', tags: ['habits', 'from-sam'], concepts: ['habits', 'recommendation'], sourceType: 'image', sourceName: 'Screenshot', readTime: 1, age: 142, note: 'Sam says start with the two-minute rule.', collections: ['weekend'] },
+    // a decoy everyone knows, on frame 0 beside Project Hail Mary
+    { id: 'dune', url: 'https://www.instagram.com/slowshelf/', title: 'Dune', summary: 'Frank Herbert’s desert-planet epic of politics, prophecy and the spice everyone wants. Book one of six.', category: 'Books', tags: ['sci-fi', 'classics'], concepts: ['fiction', 'space'], sourceType: 'web', sourceName: '@slowshelf', readTime: 2, age: 61 },
     { id: 'spirited', url: 'https://www.ghibli.jp/', title: 'Spirited Away', summary: 'Hayao Miyazaki’s story of a girl who works in a bathhouse for spirits to save her parents. It won the Oscar for Best Animated Feature.', category: 'Film', tags: ['animation', 'ghibli'], concepts: ['film', 'stories'], sourceType: 'web', sourceName: 'Studio Ghibli', readTime: 2, age: 141 },
   ],
 };

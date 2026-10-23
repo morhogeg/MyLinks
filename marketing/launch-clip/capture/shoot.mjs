@@ -151,6 +151,7 @@ async function prepareNeedle() {
         if (d) C.set(p, { ...d, createdAt: now - age * day });
       }
       for (const c of n.extra) {
+        const createdAt = Math.round(now - c.age * day);
         C.set(`users/${uid}/links/${c.id}`, {
           url: c.url,
           title: c.title,
@@ -159,17 +160,19 @@ async function prepareNeedle() {
           tags: c.tags,
           category: c.category,
           status: 'unread',
-          createdAt: Math.round(now - c.age * day),
+          createdAt,
           sourceType: c.sourceType,
           language: 'en',
           concepts: c.concepts,
           relatedLinks: [],
-          collectionIds: [],
+          collectionIds: c.collections ?? [],
           reminderStatus: 'none',
           // no third-party imagery (brand rule), as the seed does
           hideThumbnail: true,
           metadata: { originalTitle: c.title, estimatedReadTime: c.readTime, ...(c.youtubeChannel ? { youtubeChannel: c.youtubeChannel } : {}) },
           ...(c.sourceName ? { sourceName: c.sourceName } : {}),
+          // a note the user added, written as the seed writes one
+          ...(c.note ? { userNotes: [{ id: `${c.id}-note`, text: c.note, createdAt: createdAt + 3_600_000 }] } : {}),
         });
       }
     },

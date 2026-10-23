@@ -99,7 +99,9 @@ export const EndCard: React.FC<{ f: number; show: boolean }> = ({ f, show }) => 
           width: folding ? tightW : MARK_W,
           height: MARK_H,
           color: INK,
-          opacity: prog(f, from, from + 4, (t) => t * t * (3 - 2 * t)) * (1 - dotGone),
+          // (round 2) its first corner ticks only once the paper has mostly
+          // covered the app: on the app's text they read as grey blocks
+          opacity: prog(f, HITS.lockup - 9, HITS.lockup - 3, (t) => t * t * (3 - 2 * t)) * (1 - dotGone),
           filter: `drop-shadow(0 10px 30px rgba(24,32,48,${0.16 * (1 - open)}))`,
         }}
       >

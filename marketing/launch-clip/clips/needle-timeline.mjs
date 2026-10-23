@@ -106,9 +106,10 @@ export const CAPTIONS = [
   { at: 452, to: 510, text: 'It’s read every\nsingle one.', style: 'Impressed and warm, quick, a little awed, as if watching it happen right now; no drawn-out words.', pace: PACE },
   { at: 525, to: 572, text: 'Even that screenshot.', style: 'A delighted, quick aside with a small laugh in the voice, pointing at one thing.', pace: PACE },
   // (round 2, owner: a book everyone knows) the payoff in two: the voice
-  // names the book on the find, then reads Sam's advice off the real answer
-  { at: HITS.found + 6, to: HITS.answer - 2, text: 'Atomic Habits.', style: 'The reveal, recognizing it: "Atomic Habits" said clearly, with a delighted, satisfied smile, like spotting a friend across a crowded room; quick and light, one breath.', pace: PACE },
-  { at: HITS.answer + 4, to: 676, text: 'Sam said start with\nthe two-minute rule.', style: 'Warm and quick, passing on a friend\'s advice with a smile; light, no drawn-out words, landing softly on "rule".', pace: PACE },
+  // names the book just after the find's hit (its take carries over the dive
+  // into the answer), then reads Sam's advice off the real answer
+  { at: HITS.found + 4, to: 610, text: 'Atomic Habits.', style: 'The reveal, recognizing it: "Atomic Habits" said clearly, with a delighted, satisfied smile, like spotting a friend across a crowded room; quick and light, one breath.', pace: PACE },
+  { at: 613, to: 674, text: 'Sam said start with\nthe two-minute rule.', style: 'Warm and quick, passing on a friend\'s advice with a smile; light, no drawn-out words, landing softly on "rule".', pace: PACE },
   { at: HITS.lockup, to: 776, place: 'scene', text: 'Machina.\nEverything you save, finally useful.', duck: 0.4, style: 'A confident, warm sign-off; the name with a smile, then the tagline sincere but brisk, no drawn-out words.', pace: PACE },
   // the rewatch: the needle was on frame 0
   { at: HITS.ps, to: TOTAL_FRAMES + 6, text: 'P.S. It was in\nthe first frame.', duck: 0.4, style: 'A quick, playful aside, close and conspiratorial, like letting the listener in on a secret; light, no drawn-out words.', pace: PACE },

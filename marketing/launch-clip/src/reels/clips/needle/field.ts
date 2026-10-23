@@ -67,21 +67,25 @@ const fromScreen = (sx: number, sy: number, sw: number, cam: Cam = { x: 0, y: 0,
 
 // ─────────────────────────────────────────────────────────── layout A
 
+/** the needle: Sam's screenshot (capture/library.mjs `NEEDLE.needle`) */
+export const NEEDLE_ID = 'atomichabits';
+
 /**
  * Frame 0, art-directed: [id, screen x, screen y, rect width px, rx, ry, rz].
- * Sam's screenshot (`piranesi`) is lower left, sharp, readable if you know
- * what you are looking for, among four decoy books.
+ * Sam's screenshot is lower left, sharp, readable if you know what you are
+ * looking for; (round 2) every book around it is one people know, so the
+ * hunt is a hunt: Project Hail Mary and Dune lead the eye.
  */
 const FIRST_FRAME: [string, number, number, number, number, number, number][] = [
-  // the decoys lead the eye: two big book cards, one of them nearest
+  // the decoys lead the eye: two famous novels, one of them nearest
   ['hailmary', 700, 902, 520, 2, -12, 4],
-  ['fourthousand', 214, 826, 420, 3, 12, -6],
+  ['dune', 214, 826, 420, 3, 12, -6],
   ['tailend', 878, 1452, 556, -2, -9, 3],
   // the needle: lower left, smaller, turned away a little, its corner under
   // a nearer decoy; sharp, so a viewer who goes back can read it
-  ['piranesi', 300, 1252, 432, -4, 16, -7],
+  [NEEDLE_ID, 300, 1252, 432, -4, 16, -7],
   ['kahneman', 528, 1428, 468, -2, -10, 5],
-  ['overstory', 470, 752, 300, 0, -7, 4],
+  ['fourthousand', 470, 752, 300, 0, -7, 4],
   ['webb', 1046, 1186, 330, 1, -16, -3],
   ['mulafossur', 128, 1606, 468, -3, 12, 5],
   ['range', 934, 690, 262, 0, 6, -2],
@@ -90,6 +94,7 @@ const FIRST_FRAME: [string, number, number, number, number, number, number][] = 
   ['sinek', 706, 1196, 282, 1, -5, -4],
   ['seljalandsfoss', 986, 1716, 330, 2, -12, -4],
 ];
+
 /** the three the narrator names, each read as the camera passes it */
 export const NAMED: Record<'goloritze' | 'jobs' | 'coffee', { x: number; y: number; z: number; rx: number; ry: number; rz: number }> = {
   goloritze: { x: -430, y: 250, z: -3700, rx: 2, ry: 9, rz: -3 },
@@ -125,7 +130,7 @@ export const LAYOUT_A: Inst[] = (() => {
   rest.forEach((id, k) => put(id, -2100, -8800, rest.length, k, 'a'));
   // the deep haystack: everything but the needle and the named three, twice
   // more: once through the search, once past where it stops
-  const deep = CARDS.map((c) => c.id).filter((id) => id !== 'piranesi' && !(id in NAMED));
+  const deep = CARDS.map((c) => c.id).filter((id) => id !== NEEDLE_ID && !(id in NAMED));
   deep.forEach((id, k) => put(id, -2600, -8600, deep.length, k, 'am'));
   deep.forEach((id, k) => put(id, -8900, -14500, deep.length, k, 'a2'));
   // behind frame 0: small, soft cards between the heroes, so the first look
@@ -338,7 +343,7 @@ export const fieldBurst = (f: number): { cam: Cam; insts: Inst[] } => {
   const p = gatherPoint(FIRST_CAM, BURST_Y);
   const insts: Inst[] = [];
   for (const i of FIRST_FRAME_INSTS) {
-    const needle = i.id === 'piranesi';
+    const needle = i.id === NEEDLE_ID;
     const h = hash01(i.key + 'b');
     const start = needle ? BURST.needleFrom : BURST.from + Math.round(h * 10);
     const end = needle ? BURST.to : Math.min(BURST.to - 2, start + 22 + Math.round(h * 8));
@@ -364,12 +369,12 @@ export const WARP = { v0: 172, cruiseTo: HITS.brake, brakeTo: HITS.found, dFinal
 const CRUISE = WARP.v0 * (WARP.cruiseTo - HITS.send);
 const BRAKE = (WARP.v0 * (WARP.brakeTo - WARP.cruiseTo)) / 3;
 /** the needle, at the end of the tunnel */
-export const TARGET = { id: 'piranesi', x: 60, y: 40, z: -(CRUISE + BRAKE + WARP.dFinal) };
+export const TARGET = { id: NEEDLE_ID, x: 60, y: 40, z: -(CRUISE + BRAKE + WARP.dFinal) };
 
 export const LAYOUT_B: Inst[] = (() => {
   const r = rng(7);
   const out: Inst[] = [];
-  const ids = CARDS.map((c) => c.id).filter((id) => id !== 'piranesi');
+  const ids = CARDS.map((c) => c.id).filter((id) => id !== NEEDLE_ID);
   const n = ids.length * 5;
   for (let k = 0; k < n; k++) {
     const id = ids[k % ids.length];

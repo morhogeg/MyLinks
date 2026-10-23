@@ -233,14 +233,15 @@ const arrange = (o) => {
   // the dive
   whoosh(t(H.dive), (H.answer - H.dive) / FPS + 0.08, 0.07, 0);
 
-  // ── the answer: it resolves; a warm keys line between the words; the citation's ping
+  // ── the answer: it resolves under the voice; (round 2) Sam's advice runs
+  // through the citation's highlight, so the ping is seen, not heard, and the
+  // warm keys wait for the line to finish: a cadence into the sign-off
   sub(t(H.answer), 48, 0.34, 0.6);
+  const advised = afterVoice(H.answer + 20);
   [
-    [H.answer + 30, 79],
-    [H.answer + 34, 84],
+    [advised, 79],
+    [advised + 4, 84],
   ].forEach(([fr, m]) => keys(t(fr), m, 0.06, 0.1, 1.4));
-  ping(t(H.ping), 88, 0.11, 0.1, 0.9, () => 1 / 0.55);
-  tick(t(H.ping), 0.05, 1.7);
 
   // ── the sign-off: the mark's point strikes on "Machina" (lighter than the turn)
   impact(t(H.lockup + 1), 0.2);
