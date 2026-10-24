@@ -2637,6 +2637,20 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-24 — FIND THE BOOK round 6: what Machina does; the quote,
+  struck; no timer bar (owner notes on round 5, both versions).** Branch
+  `claude/reel-find-the-book`. The tunnel's line now sells the capability:
+  "Every save: read, summarized, sorted, linked." (what the analysis does
+  on save: summary, category and tags, related saves; past tense, so it
+  doesn't sound like a read-through at the moment of the question; run 26,
+  2.55s, its last three words on the drop's kicks). Over the answer the
+  caption is the quote alone, "Wait, what was it called?", with the voice
+  still saying "No more…" (a caption's `say`), struck through in ink once
+  said (`KineticLine` `strike`). The dare's timer bar and ticks are gone.
+  Found on review: the paper scrim is now the paper's own gradient (a flat
+  tone showed as a band over the sign-off), held while that paper rises
+  (fading together let the status bar ghost through). Gates pass on both
+  (71/72 spoken words, −14.01/−14.02 LUFS, −1.25 dBTP).
 - **2026-10-24 — FIND THE BOOK round 5: studio polish (owner: "make it
   perfect"; the captions took too much of the frame; "Give up?" too
   abrupt).** Branch `claude/reel-find-the-book`, both versions. Captions
