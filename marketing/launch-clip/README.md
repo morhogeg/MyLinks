@@ -901,7 +901,7 @@ node scripts/needle-stills.mjs         # review stills → out/needle-stills/
 
 | Time | Picture | On screen | Voice | Sound |
 |---|---|---|---|---|
-| 0:00 | The dare over the field (also the cover): 13 placed saves, famous decoy books leading the eye (Project Hail Mary, Dune), the needle lower left, smaller, turned, its corner under "Thinking, Fast and Slow"; under the type an ink timer runs out over 2s | BET YOU CAN'T / find the book / Sam told you / to read. | "Bet you can't find the book Sam told you to read." | a chord stab and a kick (where the loop lands); the timer ticks on each beat |
+| 0:00 | The dare over the field (also the cover): 13 placed saves, famous decoy books leading the eye (Project Hail Mary, Dune), the needle lower left, smaller, turned, its corner under "Thinking, Fast and Slow"; under the type a countdown bar runs out over 2s | BET YOU CAN'T / find the book / Sam told you / to read. | "Bet you can't find the book Sam told you to read." | a chord stab and a kick (where the loop lands); the timer ticks on each beat |
 | 0:02.0 | The timer runs out; a slow push while the eye scans | | | a rising keys figure |
 | 0:02.5 | The camera starts into the field | It's in your saves / somewhere. | "It's in your saves somewhere." | hats in, half-time kick |
 | 0:04.5 | A slalom through the haystack: each named save swings into the middle, sharp, pops with the ink ring as it is said, and anything nearer steps out of its way | Past the beach / you swore you'd visit, · the talk you'll / finish later, · the coffee trick / you'll never try. | the list, quicker each time | four on the floor, 16th hats, a whoosh between saves |
@@ -968,6 +968,21 @@ strike −12dB, the build into the drop −30 → −20dB, the drop −8dB, the 
 AAC-LC 48kHz 320k, 20.6MB; every frame pair scanned (no one-frame flash; the
 six range seams move like their neighbours); frame 839 against frame 0 under
 the type: 35.2dB PSNR. Nobody has listened to it on speakers.
+
+**Round 5 (owner: a polish round, studio grade).** The captions take less
+of the frame: the band sits high in the safe area (`Needle.tsx` `BAND`: top
+268, 60px) on a shallower paper scrim (to 410, clear by 550), and the dare
+is a touch tighter (96px). "Give up?" is re-voiced relaxed (0.61s, was
+0.31s) and lands just after the camera's slam. Craft fixes, each seen on a
+frame: the dare's timer is a countdown bar (a faint track the ink runs out
+of); the gather's brackets stay solid ink as they sweep in
+(`CitationGlyph` `fade`); the mark arrives at the match cut at Ask's own
+pull-back speed (no brake on the cut); cards passing the lens dissolve
+(from ~500 in) instead of smearing; over the answer, the paper covers the
+status bar whole and clears above the header; the sign-off mark loses its
+drop shadow and the seam where its arms' reveals meet. Rendering: the
+heap makes a browser take 2–3GB, so render at most five ranges at a time
+(`xargs -P 5`; thirteen at once ran out of memory).
 
 **Round 4 (owner, on round 3).** The dare reads as a dare: a BET YOU CAN'T
 kicker over the big type and an ink timer under it that runs out on the push

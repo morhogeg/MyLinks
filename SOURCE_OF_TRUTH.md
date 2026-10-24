@@ -2637,6 +2637,21 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-24 — FIND THE BOOK round 5: studio polish (owner: "make it
+  perfect"; the captions took too much of the frame; "Give up?" too
+  abrupt).** Branch `claude/reel-find-the-book`, both versions. Captions
+  sit high in the safe area a size down on a shallower scrim (the field
+  now shows from ~400px, was ~720px); "Give up?" re-voiced relaxed (run
+  24; 0.61s, was 0.31s), just after the camera's slam. Fixes found by a
+  frame-by-frame review: the dare's timer is a countdown bar; the gather's
+  brackets stay solid ink (they read grey fading in); the match cut into
+  Ask no longer brakes (the mark arrives at the app camera's own speed);
+  cards passing the lens dissolve instead of smearing; the answer's scrim
+  covers the status bar whole and clears above the header; the sign-off
+  mark loses its drop shadow and a one-frame seam in its arms (the shared
+  `src/ui/Brand.tsx`: an opt-out `fade` on `CitationGlyph`, and its arms'
+  reveals overlap by 2 units). Gates pass on both (71/72 words, −14.05 /
+  −14.01 LUFS, −1.20 dBTP).
 - **2026-10-23 — FIND THE BOOK round 4: the dare reads as a dare; "Give
   up?" in the middle of the pile (owner notes on round 3, both versions).**
   Branch `claude/reel-find-the-book`. The first line now opens on a kicker,
