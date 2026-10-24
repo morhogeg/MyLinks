@@ -2651,7 +2651,11 @@ exact-match, capped.
   mark loses its drop shadow and a one-frame seam in its arms (the shared
   `src/ui/Brand.tsx`: an opt-out `fade` on `CitationGlyph`, and its arms'
   reveals overlap by 2 units). Gates pass on both (71/72 words, −14.05 /
-  −14.01 LUFS, −1.20 dBTP).
+  −14.01 LUFS, −1.20 dBTP). **Verified:** the encodes (840 frames, 28.000s,
+  H.264 High yuv420p BT.709, AAC 48kHz; 23.2MB each), every frame pair
+  scanned (no one-frame flash), the loop seam under the type 35.3dB, sheets
+  of every changed beat; rendered as 20 ranges, 5 at a time (no memory
+  failures). **Not verified:** listened to on speakers.
 - **2026-10-23 — FIND THE BOOK round 4: the dare reads as a dare; "Give
   up?" in the middle of the pile (owner notes on round 3, both versions).**
   Branch `claude/reel-find-the-book`. The first line now opens on a kicker,
