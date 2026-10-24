@@ -2650,7 +2650,10 @@ exact-match, capped.
   Found on review: the paper scrim is now the paper's own gradient (a flat
   tone showed as a band over the sign-off), held while that paper rises
   (fading together let the status bar ghost through). Gates pass on both
-  (71/72 spoken words, −14.01/−14.02 LUFS, −1.25 dBTP).
+  (71/72 spoken words, −14.01/−14.02 LUFS, −1.25 dBTP). **Verified:** the
+  encodes (840 frames, 28.000s, H.264 High yuv420p BT.709, AAC 48kHz;
+  23.6/23.4MB), no one-frame flash, loop seam 35.3dB under the type, the
+  strike in both files. **Not verified:** listened to on speakers.
 - **2026-10-24 — FIND THE BOOK round 5: studio polish (owner: "make it
   perfect"; the captions took too much of the frame; "Give up?" too
   abrupt).** Branch `claude/reel-find-the-book`, both versions. Captions
