@@ -115,7 +115,7 @@ export const CAPTIONS = [
   // category and tags, linked it to related saves), past tense: done
   // already, not at the moment of the question; a word on each kick of the
   // drop as the tunnel streams past
-  { at: 452, to: 523, text: 'Every save: read,\nsummarized, sorted, linked.', style: 'Impressed and warm: "Every save" lightly, then the four words in rhythm, each one punched lightly like a beat, a small gap between them; never shouted, no drawn-out words.', pace: 'Rhythmic for this line: the four words about half a second apart, like beats.' },
+  { at: 452, to: 524, text: 'Every save: read,\nsummarized, sorted, linked.', style: 'Impressed and warm, brisk: "Every save" lightly, then the four words crisp and quick, the smallest beat between them, like ticking off a list; the whole line in about two seconds; never shouted.', pace: PACE },
   { at: 525, to: 572, text: 'Even that screenshot.', style: 'A delighted, quick aside with a small laugh in the voice, pointing at one thing.', pace: PACE },
   // (round 2, owner: a book everyone knows) the payoff in two: the voice
   // names the book just after the find's hit (its take carries over the dive
