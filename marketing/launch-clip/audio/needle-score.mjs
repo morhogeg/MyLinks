@@ -110,8 +110,6 @@ const arrange = (o) => {
   kick(t(0), 0.5);
   sub(t(0), 33, 0.42, 0.55);
   [57, 60, 64, 67, 72].forEach((m, i) => keys(t(0), m, 0.085, ((i / 4) * 2 - 1) * 0.5, 1.2));
-  // (round 4) the dare's timer, ticking on the beats to the push
-  for (const fr of [BEAT_FRAMES, 2 * BEAT_FRAMES, 3 * BEAT_FRAMES]) tick(t(fr), 0.05, 1.15);
   // the scanning beat after the line: a playful figure, a question that rises
   [
     [48, 76],

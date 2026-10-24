@@ -44,7 +44,7 @@ const BANNED = [
   [/\blibrar(y|ies)\b/i, '"library"'],
 ];
 const strings = [
-  ...CAPTIONS.map((c) => ['caption', c.text]),
+  ...CAPTIONS.flatMap((c) => [['caption', c.text], ...(c.say ? [['narration', c.say]] : [])]),
   ['question', NEEDLE.ask.question],
   ['answer', NEEDLE.ask.answer],
   ...NEEDLE.extra.flatMap((c) => [
@@ -76,16 +76,16 @@ const band = CAPTIONS.filter((c) => c.place !== 'scene');
 for (let i = 1; i < band.length; i++) if (band[i].at < band[i - 1].to) fail(`captions overlap: "${band[i - 1].text}" / "${band[i].text}"`);
 if (CAPTIONS.at(-1).to - 5 < TOTAL_FRAMES) fail('the P.S. leaves before the last frame');
 ok(`timing: ${CAPTIONS.length} lines inside their windows, none overlapping; the P.S. up on the last frame`);
-const totalWords = CAPTIONS.reduce((n, c) => n + c.text.split(/\s+/).length, 0);
+const totalWords = CAPTIONS.reduce((n, c) => n + (c.say ?? c.text).split(/\s+/).length, 0);
 (totalWords <= 75 ? ok : fail)(`script: ${totalWords} words (the brief: under about 75)`);
 
-// ── the safe area: the dare (Needle.tsx `DARE`: top 262, the kicker, three
-// lines of 96px and the timer under them) and the band lines (`BAND`: top
+// ── the safe area: the dare (Needle.tsx `DARE`: top 262, the kicker and
+// three lines of 96px) and the band lines (`BAND`: top
 // 268, two lines of 60px) stay clear of the top 250px; the lockup's lowest
 // row (812 + 261 + 55) clears the bottom 340px
 const SAFE = { top: 250, bottom: HEIGHT - 340 };
 const boxes = [
-  ['the dare', 262, 262 + 42 * 1.1 + 14 + 3 * 96 * 1.02 + 22 + 6],
+  ['the dare', 262, 262 + 42 * 1.1 + 14 + 3 * 96 * 1.02],
   ['a line', 268, 268 + 2 * 60 * 1.12],
   ['the lockup', 812 - 108, 812 + 261 + 55],
 ];

@@ -2,14 +2,13 @@ import React from 'react';
 import { AbsoluteFill, Audio, staticFile, useCurrentFrame } from 'remotion';
 import { FPS, HITS, TOTAL_FRAMES } from '../../../../clips/needle-timeline.mjs';
 import { sans } from '../../../fonts';
-import { clearOf } from '../../kit/Captions';
 import { CLOCK } from '../../kit/camera';
 import { EASE_IN_OUT, EASE_MODAL, EASE_SPRING, prog } from '../../kit/curves';
 import { Lens } from '../../kit/Paper';
 import { INK, KineticLine } from '../../kit/Type';
 import { App } from './App';
 import { EndCard, GatherMark, signOffPaper } from './Brand';
-import { FIELD_BG, MotionField, type FieldState } from './Field';
+import { FIELD_BG, MotionField, paperAt, type FieldState } from './Field';
 import { BURST, FOCAL, FRAME, READS, SEARCH_END, cameraA, cameraB, fieldA, fieldB, fieldBurst, focusA, focusB, geom, targetAt, TARGET, WARP } from './field';
 import { NEEDLE } from './variant';
 
@@ -26,10 +25,8 @@ import { NEEDLE } from './variant';
  * house grade (ink on paper).
  */
 
-const TONE = '#F8F9FB';
 const CAPTIONS = NEEDLE.captions;
 const VO = NEEDLE.vo;
-const linear = (t: number) => t;
 
 /** how many shutter samples a frame needs: more the faster things move */
 const samplesA = (f: number) => {
@@ -118,21 +115,18 @@ const FindPing: React.FC<{ f: number }> = ({ f }) => {
 /**
  * The dare, set big over the field on frame 0; it rolls out as the search
  * starts. (round 4, owner: it took a while to read as a dare) It says so: its
- * first line is a kicker, BET YOU CAN'T, over the big type, and under it an
- * ink timer runs out on the push, where the camera dives in to look for you.
+ * first line is a kicker, BET YOU CAN'T, over the big type. (round 6: the
+ * timer bar under it went; the kicker does the job.)
  */
 const HOOK = CAPTIONS[0];
 /** the dare's type, px: the kicker, the big lines and the timer under them */
-export const DARE = { top: 262, kicker: 42, kickerGap: 14, size: 96, timerGap: 22, timer: 6, timerW: 480 };
+export const DARE = { top: 262, kicker: 42, kickerGap: 14, size: 96 };
 const Hook: React.FC<{ f: number }> = ({ f }) => {
   if (f >= HOOK.to + 1) return null;
   const all = HOOK.text.split('\n');
   const kicker = HOOK.kicker ? all[0] : null;
   const lines = HOOK.kicker ? all.slice(1) : all;
   const out = prog(f, HOOK.to - 7, HOOK.to, (t) => t * t * t);
-  // a countdown bar: full on frame 0 (the cover, and where the loop lands),
-  // running out right to left over its track, empty on the push
-  const left = 1 - prog(f, 0, HITS.push, linear);
   const roll = { transform: `translateY(${Math.round(-out * 108)}%)` };
   const clip = { overflow: 'hidden', padding: '0.04em 0.12em 0.12em', margin: '-0.04em 0 -0.12em' } as const;
   return (
@@ -174,11 +168,6 @@ const Hook: React.FC<{ f: number }> = ({ f }) => {
           </div>
         </div>
       ))}
-      <div style={{ ...clip, marginTop: DARE.timerGap - 0.04 * 16 }}>
-        <div style={{ ...roll, position: 'relative', width: DARE.timerW, height: DARE.timer, borderRadius: DARE.timer / 2, background: 'rgba(20,20,27,0.12)' }}>
-          {left > 0 && <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: DARE.timerW * left, borderRadius: DARE.timer / 2, background: INK }} />}
-        </div>
-      </div>
     </div>
   );
 };
@@ -191,10 +180,17 @@ const Lines: React.FC<{ f: number }> = ({ f }) => (
   <AbsoluteFill style={{ pointerEvents: 'none' }}>
     {CAPTIONS.filter((c) => c.place !== 'scene').map((c) => {
       const t = VO.find((v) => v.frame === c.at);
-      const starts = t?.words.map((s) => Math.round(s * FPS));
+      // (round 6) a line can show less than is said (`say`): what is shown
+      // is the end of what is said, so its words take the last timings
+      const skip = c.say ? c.say.split(/\s+/).length - c.text.split(/\s+/).length : 0;
+      const starts = t?.words.slice(skip).map((s) => Math.round(s * FPS));
+      // struck through as its last word is said ("no more"), drawn over 8
+      // frames, held a moment before the line leaves
+      const end = c.at + (starts?.[starts.length - 1] ?? 0);
+      const strike = c.strike ? prog(f, end + 1, end + 9, EASE_MODAL) : 0;
       return (
         <div key={c.at} style={{ position: 'absolute', left: 0, right: 0, top: BAND.top, display: 'flex', justifyContent: 'center' }}>
-          <KineticLine text={c.text} frame={f} from={c.at} to={c.to} starts={starts} size={BAND.size} weight={650} width={1000} />
+          <KineticLine text={c.text} frame={f} from={c.at} to={c.to} starts={starts} size={BAND.size} weight={650} width={1000} strike={strike} />
         </div>
       );
     })}
@@ -208,15 +204,17 @@ const Lines: React.FC<{ f: number }> = ({ f }) => (
  */
 const scrimAt = (f: number) => {
   // [solid until, clear by, opacity]
-  if (f < HOOK.to + 4) return { solid: 640, clear: 830, o: 1 };
+  if (f < HOOK.to + 4) return { solid: 625, clear: 805, o: 1 };
   if (f >= HITS.typing - 2 && f < HITS.send) return { solid: 280, clear: 520, o: 1 };
   // (round 5) over the answer the paper covers the app's status bar whole
   // and clears in the gap above its header (status text ≤ 490px, header text
   // ≥ 560px through the slow push), so nothing half-shows
-  if (f >= HITS.answer && f < HITS.lockup) return { solid: 505, clear: 548, o: 1 - prog(f, HITS.lockup - 15, HITS.lockup - 3, EASE_IN_OUT) };
+  // (round 6) held whole while the sign-off's paper rises over the app (fading
+  // with it, the two together left the status bar ghosting through)
+  if (f >= HITS.answer && f < HITS.lockup) return { solid: 505, clear: 548, o: 1 };
   if (f >= HITS.lockup && f < HITS.ps - 2) return { solid: 410, clear: 550, o: 0 };
   // the P.S. sits in the dare's own scrim, so the loop's seam is invisible
-  if (f >= HITS.ps - 2) return { solid: 640, clear: 830, o: 1 };
+  if (f >= HITS.ps - 2) return { solid: 625, clear: 805, o: 1 };
   const on = CAPTIONS.some((c) => c.place !== 'scene' && f >= c.at - 8 && f <= c.to + 4);
   return { solid: 410, clear: 550, o: on ? 1 : 0.0 };
 };
@@ -249,7 +247,10 @@ export const Needle: React.FC<{ withAudio?: boolean; withCaptions?: boolean }> =
           style={{
             pointerEvents: 'none',
             opacity: o,
-            background: `linear-gradient(180deg, ${TONE} 0px, ${TONE} ${sc.solid}px, ${clearOf(TONE)} ${sc.clear}px)`,
+            // (round 6) the paper itself, its own colour at every height, so
+            // over the sign-off's paper it is invisible (one flat tone showed
+            // as a lighter band there)
+            background: `linear-gradient(180deg, ${paperAt(0)} 0px, ${paperAt(sc.solid)} ${sc.solid}px, ${paperAt(sc.clear, 0)} ${sc.clear}px)`,
           }}
         />
       )}

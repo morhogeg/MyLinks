@@ -23,7 +23,24 @@ import { NEEDLE } from './variant';
  * mean). Fast moves get more samples; a still frame gets one.
  */
 
-export const FIELD_BG = 'linear-gradient(180deg, #F8F9FB 0%, #F1F3F6 58%, #ECEEF2 100%)';
+/** the paper: [fraction of the frame's height, rgb], top to bottom */
+const PAPER: [number, [number, number, number]][] = [
+  [0, [0xf8, 0xf9, 0xfb]],
+  [0.58, [0xf1, 0xf3, 0xf6]],
+  [1, [0xec, 0xee, 0xf2]],
+];
+const hex = (c: number[]) => `#${c.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+export const FIELD_BG = `linear-gradient(180deg, ${PAPER.map(([p, c]) => `${hex(c)} ${p * 100}%`).join(', ')})`;
+/** the paper's colour at a height (px), with an alpha: so a scrim can BE the paper */
+export const paperAt = (y: number, alpha = 1) => {
+  const t = Math.min(1, Math.max(0, y / FRAME.h));
+  const k = t <= PAPER[1][0] ? 0 : 1;
+  const [t0, c0] = PAPER[k];
+  const [t1, c1] = PAPER[k + 1];
+  const u = (t - t0) / (t1 - t0);
+  const c = c0.map((v, i) => Math.round(v + (c1[i] - v) * u));
+  return `rgba(${c.join(', ')}, ${alpha})`;
+};
 
 const FOG: [number, number] = [4200, 9400];
 const smooth = (a: number, b: number, x: number) => {

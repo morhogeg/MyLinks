@@ -115,8 +115,8 @@ export const CAPTIONS = [
   // category and tags, linked it to related saves), past tense: done
   // already, not at the moment of the question; a word on each kick of the
   // drop as the tunnel streams past
-  { at: 452, to: 524, text: 'Every save: read,\nsummarized, sorted, linked.', style: 'Impressed and warm, brisk: "Every save" lightly, then the four words crisp and quick, the smallest beat between them, like ticking off a list; the whole line in about two seconds; never shouted.', pace: PACE },
-  { at: 525, to: 572, text: 'Even that screenshot.', style: 'A delighted, quick aside with a small laugh in the voice, pointing at one thing.', pace: PACE },
+  { at: 452, to: 530, text: 'Every save: read,\nsummarized, sorted, linked.', style: 'Impressed and warm, brisk: "Every save" lightly, then the four words crisp and quick, the smallest beat between them, like ticking off a list; the whole line in about two seconds; never shouted.', pace: PACE },
+  { at: 532, to: 572, text: 'Even that screenshot.', style: 'A delighted, quick aside with a small laugh in the voice, pointing at one thing.', pace: PACE },
   // (round 2, owner: a book everyone knows) the payoff in two: the voice
   // names the book just after the find's hit (its take carries over the dive
   // into the answer), then (round 4, owner: Sam's advice was a wasted line)
@@ -143,7 +143,7 @@ export const CAPTIONS = [
  */
 const VIDEO_LINES = {
   6: { text: 'Bet you can’t\nfind the video\nSam told you\nto watch.', style: 'A playful, teasing dare to a friend, grinning: "Bet you can\'t" with a cheeky lift, then the rest quick and bright in one breath; landing lightly on "watch".' },
-  525: { text: 'Watched the videos, too.', style: 'A delighted, quick aside with a small laugh in the voice, as if it is a little ridiculous how thorough it is.' },
+  532: { text: 'Watched the videos, too.', style: 'A delighted, quick aside with a small laugh in the voice, as if it is a little ridiculous how thorough it is.' },
   // the name, as the book's is named (the book's window and the book's
   // next line, shared: round 4)
   [HITS.found + 4]: { text: 'Mark Manson.', style: 'The reveal, recognizing it: "Mark Manson" said clearly, with a delighted, satisfied smile, like spotting a friend across a crowded room; quick and light, one breath.' },

@@ -52,7 +52,9 @@ export const KineticLine: React.FC<{
   weight?: number;
   font?: string;
   tracking?: string;
-}> = ({ text, frame, from, to, starts, size = 64, sizes, width = 940, align = 'center', color = INK, weight = 600, font = sans, tracking = '-0.028em' }) => {
+  /** 0–1: an ink line struck through the text, drawn line by line ("no more") */
+  strike?: number;
+}> = ({ text, frame, from, to, starts, size = 64, sizes, width = 940, align = 'center', color = INK, weight = 600, font = sans, tracking = '-0.028em', strike = 0 }) => {
   // (2026-10-04, owner: the word-by-word blur reveal read "dated and laggy";
   // the full captions stay, in the Headline motion) each LINE rises out of
   // its own mask in one decisive move (HEAD_IN frames, ease-out quint, no
@@ -73,6 +75,7 @@ export const KineticLine: React.FC<{
         const tin = OUT_QUINT(Math.min(1, Math.max(0, (local - lineStart + HEAD_LEAD) / HEAD_IN)));
         const tout = IN_CUBIC(Math.min(1, Math.max(0, (local - outStart - li) / HEAD_OUT)));
         const y = (1 - tin) * 108 - tout * 108;
+        const struck = Math.min(1, Math.max(0, strike * lines.length - li));
         return (
           // the mask: a little taller than the line, so descenders never clip
           <div key={li} style={{ overflow: 'hidden', padding: '0.06em 0.1em 0.14em', margin: '-0.06em 0 -0.14em' }}>
@@ -88,7 +91,26 @@ export const KineticLine: React.FC<{
                 textAlign: align,
               }}
             >
-              {words.join(' ')}
+              {strike > 0 ? (
+                <span style={{ position: 'relative', display: 'inline-block' }}>
+                  {words.join(' ')}
+                  {struck > 0 && (
+                    <span
+                      style={{
+                        position: 'absolute',
+                        left: '-0.04em',
+                        top: '0.6em',
+                        height: '0.07em',
+                        width: `calc(${(struck * 100).toFixed(2)}% + ${(0.08 * struck).toFixed(3)}em)`,
+                        borderRadius: '0.035em',
+                        background: color,
+                      }}
+                    />
+                  )}
+                </span>
+              ) : (
+                words.join(' ')
+              )}
             </div>
           </div>
         );
