@@ -110,16 +110,21 @@ export const CAPTIONS = [
   { at: HITS.giveUp + 1, to: 322, text: 'Give up?', style: 'A teasing, warm question to a friend who is clearly lost in the pile: relaxed and unhurried, both words given their full length, "up?" lifting a little at the end; nothing clipped.', pace: 'Relaxed for this line only, about 120 words a minute; no pause between the two words.' },
   { at: 323, to: 386, text: 'Or just ask\nMachina.', duck: 0.4, style: 'The turn: bright, warm and confident, a little conspiratorial; the name lands with a smile.', pace: PACE },
   // the warp: through every save at speed
-  // (round 4) "already": it read each save when it was saved; the tunnel is
-  // its memory, not a read-through at the moment of the question
-  { at: 452, to: 510, text: 'It already read\nevery single one.', style: 'Impressed and warm, quick and a little awed, a light lean on "already"; no drawn-out words.', pace: PACE },
+  // (round 6, owner: say what it does) the four things Machina did to every
+  // save when it was saved (read it, wrote its summary, filed it under a
+  // category and tags, linked it to related saves), past tense: done
+  // already, not at the moment of the question; a word on each kick of the
+  // drop as the tunnel streams past
+  { at: 452, to: 523, text: 'Every save: read,\nsummarized, sorted, linked.', style: 'Impressed and warm: "Every save" lightly, then the four words in rhythm, each one punched lightly like a beat, a small gap between them; never shouted, no drawn-out words.', pace: 'Rhythmic for this line: the four words about half a second apart, like beats.' },
   { at: 525, to: 572, text: 'Even that screenshot.', style: 'A delighted, quick aside with a small laugh in the voice, pointing at one thing.', pace: PACE },
   // (round 2, owner: a book everyone knows) the payoff in two: the voice
   // names the book just after the find's hit (its take carries over the dive
   // into the answer), then (round 4, owner: Sam's advice was a wasted line)
   // the everyday pain it ends, over the real answer
   { at: HITS.found + 4, to: 610, text: 'Atomic Habits.', style: 'The reveal, recognizing it: "Atomic Habits" said clearly, with a delighted, satisfied smile, like spotting a friend across a crowded room; quick and light, one breath.', pace: PACE },
-  { at: 613, to: 674, text: 'No more “wait,\nwhat was it called?”', style: 'Relieved and playful, quick: "No more" light and knowing, then the quoted bit in a mock-searching voice, the way everyone mutters it; landing lightly on "called"; no drawn-out words.', pace: PACE },
+  // (round 6, owner) on screen the quote alone, struck through once said
+  // (Needle.tsx `Lines`): the voice still says "No more" (`say`)
+  { at: 613, to: 674, say: 'No more “wait, what was it called?”', strike: true, text: '“Wait,\nwhat was it called?”', style: 'Relieved and playful, quick: "No more" light and knowing, then the quoted bit in a mock-searching voice, the way everyone mutters it; landing lightly on "called"; no drawn-out words.', pace: PACE },
   { at: HITS.lockup, to: 776, place: 'scene', text: 'Machina.\nEverything you save, finally useful.', duck: 0.4, style: 'A confident, warm sign-off; the name with a smile, then the tagline sincere but brisk, no drawn-out words.', pace: PACE },
   // the rewatch: the needle was on frame 0
   { at: HITS.ps, to: TOTAL_FRAMES + 6, text: 'P.S. It was in\nthe first frame.', duck: 0.4, style: 'A quick, playful aside, close and conspiratorial, like letting the listener in on a secret; light, no drawn-out words.', pace: PACE },
