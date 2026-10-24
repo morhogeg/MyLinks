@@ -13,14 +13,17 @@ export const CitationGlyph: React.FC<{
   assembly?: number;
   /** 0 → no dot, 1 → dot at full size. */
   dot?: number;
-}> = ({ style, assembly = 1, dot = 1 }) => {
+  /** false: the brackets stay solid ink while they travel (no fade with assembly). */
+  fade?: boolean;
+}> = ({ style, assembly = 1, dot = 1, fade = true }) => {
   const spread = (1 - assembly) * 320;
+  const ink = fade ? assembly : 1;
   return (
     <svg viewBox="288 292 448 416" style={style} fill="currentColor">
-      <g transform={`translate(${-spread} 0)`} opacity={assembly}>
+      <g transform={`translate(${-spread} 0)`} opacity={ink}>
         <path d="M296 300 L396 300 L396 358 L354 358 L354 642 L396 642 L396 700 L296 700 Z" />
       </g>
-      <g transform={`translate(${spread} 0)`} opacity={assembly}>
+      <g transform={`translate(${spread} 0)`} opacity={ink}>
         <path d="M728 300 L628 300 L628 358 L670 358 L670 642 L628 642 L628 700 L728 700 Z" />
       </g>
       <circle cx="512" cy="500" r={52 * dot} opacity={dot} />
@@ -170,9 +173,11 @@ export const AnimatedMark: React.FC<{
       <defs>
         <clipPath id={`${id}-clip`}>
           {/* the arms are REVEALED from the corners inward — two rects that
-              grow toward the middle, exactly as the app clips them */}
-          <rect x="0" y={TOP} width="1024" height={f.clipH} />
-          <rect x="0" y={BOT - f.clipH} width="1024" height={f.clipH} />
+              grow toward the middle, exactly as the app clips them (each a
+              hair longer, so where they meet their anti-aliased edges
+              overlap instead of leaving a light seam across the arms) */}
+          <rect x="0" y={TOP} width="1024" height={f.clipH + 2} />
+          <rect x="0" y={BOT - f.clipH - 2} width="1024" height={f.clipH + 2} />
         </clipPath>
       </defs>
       <g clipPath={`url(#${id}-clip)`}>

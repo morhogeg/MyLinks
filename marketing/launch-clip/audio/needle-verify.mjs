@@ -80,13 +80,13 @@ const totalWords = CAPTIONS.reduce((n, c) => n + c.text.split(/\s+/).length, 0);
 (totalWords <= 75 ? ok : fail)(`script: ${totalWords} words (the brief: under about 75)`);
 
 // ── the safe area: the dare (Needle.tsx `DARE`: top 262, the kicker, three
-// lines of 104px and the timer under them) and the band lines (top 330, two
-// lines of 68px) stay clear of the top 250px; the lockup's lowest row
-// (812 + 261 + 55) clears the bottom 340px
+// lines of 96px and the timer under them) and the band lines (`BAND`: top
+// 268, two lines of 60px) stay clear of the top 250px; the lockup's lowest
+// row (812 + 261 + 55) clears the bottom 340px
 const SAFE = { top: 250, bottom: HEIGHT - 340 };
 const boxes = [
-  ['the dare', 262, 262 + 46 * 1.1 + 16 + 3 * 104 * 1.02 + 26 + 7],
-  ['a line', 330, 330 + 2 * 68 * 1.12],
+  ['the dare', 262, 262 + 42 * 1.1 + 14 + 3 * 96 * 1.02 + 22 + 6],
+  ['a line', 268, 268 + 2 * 60 * 1.12],
   ['the lockup', 812 - 108, 812 + 261 + 55],
 ];
 for (const [what, a, b] of boxes) if (a < SAFE.top || b > SAFE.bottom) fail(`${what} (${a}–${Math.round(b)}px) leaves the safe area`);

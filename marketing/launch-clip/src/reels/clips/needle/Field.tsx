@@ -115,7 +115,9 @@ export const FieldView: React.FC<FieldState & { background?: boolean }> = ({
           // too small to read or to matter: a speck the fog would take anyway
           if (screenW < 22) return null;
           const fog = 1 - smooth(fogRange[0], fogRange[1], d);
-          const fade = near.includes(i.key) ? 1 : smooth(110, 190, d);
+          // (round 5) a card passing the lens dissolves before it is a
+          // frame-filling smear (it is wider than the frame from ~500 in)
+          const fade = near.includes(i.key) ? 1 : smooth(150, 520, d);
           let aside = 1;
           if (subj && i.key !== subject && d < subj.d) {
             const w = g.rect.w * s * k;

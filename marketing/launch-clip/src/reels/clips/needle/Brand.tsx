@@ -30,16 +30,25 @@ const INK_OF_TIGHT = 432 / 448;
 
 /** the gathered mark's ink width at the strike, and at the cut (Ask's own) */
 const STRIKE_INK = 268;
+/**
+ * (round 5) the pull-back after the strike, from rest into the cut at the
+ * app's own speed there: Ask's camera leaves the cut on EASE_MODAL (slope
+ * 2.25), so the mark arrives shrinking at that rate (g'(1) = 0.19) and the
+ * match carries the motion instead of braking on it
+ */
+const INTO_CUT = (t: number) => t * t * (2.81 - 1.81 * t);
 
 export const GatherMark: React.FC<{ f: number }> = ({ f }) => {
-  if (f < HITS.gather + 8 || f >= HITS.ask) return null;
+  if (f < HITS.markStrike - 16 || f >= HITS.ask) return null;
   // the brackets come in from wide and snap (EASE_SPRING overshoots inward,
-  // the app's own snap), the point strikes on "Machina"
+  // the app's own snap), solid ink all the way (round 5: fading in with
+  // their travel they read grey over the field), the point strikes on
+  // "Machina"
   const close = EASE_SPRING(Math.min(1, Math.max(0, (f - (HITS.markStrike - 16)) / 14)));
   const dot = EASE_SPRING(Math.min(1, Math.max(0, (f - (HITS.markStrike - 3)) / 6)));
-  const appear = prog(f, HITS.gather + 8, HITS.markStrike - 12, EASE_MODAL);
+  const appear = prog(f, HITS.markStrike - 16, HITS.markStrike - 14, (t) => t);
   // after the strike, the pull-back the app shot continues
-  const ink = STRIKE_INK + (MATCH_INK_PX - STRIKE_INK) * prog(f, HITS.markStrike + 1, HITS.ask, (t) => t * t);
+  const ink = STRIKE_INK + (MATCH_INK_PX - STRIKE_INK) * prog(f, HITS.markStrike + 1, HITS.ask, INTO_CUT);
   const w = ink / INK_OF_TIGHT;
   return (
     <AbsoluteFill style={{ pointerEvents: 'none' }}>
@@ -54,7 +63,7 @@ export const GatherMark: React.FC<{ f: number }> = ({ f }) => {
           opacity: appear,
         }}
       >
-        <CitationGlyph assembly={Math.max(0.0001, close)} dot={dot} style={{ width: '100%', height: 'auto', overflow: 'visible' }} />
+        <CitationGlyph assembly={Math.max(0.0001, close)} dot={dot} fade={false} style={{ width: '100%', height: 'auto', overflow: 'visible' }} />
       </div>
     </AbsoluteFill>
   );
@@ -102,7 +111,8 @@ export const EndCard: React.FC<{ f: number; show: boolean }> = ({ f, show }) => 
           // (round 2) its first corner ticks only once the paper has mostly
           // covered the app: on the app's text they read as grey blocks
           opacity: prog(f, HITS.lockup - 9, HITS.lockup - 3, (t) => t * t * (3 - 2 * t)) * (1 - dotGone),
-          filter: `drop-shadow(0 10px 30px rgba(24,32,48,${0.16 * (1 - open)}))`,
+          // (round 5) ink on paper: the faintest lift, not a drop shadow
+          filter: `drop-shadow(0 8px 24px rgba(24,32,48,${0.07 * (1 - open)}))`,
         }}
       >
         {folding ? (
