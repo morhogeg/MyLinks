@@ -22,7 +22,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CAPTIONS, FPS, HEIGHT } from '../clips/revisit-timeline.mjs';
-import { ITEMS } from '../clips/revisit-list.mjs';
+import { BAND, ITEMS } from '../clips/revisit-list.mjs';
 import { CARDS, REVISIT } from '../capture/library.mjs';
 import { lufs, powerDb, speechBand, truePeak } from './loudness.mjs';
 
@@ -115,12 +115,12 @@ const totalWords = CAPTIONS.reduce((n, c) => n + c.text.split(/\s+/).length, 0);
 (totalWords <= 75 ? ok : fail)(`script: ${totalWords} words (the brief: under about 75)`);
 
 // ── the safe area: the hook (top 262, two lines of 118px), the band lines
-// (top 330, up to three lines of 68px) and the lockup's lowest row
+// (BAND.top, round 7: 258; up to three lines of 68px) and the lockup's lowest row
 const SAFE = { top: 250, bottom: HEIGHT - 340 };
 const most = Math.max(...band.map((c) => c.text.split('\n').length));
 const boxes = [
   ['the hook', 262, 262 + 2 * 118 * 1.02],
-  ['a line', 330, 330 + most * 68 * 1.12],
+  ['a line', BAND.top, BAND.top + most * 68 * 1.12],
   ['the lockup', 812 - 108, 812 + 261 + 55],
 ];
 for (const [what, a, b] of boxes) if (a < SAFE.top || b > SAFE.bottom) fail(`${what} (${a}–${Math.round(b)}px) leaves the safe area`);

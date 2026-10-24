@@ -10,7 +10,7 @@ import { INK, KineticLine } from '../../kit/Type';
 import { App, LIST, rowAt, toFrame } from './App';
 import { EndCard, signOffPaper } from './Brand';
 import { InkList, InkRow, SHEET, SHEET_BG, listGeo, type RowGeo } from './Ink';
-import { ACTS, ITEMS, L, LIST_H, STOP_Y, TOPS, VIDEO, heightOf, linesOf, scrollAt, speedAt, type Item } from './list';
+import { ACTS, BAND as EDGE, ITEMS, L, LIST_H, STOP_Y, TOPS, VIDEO, heightOf, linesOf, scrollAt, speedAt, type Item } from './list';
 import { Sheet, landAt, tearAt, type SheetPose } from './Sheet';
 import { pchip } from './smooth';
 import VO from './revisit-vo.json';
@@ -179,6 +179,14 @@ const Scrim: React.FC<{ tone: string; solid: number; clear: number; o: number }>
 
 /** act one's scrim is drawn ON the sheet (it leaves with it when it tears) */
 const sheetScrimAt = (f: number) => (f < HITS.hookOut ? 0 : 1);
+/** (round 7) its edge: deep enough for the three "later"s, then up to the
+ *  band's own edge (two lines) once they have gone, while the list spins too
+ *  fast to see it move; softer than the app's, for the ink rows sliding under */
+const LATERS = BAND.find((c) => c.text.split('\n').length === 3)!;
+const sheetEdgeAt = (f: number) => {
+  const deep = 1 - prog(f, LATERS.to + 2, LATERS.to + 10, EASE_IN_OUT);
+  return { solid: EDGE.solid + 75 * deep, clear: EDGE.solid + 68 + 85 * deep };
+};
 /** the app's: short, since the picture starts right under the band */
 const appScrimAt = (f: number) => (f >= HITS.tear - 8 && lineUp(f) ? 1 : 0);
 
@@ -187,7 +195,7 @@ const Lines: React.FC<{ f: number }> = ({ f }) => (
     {BAND.map((c) => {
       const starts = LINES.find((v) => v.frame === c.at)?.words.map((s) => Math.round(s * FPS));
       return (
-        <div key={c.at} style={{ position: 'absolute', left: 0, right: 0, top: 330, display: 'flex', justifyContent: 'center' }}>
+        <div key={c.at} style={{ position: 'absolute', left: 0, right: 0, top: EDGE.top, display: 'flex', justifyContent: 'center' }}>
           <KineticLine text={c.text} frame={f} from={c.at} to={c.to} starts={starts} size={68} weight={650} width={1000} />
         </div>
       );
@@ -200,7 +208,7 @@ const PadSheet: React.FC<{ f: number; pose: SheetPose; captions: boolean }> = ({
   <Sheet pose={pose}>
     <MotionList f={f} />
     <StopPing f={f} />
-    {captions && <Scrim tone={SHEET} solid={600} clear={700} o={eased(f, sheetScrimAt)} />}
+    {captions && <Scrim tone={SHEET} {...sheetEdgeAt(f)} o={eased(f, sheetScrimAt)} />}
     {captions && f < HITS.hookOut + 12 && <HookType out={prog(f, HITS.hookOut, HITS.hookOut + 8, (t) => t * t * t)} />}
   </Sheet>
 );
@@ -251,10 +259,11 @@ const TornPad: React.FC<{ f: number; captions: boolean }> = ({ f, captions }) =>
 
 // ─────────────────────────────────────────────────── act three: the pull-out
 
-/** the whole list on the landing sheet, in two columns, under the band */
+/** the whole list on the landing sheet, in two columns, under the band
+ *  (round 7: from 480, under the higher band; it started at 560) */
 const SPLIT = TOPS.findIndex((t) => t >= LIST_H / 2);
 const COL_H = Math.max(TOPS[SPLIT], LIST_H - TOPS[SPLIT]);
-const PULL = { y0: 560, z: Math.min(0.42, 1320 / COL_H), ox: [34, 556] };
+const PULL = { y0: 480, z: Math.min(0.42, 1400 / COL_H), ox: [34, 556] };
 const pullGeo = (k: number): RowGeo => {
   const col = k < SPLIT ? 0 : 1;
   return listGeo(PULL.y0 + (TOPS[k] - (col ? TOPS[SPLIT] : 0)) * PULL.z, PULL.z, PULL.ox[col]);
@@ -428,16 +437,18 @@ const PullOut: React.FC<{ f: number }> = ({ f }) => {
  * it followed the gap between the list and the app's Undo toasts, and jumped
  * each time a toast stacked up), low enough to leave the list alone, and
  * gone once the toast-free frames (`rest`) take over, before the week opens.
+ * (Round 7: with the list framed higher, the toasts only reach the frame in
+ * the fold's last half second, so the paper comes in just before them, and
+ * the ticks of the lower rows are no longer under it.)
  */
 const FOOT = { clear: 1480, solid: 1640 };
-const footAt = (f: number) => (f < HITS.tick + 10 || f >= HITS.lockup ? 0 : 1 - prog(f, HITS.allDone + 12, HITS.allDone + 24, EASE_IN_OUT));
+const footAt = (f: number) => (f < HITS.allDone - 18 || f >= HITS.lockup ? 0 : 1 - prog(f, HITS.allDone + 12, HITS.allDone + 24, EASE_IN_OUT));
 
 export const Revisit: React.FC<{ withAudio?: boolean; withCaptions?: boolean }> = ({ withAudio = true, withCaptions = true }) => {
   const f = useCurrentFrame();
   CLOCK.perFrame = 1;
   const paper = signOffPaper(f);
   const foot = eased(f, footAt);
-  const listShot = f >= HITS.land + 13 && f < HITS.push2;
   return (
     <AbsoluteFill style={{ fontFamily: sans, background: SET_BG }}>
       {withAudio && <Audio src={staticFile('clips/revisit/score-vo.wav')} />}
@@ -454,7 +465,7 @@ export const Revisit: React.FC<{ withAudio?: boolean; withCaptions?: boolean }> 
           }}
         />
       )}
-      {withCaptions && <Scrim tone={TONE} solid={listShot ? 492 : 505} clear={listShot ? 522 : 600} o={eased(f, appScrimAt)} />}
+      {withCaptions && <Scrim tone={TONE} solid={EDGE.solid} clear={EDGE.clear} o={eased(f, appScrimAt)} />}
       {/* the pull-out: a sheet lands with the list, five saves leave it */}
       <PullOut f={f} />
       {/* the sign-off's paper, the lockup */}

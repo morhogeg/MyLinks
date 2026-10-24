@@ -2637,6 +2637,46 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-24 — TICK IT OFF round 7: the app framed higher, under a
+  shorter band (owner: "isn't the main area where we show the app a bit too
+  low? It seems like the captions area takes too much vertical space, no?").**
+  Branch `claude/reel-revisit`.
+  - **The band.** The lines start at 258px (were 330), their caps inside the
+    250px safe line. The paper behind them is solid to 432 and clear at 466
+    (was 505/600). It's one constant, `BAND` in `clips/revisit-list.mjs`, and
+    the safe-area gate reads it.
+  - **Every app shot framed up to it.** The card's top, "Do this" and the
+    week's banner start right under the band. The app's row above each (the
+    synthesis banner, the tab's title, "This week") sits under the paper, so
+    the edge never cuts a line. The list shots zoom about the "Do this" line,
+    held there. The to-do rows are about 250px higher, and all five are in
+    frame as they tick (three were).
+  - **Act one follows.** The spin stops 138px higher (`STOP_Y` 645), so the
+    tear still lands the card's title on the ink one. The score's slot clicks
+    follow the scroll (one more click). The landing sheet's list starts at
+    480 (was 560).
+  - **The foot.** Its paper now comes in only for the fold's last half
+    second, when the Undo toasts reach the frame. The fold zooms out to 2.86
+    (was 2.8) to keep them under it.
+
+  No new voice; the score was re-rendered for the clicks, and the whole reel
+  re-rendered.
+
+  **Verified:**
+  - gates: every line 12.5 to 23.7 dB over the music, −14.03 LUFS,
+    −1.29 dBTP, all type inside the safe area;
+  - the encode: 870 frames, 29.000 s, 23.2 MB, −13.9 LUFS and −1.2 dBTP
+    after AAC;
+  - no one-frame flash, stall, jump or jitter run. The push in and the glide
+    to the week are smoother than round 6 (largest frame-to-frame speed
+    change 1.5 and 1.7, were 2.9 and 2.2). The folds are the same app motion
+    as before; the tracker now reads them at 42 (was 26) only because more
+    of the list is in frame;
+  - stills of every shot: no line of the app cut by the band's edge, and no
+    Undo toast in frame (the foot stays flat paper while they exist).
+
+  **Not verified:** watched on a phone or inside Instagram; listened to on
+  speakers.
 - **2026-10-23 — TICK IT OFF round 6: the benefit, said outright and in
   order (owner: "it should be clear to the user that Machina creates an
   action item or to do from each card, and then we have the weekly

@@ -16,5 +16,6 @@ export const heightOf = LIST.heightOf as (it: Item) => number;
 export const TOPS = LIST.TOPS as unknown as number[];
 export const LIST_H: number = LIST.LIST_H;
 export const STOP_Y: number = LIST.STOP_Y;
+export const BAND = LIST.BAND as { top: number; solid: number; clear: number };
 export const scrollAt = LIST.scrollAt as (t: number) => number;
 export const speedAt = LIST.speedAt as (t: number) => number;

@@ -1149,6 +1149,33 @@ jumps), then fixed at each cause:
   scroll back up is laid over by the fraction of its next frame (whole take
   frames stepped its slow ends).
 
+**Round 7: the frame (owner: "isn't the main area where we show the app a
+bit too low? It seems like the captions area takes too much vertical
+space").** It was: the lines were set at 330px and the paper behind them ran
+solid to 505 and clear at 600, so every app shot began about a third of the
+way down. The lines now start at 258 (their caps at 272, inside the feeds'
+250px safe line) and the paper is solid to 432 and clear at 466 (`BAND` in
+`clips/revisit-list.mjs`, which the safe-area gate reads too). Every app shot
+is framed up to that edge, with a gap between two of the app's own rows in
+its 34px fade, so the edge never cuts a line of the app: the synthesis banner
+above the video's card, the tab's title above "Do this", "This week" above
+its banner all sit under the paper. The list, the push in, the ticks and the
+fold zoom about the "Do this" line, held at the edge, so the list only grows
+down the frame (the push in used to carry the header 190px down): the to-do
+rows sit about 250px higher, and all five are in the frame as they tick
+(three were). The spin stops 138px higher (`STOP_Y` 645) so the tear still
+lands the card's title where the ink one was; the slot clicks follow the
+scroll (one more). Act one's paper is deep for the three "later"s, then comes
+up to the band's edge. The landing sheet's list starts at 480 (was 560). The
+foot's paper now comes in only for the fold's last half second, when the
+Undo toasts reach the frame, and the fold zooms out to 2.86 (was 2.8) to keep
+them under it. (Measured on the encode: the push in and the glide to the week
+are smoother than round 6, largest frame-to-frame speed change 1.5 and 1.7
+against 2.9 and 2.2. The flow audit reads the folds' as 42 where round 6 read
+26: the same app fold at the same speed, about 100px a frame at its peak in
+both, but with more of the moving list in the frame the tracker follows it
+through frames it used to drop.)
+
 **What is real and what is not.** Every app pixel is the shipped app on
 `main` (2026-10-23), one continuous use of it captured by
 `capture/shoot.mjs revisitClip`: Home with the video's card on top of the
@@ -1234,11 +1261,11 @@ in the script; all 42 list items are saves in the account, titled as saved;
 the five picked are the five "Do this" lines, in Revisit's order; the
 video's title, channel, 11:45, key moments and "Do this" line match YouTube
 and Machina's analysis; every line inside its window; the type inside the
-feeds' safe area; (round 6) every line 12.7 to 23.2dB over the music in the
-speech band (the to-do line 17.5dB, the Sunday line 13.6dB, "You even saved…"
-20.4dB); −14.02 LUFS, −1.28 dBTP; the loop's audio seam inside the score's
-own steps. The encode (round 6): 870 frames, 29.000s, H.264 High 4.1 yuv420p
-BT.709 limited range, AAC-LC 48kHz 320k, 21.3MB, −13.9 LUFS and −1.2 dBTP
+feeds' safe area; (round 7) every line 12.5 to 23.7dB over the music in the
+speech band (the to-do line 17.8dB, the Sunday line 14.2dB, "You even saved…"
+20.8dB); −14.03 LUFS, −1.29 dBTP; the loop's audio seam inside the score's
+own steps. The encode (round 7): 870 frames, 29.000s, H.264 High 4.1 yuv420p
+BT.709 limited range, AAC-LC 48kHz 320k, 23.2MB, −13.9 LUFS and −1.2 dBTP
 after the AAC encode; every frame pair scanned: no one-frame flash, no
 frame that stalls inside a move, no lone jump, no run of alternating speeds,
 the eight range seams moving like their neighbours; the largest

@@ -5,6 +5,7 @@ import { AppShot, SCREEN_RADIUS, Tap } from '../../kit/AppShot';
 import type { Cam } from '../../kit/camera';
 import { EASE_IN_OUT, prog } from '../../kit/curves';
 import { addTakes, frameSrc, rectOf, takeOf, type Rect } from '../../kit/takes';
+import { BAND, STOP_Y } from './list';
 import { camShift, smoothCam, type SKey } from './smooth';
 import TAKES from './takes.json';
 
@@ -67,9 +68,9 @@ export const LIST = {
   rows: [0, 1, 2, 3, 4].map((k) => ({ row: R(`row${k}`), task: R(`task${k}`), card: R(`card${k}`), tick: R(`tick${k}`) })),
 };
 const CARD = rectOf(T, M.home, 'videoCard');
+const TITLE = rectOf(T, M.home, 'videoTitle');
 /** the week's synthesis in Revisit, closed (`rest`) and open (`weekRead`) */
 const BANNER = rectOf(T, M.rest, 'banner');
-const PARA = rectOf(T, M.weekRead, 'para1');
 const PHRASE: Rect[] = [0, 1, 2].map((k) => {
   try {
     return rectOf(T, M.weekRead, `phrase#${k}`);
@@ -79,8 +80,9 @@ const PHRASE: Rect[] = [0, 1, 2].map((k) => {
 }).filter(Boolean) as Rect[];
 
 const CARD_CY = CARD[1] + CARD[3] / 2;
-/** the card's title, in frame px, when the sheet tears off (list.ts STOP_Y) */
-export const CARD_TITLE_Y = 783;
+const TITLE_CY = TITLE[1] + TITLE[3] / 2;
+/** the line the list's shots zoom about: the top of the "Do this" header */
+const DO = LIST.doHead[1];
 
 /**
  * (round 4) One smooth camera (smooth.ts): every move eases out of the one
@@ -88,26 +90,36 @@ export const CARD_TITLE_Y = 783;
  * links, and nothing starts with a jolt (the kit's per-segment EASE_MODAL left
  * at 2.25 times its average speed: the push in to the video's line jumped 2.5%
  * of zoom in its first frame).
+ *
+ * (Round 7, owner: the app sat too low, under too tall a band.) Every shot is
+ * framed up to the band's edge (list.ts `BAND`): the card's top, "Do this"
+ * and the week's banner each start right under it, the line of the app above
+ * each one (the banner, the tab's title, "This week") under its paper. The
+ * list, the push in, the ticks and the fold all zoom about the "Do this" line,
+ * held at the edge, so the list only ever grows down the frame (the push in
+ * used to carry the header down 190px as it zoomed); the week pushes in about
+ * its banner's top. The to-do rows sit about 250px higher than in round 6.
  */
 export const appKeys: SKey[] = [
   // the tear reveals the video's card, its title where the ink one was; a
   // slow push until the landing sheet covers it
-  { f: HITS.tear, cx: 196.5, cy: CARD_CY, z: 2.6, fx: 540, fy: 1050 },
+  { f: HITS.tear, cx: 196.5, cy: CARD_CY, z: 2.6, fx: 540, fy: STOP_Y + (CARD_CY - TITLE_CY) * 2.6 },
   { f: HITS.land + 12, cy: CARD_CY - 8, z: 2.72 },
   // (under the landed sheet) the cut to Revisit: "Do this", the whole list
-  { f: HITS.land + 13, cx: 196.5, cy: 368, z: 2.0, fx: 540, fy: 1050 },
-  { f: HITS.push2, z: 2.02 },
+  { f: HITS.land + 13, cx: 196.5, cy: DO, z: 2.1, fx: 540, fy: BAND.clear - 4 },
+  { f: HITS.push2, z: 2.12 },
   // in to the video's to-do
-  { f: HITS.push2 + 34, cy: LIST.rows[0].row[1] + 70, z: 2.9, fy: 1000 },
+  { f: HITS.push2 + 34, z: 2.9 },
   { f: HITS.tick, z: 2.96 },
-  // over the list as it ticks off and folds toward its header, onto "All done."
-  { f: HITS.allDone + 4, cy: LIST.doHead[1] + 70, z: 2.8, fy: 980 },
-  // (round 6) on down to this week's synthesis, right under it, framed with
-  // the room below where its page will open (the banner clear of the
-  // caption's band); the tap; on in to the paragraph as the page unrolls
-  { f: HITS.weekTap - 1, cy: BANNER[1] + 137, z: 2.85, fy: 1000 },
-  { f: HITS.weekRead, cy: PARA[1] + PARA[3] / 2 - 18, z: 3.0 },
-  // a slow push on the page, and on out through the dissolve
+  // a little out as the list ticks off and folds toward its header, onto
+  // "All done." (round 7: to 2.86, not 2.8, which now let the Undo toasts
+  // stacking at the phone's foot rise out of the foot's paper)
+  { f: HITS.allDone + 4, z: 2.86 },
+  // (round 6) on down to this week's synthesis, right under it; the tap; on
+  // in as its page unrolls, a slow push on the page, and on out through the
+  // dissolve
+  { f: HITS.weekTap - 1, cy: BANNER[1], z: 2.85, fy: BAND.clear + 2 },
+  { f: HITS.weekRead, z: 3.0 },
   { f: HITS.lockup - 14, z: 3.07 },
   { f: HITS.lockup + 4, z: 2.94 },
 ];

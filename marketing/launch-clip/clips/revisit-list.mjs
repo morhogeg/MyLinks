@@ -94,9 +94,22 @@ export const heightOf = (it) => (it.br ? 2 : 1) * L.lineH + L.metaGap + L.metaH 
 export const TOPS = ITEMS.reduce((acc, it, k) => [...acc, k === 0 ? 0 : acc[k - 1] + heightOf(ITEMS[k - 1])], []);
 export const LIST_H = TOPS[TOPS.length - 1] + heightOf(ITEMS[ITEMS.length - 1]);
 
+/**
+ * The band of captions (Revisit.tsx `Lines`, `Scrim`): where its lines are
+ * set, and where the paper behind them is solid down to and clear at.
+ * (Round 7, owner: "isn't the main area where we show the app a bit too low?
+ * the captions area takes too much vertical space") The lines went up 72px,
+ * their caps 22px inside the feeds' safe area; the paper ends 134px higher
+ * (it was solid to 505 and clear at 600), on a short edge every app shot is
+ * framed to (App.tsx `appKeys`): the gap between two of the app's own rows
+ * sits in it, so the edge never cuts through a line of the app.
+ */
+export const BAND = { top: 258, solid: 432, clear: 466 };
+
 /** where the video's title block is centred when the spin stops: on the real
- *  card's title once the sheet tears off (App.tsx `CARD_TITLE_Y`) */
-export const STOP_Y = 783;
+ *  card's title once the sheet tears off (App.tsx `appKeys`); (round 7) 138px
+ *  higher, the card's top edge right under the band */
+export const STOP_Y = 645;
 
 /**
  * (round 4) A ratchet step: a damped spring answering a step, from rest. It
