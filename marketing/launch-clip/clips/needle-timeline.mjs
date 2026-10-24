@@ -103,8 +103,11 @@ export const CAPTIONS = [
   // the list: each item swings past as it is named
   { at: 135, to: 194, text: 'Past the beach\nyou swore you’d visit,', style: 'Starting a list with amusement, a wry nod; quick, flowing straight on, the sentence is not finished.', pace: PACE },
   { at: 198, to: 239, text: 'the talk you’ll\nfinish later,', style: 'The same list, a little quicker, a playful eye-roll; flowing straight on.', pace: PACE },
-  { at: 243, to: 297, text: 'the coffee trick\nyou’ll never try.', style: 'The last item of the list, quickest, laughing at the listener a little on "never try"; landing it.', pace: PACE },
-  { at: HITS.giveUp, to: 318, text: 'Give up?', style: 'A teasing, grinning two-word question, light and quick.', pace: PACE },
+  { at: 243, to: 296, text: 'the coffee trick\nyou’ll never try.', style: 'The last item of the list, quickest, laughing at the listener a little on "never try"; landing it.', pace: PACE },
+  // (round 5, owner: it was too abrupt and over too fast) unhurried, both
+  // words at full length, in the silence of the dead stop (the take's own
+  // lead-in puts the voice just after the camera's slam)
+  { at: HITS.giveUp - 2, to: 322, text: 'Give up?', style: 'A teasing, warm question to a friend who is clearly lost in the pile: relaxed and unhurried, both words given their full length, "up?" lifting a little at the end; nothing clipped.', pace: 'Relaxed for this line only, about 120 words a minute; no pause between the two words.' },
   { at: 323, to: 386, text: 'Or just ask\nMachina.', duck: 0.4, style: 'The turn: bright, warm and confident, a little conspiratorial; the name lands with a smile.', pace: PACE },
   // the warp: through every save at speed
   // (round 4) "already": it read each save when it was saved; the tunnel is
