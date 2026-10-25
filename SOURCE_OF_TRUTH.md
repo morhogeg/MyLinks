@@ -160,6 +160,14 @@ surface in the category and a knowledge graph computed on every save. The path t
   safe to land before setup). A global `CODE_SIGN_IDENTITY` override is still not
   an option — it leaks onto every SPM target (run #17) — which is why the fix is
   keychain import, not a project signing change.
+- **The share extension starts from the ObjC name `ShareViewController`**
+  (`ShareExt/Info.plist` `NSExtensionPrincipalClass` = the name
+  `@objc(ShareViewController)` gives). That attribute must sit directly on
+  `class ShareViewController: UIViewController`: build 1383 put a helper class
+  between them, compiled green, and the share sheet did nothing on tap in
+  every app. Put new classes above the entry point's doc comment or below the
+  view controller; the TestFlight workflow's "Verify the share extension's
+  entry point" step fails a build that gets this wrong.
 - **Two parallel Claude sessions:** TestFlight runs share one concurrency group
   and one build-number sequence (1000 + run number) — runs queue, numbers never
   collide, but a build only contains its own branch's code. Sync with
@@ -861,10 +869,16 @@ The multi-user auth work described below **was** fully written but not live:
   cards, `share_ingest` accepts `pagePreview`. Share extension
   (`PagePreviewReader` in `ShareViewController.swift`) built the same day:
   **TestFlight build 1383** (run #383, commit `52b421e3`, version 1.0 — the
-  upload was accepted while 1.0/1382 is in review). **Left:** owner verifies ON DEVICE (an IG photo post, an
-  IG reel, a TikTok from the TikTok app) that each card carries the real
-  caption + handle, and that ✕ during the read still saves. Launch waits on
-  this. 1.0 (build 1382) stays in review, release is manual.
+  upload was accepted while 1.0/1382 is in review). **1383's share extension
+  died on tap, from every app** (its `@objc(ShareViewController)` landed on
+  `PagePreviewReader`, §9); **fixed in build 1384** (run #384, merge
+  `33aaf40`), which also makes the phone read ask for English and treat
+  Instagram `/accounts/` + `/challenge/` pages as the wall. 1382 (in review)
+  never had the bug. **Left:** owner verifies ON DEVICE on 1384: the share
+  sheet opens again (any link, any app), then an IG photo post, an IG reel and
+  a TikTok from the TikTok app each land with the real caption + handle, and ✕
+  during the read still saves. Launch waits on this. 1.0 (build 1382) stays in
+  review, release is manual.
 
 1. **[x] Native auth build green (iOS)** *(code done 2026-07-03 — root cause was
    the Xcode 16 toolchain, not a dependency conflict; see §3. Workflow moved to
@@ -2707,6 +2721,35 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-25 — BUILD 1383 SHARE SHEET DEAD ON TAP; FIXED IN 1384.** Owner
+  report: tapping Machina in the share sheet did nothing, in every app.
+  **Cause (verified in source):** commit `f1e0bee` inserted
+  `PagePreviewReader` between `@objc(ShareViewController)` and
+  `class ShareViewController`, so the attribute named the helper class.
+  `ShareExt/Info.plist`'s `NSExtensionPrincipalClass` is that ObjC name, so iOS
+  created `PagePreviewReader` (an NSObject with no `init()`) instead of the
+  view controller and the extension died at launch. It compiled and archived
+  green, which is why 1383 shipped. 1382 (in App Review) predates `f1e0bee`
+  and is NOT affected. **Shipped (commit `d552155`, merge `33aaf40`, run #384
+  → build 1384):** attribute and doc comment back on the view controller (the
+  rest of the class is byte-identical to 1382's); new `ios-testflight.yml`
+  step "Verify the share extension's entry point" fails the build before
+  compiling unless exactly one `@objc(ShareViewController)` line sits directly
+  above `class ShareViewController: UIViewController` (tested here against
+  1383's source: fails; 1382's and 1384's: pass). Same build, Instagram read
+  hardening: the hidden web view sends `Accept-Language: en-US` like the
+  server does (Instagram translates its login page and "likes - user on date:"
+  wording, and every wall check and parser is English), and an Instagram
+  `/accounts/` or `/challenge/` page counts as the wall in any language, so a
+  Hebrew phone can't send a Hebrew login page as the post. Extraction script
+  checked in Chromium on mocked IG/TikTok pages (post sent; English wall,
+  Hebrew login redirect, checkpoint → nothing; both TikTok layouts sent);
+  backend suite 1976 pass, backend unchanged (no functions deploy). **Not
+  verified:** a Swift compile (none here; the TestFlight run is the compile),
+  anything on device, live Instagram (this session's network policy blocks
+  instagram.com), and whether WebKit keeps the `Accept-Language` header across a
+  redirect. **Owner:** install 1384, confirm the sheet opens on any link, then
+  run the IG/TikTok checks in §4 P0.
 - **2026-10-25 — INSTAGRAM + TIKTOK SHARES WERE LOGIN-PAGE CARDS (backend fix
   shipped; phone-side read pending).** Owner report: every Instagram share
   became an "Instagram" / "Instagram Login Page" card, then the same for TikTok.
