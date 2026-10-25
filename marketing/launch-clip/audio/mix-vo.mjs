@@ -37,6 +37,8 @@ const SCRIPTS = {
   needle: { vo: path.join(root, 'out', 'vo', 'needle'), score: 'clips/needle/score.wav', out: 'clips/needle/score-vo.wav', duck: 0.55 },
   // (round 3) its video needle (`needle-score.mjs video`): the same balance
   'needle-video': { vo: path.join(root, 'out', 'vo', 'needle-video'), score: 'clips/needle/score-video.wav', out: 'clips/needle/score-video-vo.wav', duck: 0.55 },
+  // TICK IT OFF (clips/revisit-timeline.mjs, audio/revisit-score.mjs): the reel's balance
+  revisit: { vo: path.join(root, 'out', 'vo', 'revisit'), score: 'clips/revisit/score.wav', out: 'clips/revisit/score-vo.wav', duck: 0.55 },
 };
 const name = process.argv[2] ?? 'film';
 const script = SCRIPTS[name];
@@ -85,6 +87,7 @@ const lineDuck =
 // (the FIND clip's lines duck the same way, from its own timeline)
 if (name === 'find') for (const c of (await import('../clips/find-timeline.mjs')).CAPTIONS) if (c.duck) lineDuck[c.at] = c.duck;
 if (name === 'savethis') for (const c of (await import('../clips/savethis-timeline.mjs')).CAPTIONS) if (c.duck) lineDuck[c.at] = c.duck;
+if (name === 'revisit') for (const c of (await import('../clips/revisit-timeline.mjs')).CAPTIONS) if (c.duck) lineDuck[c.at] = c.duck;
 if (name === 'needle' || name === 'needle-video') {
   for (const c of (await import('../clips/needle-timeline.mjs')).NEEDLES[name === 'needle' ? 'book' : 'video'].captions) if (c.duck) lineDuck[c.at] = c.duck;
 }
@@ -139,7 +142,7 @@ let g = peak > 0.98 ? 0.98 / peak : 1;
 // Shorts and YouTube expect a finished mix (the round-12 mix measured −15.8).
 // A global gain, then a look-ahead limiter on the few transients that would
 // pass the ceiling. The film's mix is untouched (it has no MASTER).
-const MASTER = { reel: { lufs: -14, truePeak: -1 }, find: { lufs: -14, truePeak: -1 }, savethis: { lufs: -14, truePeak: -1 }, needle: { lufs: -14, truePeak: -1 }, 'needle-video': { lufs: -14, truePeak: -1 } }[name];
+const MASTER = { reel: { lufs: -14, truePeak: -1 }, find: { lufs: -14, truePeak: -1 }, savethis: { lufs: -14, truePeak: -1 }, needle: { lufs: -14, truePeak: -1 }, 'needle-video': { lufs: -14, truePeak: -1 }, revisit: { lufs: -14, truePeak: -1 } }[name];
 if (MASTER) {
   let gain = 10 ** ((MASTER.lufs - lufs(L, R, SR)) / 20);
   let ceiling = 10 ** ((MASTER.truePeak - 0.3) / 20);

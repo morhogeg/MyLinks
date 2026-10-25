@@ -1,0 +1,103 @@
+[
+ {
+  "frame": 6,
+  "text": "Your saves are a to-do list.",
+  "words": [
+   0.03,
+   0.302,
+   0.629,
+   0.847,
+   0.956,
+   1.283
+  ]
+ },
+ {
+  "frame": 64,
+  "text": "Watch later. Read later. Try later.",
+  "words": [
+   0.03,
+   0.404,
+   1.18,
+   1.584,
+   2.45,
+   2.817
+  ]
+ },
+ {
+  "frame": 182,
+  "text": "You even saved a video on procrastination.",
+  "words": [
+   0.02,
+   0.29,
+   0.627,
+   1.032,
+   1.167,
+   1.671,
+   1.873
+  ]
+ },
+ {
+  "frame": 276,
+  "text": "Relax. Makeena watched it.",
+  "words": [
+   0.03,
+   0.83,
+   1.266,
+   1.702
+  ]
+ },
+ {
+  "frame": 343,
+  "text": "For every save you can act on, it writes you a to-do.",
+  "words": [
+   0.03,
+   0.226,
+   0.521,
+   0.766,
+   0.962,
+   1.159,
+   1.355,
+   1.551,
+   1.699,
+   2.042,
+   2.238,
+   2.336
+  ]
+ },
+ {
+  "frame": 476,
+  "text": "Even the procrastination one.",
+  "words": [
+   0.03,
+   0.31,
+   0.534,
+   1.43
+  ]
+ },
+ {
+  "frame": 612,
+  "text": "And every Sunday, it writes up your week.",
+  "words": [
+   0.05,
+   0.321,
+   0.728,
+   1.36,
+   1.479,
+   1.756,
+   1.875,
+   2.072
+  ]
+ },
+ {
+  "frame": 726,
+  "text": "Makeena. Everything you save, finally useful.",
+  "words": [
+   0.03,
+   0.86,
+   1.415,
+   1.617,
+   2.22,
+   2.64
+  ]
+ }
+]

@@ -1082,6 +1082,287 @@ node audio/needle-score.mjs video && node audio/mix-vo.mjs needle-video && node 
 NEEDLE=video node scripts/needle-stills.mjs   # → out/needle-stills-video/
 ```
 
+## TICK IT OFF (the revisit reel)
+
+`MachinaRevisit` is a 29s vertical Reel about the side of Machina that comes
+back to you (2026-10-23): the "Do this" list, the weekly synthesis and the
+rest of the Revisit tab. **The idea: your saves are a to-do list you never
+get to; Machina writes you a to-do for every save you can act on, and every
+Sunday it writes up your week.** (Round 6, owner: "it should be clear to the
+user that Machina creates an action item or to do from each card, and then
+we have the weekly synthesis".) Frame 0 says it, "Your saves are a to-do
+list.", over an ink list of this account's real saves, each waiting on an
+empty circle (Watch …, Read …, Try …, Visit …). The list ratchets on,
+"later" after "later", spins like a slot reel and stops dead on the save
+that gives the game away: a video on procrastination (Mark Manson's, real, on
+his own channel). "Relax. Machina watched it.": the sheet tears off the pad,
+and under it is the real app, that save's card, summed up. "For every save
+you can act on, it writes you a to-do.": a new sheet lands with the whole
+list on it, the five saves you can act on light up and fly onto the real "Do
+this" rows, and each "Watch …" is struck out, its title dropping into the
+row's grey line while its to-do is written in. (Only those five: the
+analysis writes a to-do only when a save supports a concrete action,
+functions/ai_service.py, so the line says "every save you can act on", not
+every save.) The payoff (60%, played at half speed): "Even the
+procrastination one.", the video's to-do ticked, the other four following on
+the beat, the rows folding away to the app's own "All done. New tasks arrive
+with your saves." Then the week: "And every Sunday, it writes up your
+week.", this week's synthesis, right under "All done.", tapped open in place,
+its first paragraph on that video and "the smallest step you can take
+today", underlined in ink. The sign-off, held on the logo and the tagline to
+the last frame (round 2, owner: "the final frame is the to do list again -
+it should be the Machina logo and tagline"; round 1 ended on a fresh sheet
+landing as frame 0), and the loop cuts on the beat from the logo back to the
+hook. The device is the pad and its circle (a sheet tears off, another
+lands; the circle you never fill is the app's own "Do this" circle, and in
+the end it fills), none of FIND THE BOOK's (no dare, no hidden object, no 3D
+field, no tunnel, no P.S.). Rounds 1 to 5 told the week first and the to-dos
+after it, in half a sentence; round 5 had already caught that they read as
+weekly ("To do items are actually added automatically immediately with an
+added card, not once a week").
+
+Pitched against two others (the owner can ask for either): THE RECEIPT (a
+till receipt of the week's saves printing on the beat, totting up the hours
+you meant to spend, torn off into a Sunday read and a five-line list) and
+SUNDAY MORNING (a week of saves piling up day by day on a calendar strip,
+folding like a paper map into one page on Sunday). This one won because its
+frame 0 is a truth people recognise, its payoff is the app's own tick rather
+than a metaphor, and one save (the procrastination video) runs through every
+beat.
+
+```bash
+# today's app (a video branch's own web/ can be weeks old: capture main's)
+git worktree add --detach <dir> origin/main && (cd <dir>/web && npm ci)
+CAPTURE_WEB=<dir>/web node capture/build-app.mjs
+CAPTURE_ONLY=revisitClip node capture/shoot.mjs
+git checkout src/reels/data/takes.json   # shoot.mjs rewrites it from the takes present
+python3 audio/synth-vo.py revisit && python3 audio/vo-to-44k.py out/vo/revisit && python3 audio/vo-deess.py out/vo/revisit
+node audio/revisit-score.mjs && node audio/mix-vo.mjs revisit
+node audio/revisit-verify.mjs          # bans, the list is the account's, the video's facts, windows, safe area, voice over music, −14 LUFS, the loop
+# render in parallel frame ranges (one browser composites on ONE core); the
+# spin (150–236) and the tear (288–305) are the heavy stretches. Keep
+# --concurrency=1: two tabs in one range rasterize the composited list at
+# slightly different offsets, and alternate frames then shimmer
+for r in a:0-149 b1:150-199 b2:200-249 c:250-329 d:330-459 e:460-599 f:600-729 g:730-869; do
+  npx remotion render src/index.ts MachinaRevisit out/revisit/seg-${r%%:*}.mp4 --frames=${r#*:} --concurrency=1 --muted --crf=14 &
+done; wait
+printf "file 'seg-%s.mp4'\n" a b1 b2 c d e f g > out/revisit/concat.txt
+ffmpeg -f concat -safe 0 -i out/revisit/concat.txt -c copy out/revisit/joined.mp4
+# the posting file: full-range BT.601 frames → limited-range BT.709 yuv420p, AAC 48kHz
+ffmpeg -i out/revisit/joined.mp4 -i public/clips/revisit/score-vo.wav -map 0:v -map 1:a \
+  -vf "scale=in_range=full:out_range=tv:in_color_matrix=bt601:out_color_matrix=bt709,format=yuv420p" \
+  -c:v libx264 -preset slow -crf 15 -profile:v high -level 4.1 \
+  -color_primaries bt709 -color_trc bt709 -colorspace bt709 -color_range tv \
+  -c:a aac -b:a 320k -ar 48000 -ac 2 -shortest -movflags +faststart out/revisit/final_reel.mp4
+node scripts/revisit-stills.mjs        # review stills → out/revisit-stills/
+```
+
+| Time | Picture | On screen | Voice | Sound |
+|---|---|---|---|---|
+| 0:00 | Frame 0 (also the cover): the hook over the ink list, nine real saves in view, each on an empty circle | Your saves are / a to-do list. | "Your saves are a to-do list." | a chord stab and a kick (where the loop lands) |
+| 0:01.9 | The hook rolls out; the list ratchets one save, then two, then three, each step on its verb (a spring from rest, round 4), under one slow push that runs to the tear | Watch later. / Read later. / Try later. | "Watch later. Read later. Try later." | a ratchet click and a rising pluck a step; the half-time beat |
+| 0:05.0 | The slot spin: one speed curve, up from rest and braking firmly to a stop, real motion blur | You even saved a video / on procrastination. | "You even saved a video on procrastination." | four on the floor, a riser, the reel's own clicks |
+| 0:08.0 | It stops dead on the video, "Watch How to Beat Procrastination Like It Owes You Money · Mark Manson · 11:45", set apart in an ink ring; the rest recede; two rings out; a slow push | | | a clunk; the band stops; one hushed note for the comic beat |
+| 0:09.6 | After "Relax.": the sheet rips along the binding, sags off its last corner and is pulled away, picking up speed (its own shutter) | Relax. / Machina watched it. | "Relax. Machina watched it." | a paper rip, a whoosh |
+| 0:10.0 | Under it, the real app: Home, the video's card on top of the feed, summed up (12m), its title where the ink one was; a slow push | | | on I, warm |
+| 0:11.2 | (Round 6) A new sheet drops onto the pad with the whole list on it, in two columns; on "act on" (0:12.6) the five saves you can act on light up a 16th apart | For every save you can act on, / it writes you a to-do. | "For every save you can act on, it writes you a to-do." | a sheet's pat, four on the floor, five plucks |
+| 0:13.0 | On "it writes", the five fly onto the real Revisit tab's "Do this" rows as the sheet gives way | | | a whoosh |
+| 0:13.8 | A row every 6 frames, as "to-do" is said: the verb struck out, the save's title dropping into the row's grey title line, its to-do written in where it stood | | | a pen stroke a row |
+| 0:14.7 | In to the video's to-do ("When you feel stuck, identify the smallest, simplest action you can take today…"); an ink ring closes on its circle | Even the / procrastination one. | "Even the procrastination one." | the drums fall away; a riser |
+| 0:17.3 | **The payoff (60%), at half speed (round 4)**: the video's to-do ticked on "one", the other four an 8th apart: each circle fills, each line is struck, "Do this" held still | | | five rising pings home on I, the band in full |
+| 0:18.6 | The rows fold away an 8th apart, at half speed: "All done. New tasks arrive with your saves." (0:20.1) | | | a soft brush of paper a row; a bell |
+| 0:20.4 | (Round 6) Down to this week's synthesis, right under "All done."; the thumb taps it open (0:21.7) and its page unrolls in place; its first paragraph, "…the loudest one is a video on procrastination… the way out is the smallest step you can take today.", the phrase underlined in ink | And every Sunday, / it writes up your week. | "And every Sunday, it writes up your week." | a light groove on IV, a tap, a pen stroke |
+| 0:24.1 | The tab goes out of focus under the paper as the app's own launch mark draws in over it; the wordmark on the spoken name, the tagline word by word | MACHINA / Everything you save, finally useful. | "Machina. Everything you save, finally useful." | the brand's impact, lighter; a bell |
+| 0:27.1 | The lockup holds to the last frame on a slow push (round 2: the last frame is the logo and the tagline) | | | the last bar leans to vi; a bell rings over the cut |
+| 0:29.0 | The loop cuts on the beat from the logo to the hook (0:00) | | | the stab lands again |
+
+**Round 4: the polish (owner: "it needs a full round of refinements and
+polishes to make Apple grade … fix lags, bitterness, abrupt cuts etc").**
+Measured first, frame by frame (optical flow on the encode: the dominant
+motion of every frame pair, the frames that stall inside a move, the speed
+jumps), then fixed at each cause:
+- *Jolts and dead stops.* The kit's camera eases each segment on its own
+  (EASE_MODAL leaves at 2.25 times its average speed): the push in to the
+  video's line jumped 2.5% of zoom in its first frame, and the camera stopped
+  dead at the synthesis and set off again. The app camera is now one monotone
+  spline through its keys (`src/reels/clips/revisit/smooth.ts`): continuous
+  speed through every key, no overshoot, and it goes one way from the card to
+  the paragraph (it used to rise to the banner and turn round on the tap).
+  The largest frame-to-frame speed change in the push-in fell from 31 to 3.
+- *The ratchet and the spin.* The steps used the app's spring curve, which
+  leaves at 4.6 times its average speed (50 to 80px in a step's first
+  frame); they are now a damped spring from rest. The spin was u² into
+  ease-out-back (a kink where the push turned to a brake, an overshoot that
+  crept back a pixel at a time); it is one speed curve, v ∝ u^1.8 (1 − u)^1.3.
+- *Shimmer.* The ink list was zoomed by resizing its type every frame, and
+  its dividers were rounded to whole pixels: the text stepped about half a
+  pixel either way through every slow push (measured on the encode). The rows
+  are now laid out once on whole pixels and the scroll and zoom are one
+  transform on a composited layer (`willChange: transform`), which Chromium
+  moves by fractions of a pixel (a probe: 0.05px of wobble against 0.3px and
+  whole-pixel snaps); the same for the sign-off's slow push.
+- *Motion blur.* Nine copies up to 11px apart read as stripes. The list now
+  takes samples at most 3px apart (up to 14) melted by a blur along the move;
+  a sheet takes up to 14 and one blur along its move, not around it.
+- *The synthesis.* The app opens it in one frame (the card gone, an empty
+  page, then the text), which read as a cut; the open page now unrolls down
+  over the closed one from the tap (a mask with a soft edge, the app's own
+  two frames on either side of it).
+- *The tear and the landing.* The tear rips for six frames and the sheet is
+  then pulled away picking up speed from rest (it was thrown at full speed and
+  gone in five frames). The landing sheet drops onto the pad from above,
+  toward the camera (a little large, out of its own shadow), where it slammed
+  down 2000px in four frames.
+- *The payoff.* At the app's speed each row's 280ms fold was two frames at
+  30fps and the list snapped up five times. The ticks are rolled again at
+  120fps and played at HALF SPEED (the clicks 125ms apart in the app's time,
+  so still an 8th apart on screen); a fold now plays over about four frames
+  of real motion and the cascade runs an 8th apart. Two beats longer: 29.0s.
+- *The ending.* The tab used to dissolve to bare paper for a few frames
+  before the mark appeared; it now goes out of focus under the paper as the
+  pull-back carries on, and the mark draws in over the last of it. The
+  scroll back up is laid over by the fraction of its next frame (whole take
+  frames stepped its slow ends).
+
+**Round 7: the frame (owner: "isn't the main area where we show the app a
+bit too low? It seems like the captions area takes too much vertical
+space").** It was: the lines were set at 330px and the paper behind them ran
+solid to 505 and clear at 600, so every app shot began about a third of the
+way down. The lines now start at 258 (their caps at 272, inside the feeds'
+250px safe line) and the paper is solid to 432 and clear at 466 (`BAND` in
+`clips/revisit-list.mjs`, which the safe-area gate reads too). Every app shot
+is framed up to that edge, with a gap between two of the app's own rows in
+its 34px fade, so the edge never cuts a line of the app: the synthesis banner
+above the video's card, the tab's title above "Do this", "This week" above
+its banner all sit under the paper. The list, the push in, the ticks and the
+fold zoom about the "Do this" line, held at the edge, so the list only grows
+down the frame (the push in used to carry the header 190px down): the to-do
+rows sit about 250px higher, and all five are in the frame as they tick
+(three were). The spin stops 138px higher (`STOP_Y` 645) so the tear still
+lands the card's title where the ink one was; the slot clicks follow the
+scroll (one more). Act one's paper is deep for the three "later"s, then comes
+up to the band's edge. The landing sheet's list starts at 480 (was 560). The
+foot's paper now comes in only for the fold's last half second, when the
+Undo toasts reach the frame, and the fold zooms out to 2.86 (was 2.8) to keep
+them under it. (Measured on the encode: the push in and the glide to the week
+are smoother than round 6, largest frame-to-frame speed change 1.5 and 1.7
+against 2.9 and 2.2. The flow audit reads the folds' as 42 where round 6 read
+26: the same app fold at the same speed, about 100px a frame at its peak in
+both, but with more of the moving list in the frame the tracker follows it
+through frames it used to drop.)
+
+**What is real and what is not.** Every app pixel is the shipped app on
+`main` (2026-10-23), one continuous use of it captured by
+`capture/shoot.mjs revisitClip`: Home with the video's card on top of the
+feed, the Revisit tab scrolled to "Do this" (five to-dos from five saves),
+the five ticked an 8th apart, played at half speed (rolled at 120fps on the
+app's clock, the clicks 125ms apart; each circle's spring, the strike, the
+650ms hold, the 280ms fold, the list closing up, the empty state), and the
+tab again once the five Undo toasts have timed out (until then they stay
+below the frame and under a fixed paper fade at its foot), where this week's
+synthesis, right under "All done.", is tapped open in place (round 6; the app
+opens it in one frame, the reel unrolls the open page down over the closed
+one from the tap). (Round 3, owner: the frame's foot
+"is jumpy" as the list ticks off.) The page used to end right under "Do
+this", so as the rows folded the browser re-clamped its scroll in uneven
+jumps, once even back up, and the camera's tracking of the list turned that
+into a jumping foot of the frame; the account now has nine days of past
+Daily Brews below the list, as a lived-in Revisit tab has, so the page never
+moves under the ticks and the rows fold up on their own. Scripted, as in every
+capture: the backend, so the account (`REVISIT` in `capture/library.mjs`):
+FIND THE BOOK's haystack without Sam's screenshot, the recipes or Tim Urban's
+procrastination talk (one video on procrastination, not two), plus the
+video; this week's six saves dated into the week; a reminder due ten minutes
+ago; nine past Daily Brews (round 3); the five open "Do this" lines (only saves that call for an action carry
+one, as in the app; Tail End's and the V60's are the house account's, Four
+Thousand Weeks' and Cala Goloritzé's are new and true to their summaries);
+and this week's synthesis, written from those six saves (round 6 shows it
+in Revisit, where it used to be opened on Home before the to-dos). The ink
+list, the sheets, the underline, the pull-out and the rewrite are the reel's: the
+rewrite covers each real line in the row's own white and wipes it in (the app
+shows the list already written). The iOS share sheet is not shown.
+
+**The video.** Mark Manson's "How to Beat Procrastination Like It Owes You
+Money" (his channel, 11:45). Checked on GitHub by `video-facts.yml`: title
+and channel are YouTube's oEmbed, the length is the channel's upload list;
+the card's summary, its 12m, its key moments and its "Do this" line ("When
+you feel stuck, identify the smallest, simplest action you can take today to
+move toward your goal and do it immediately to trigger the do something
+principle.", verbatim) are Machina's own `analyze_youtube` run on it
+(`capture/video-facts/-Feev1ZK6L4.json`), and a second model's transcript of
+its first 45 seconds ("Every problem of inaction is ultimately a problem of
+emotion. You procrastinate not because you don't know what to do, but
+because you don't feel like doing it.") and its last two minutes ("…just by
+doing anything, you learn something.") backs the synthesis' paraphrase. No
+thumbnail (rights; his face would read as an endorsement); the reel never
+plays the video (its opening has a swear word). In the app the full weekly
+synthesis and a video's understanding are Pro (and the 14-day trial); the
+reel names no plan.
+
+**Voice.** Gemini TTS (`gemini-3.8-flash-tts`), Sulafat, per-line direction
+in the timeline (a friend catching you out and laughing with you, then
+showing you the trick), voiced on GitHub by `narration-tts.yml` (run 22;
+run 24 for round 6's two lines that explain the app, "For every save you can
+act on, it writes you a to-do." and "And every Sunday, it writes up your
+week.", directed at an easy, natural pace, about 5 and 4 syllables a second:
+round 5's to-do line was directed "quick" twice and came out at 7, "very sped
+up and not natural", owner); the sign-off is FIND THE BOOK's take, the same
+key. Resampled to 44.1kHz, de-essed. 53 words. (Round 5,
+owner: "the you word is barely audible".) It was not quiet, it was gone: the
+take's quick "You" is set off from "even" by about 50ms of silence, and
+`to_the_words` (audio/gemini_tts.py), which keeps a soft first word only
+while it runs on unbroken, took it for a breath in and trimmed the line to
+"even saved…". It now reaches back across a pause of up to 80ms to anything
+word-loud (a breath never comes within 14dB of the line's typical level);
+of the 87 committed takes only four trim differently, and this is the only
+one any current script uses. The "You" is the line's softest word, so it
+is also lifted 3dB (`lift` on its caption, applied by synth-vo.py), and in
+the score the spin's clicks step back under the voice and the kick two
+frames before it is softened. The cut is timed to the takes: the spin stops on
+"procrastination", the sheet tears between "Relax." and "Machina", the five
+light up on "act on", fly on "it writes" and are written in on "to-do", the
+tick lands on "one", and the week's page unrolls on "writes up your week".
+
+**The score.** `audio/revisit-score.mjs`, 120 BPM, with five synthesized
+foley voices of its own (a ratchet click, a paper rip, a sheet landing, a pen
+stroke and, round 4, a row folding away: a soft brush of paper). The slot reel's clicks are not a pattern: one per save crossing the
+middle of the frame, read off the same scroll the picture uses
+(`clips/revisit-list.mjs` `CLICKS`), so they speed up and brake with it.
+
+**Measured, not listened to.** `node audio/revisit-verify.mjs`: brand bans
+on 326 strings (captions, the added saves, the synthesis, the "Do this"
+lines, the ink list, every captured frame) and no plan, price or store words
+in the script; all 42 list items are saves in the account, titled as saved;
+the five picked are the five "Do this" lines, in Revisit's order; the
+video's title, channel, 11:45, key moments and "Do this" line match YouTube
+and Machina's analysis; every line inside its window; the type inside the
+feeds' safe area; (round 7) every line 12.5 to 23.7dB over the music in the
+speech band (the to-do line 17.8dB, the Sunday line 14.2dB, "You even saved…"
+20.8dB); −14.03 LUFS, −1.29 dBTP; the loop's audio seam inside the score's
+own steps. The encode (round 7): 870 frames, 29.000s, H.264 High 4.1 yuv420p
+BT.709 limited range, AAC-LC 48kHz 320k, 23.2MB, −13.9 LUFS and −1.2 dBTP
+after the AAC encode; every frame pair scanned: no one-frame flash, no
+frame that stalls inside a move, no lone jump, no run of alternating speeds,
+the eight range seams moving like their neighbours; the largest
+frame-to-frame changes are the spin's own blur. Against round 3, the largest
+change of speed from one frame to the next (optical flow, px a frame): the
+ratchet 50 → 26, the card and the glide to the synthesis 10 → 3, the landing
+13 → 3, the push in to the video's line 31 → 3, the ticks and folds 47 → 26,
+the pull-back 24 → 14 (the tear's 27 is the pull's steady acceleration, by
+design). The last frame is the logo and the tagline, and the loop is a cut on
+the beat from it to the hook. Not fixed, by measurement: on a slow push the
+composited type is a touch crisper each time it crosses a whole pixel (about
+2% in edge contrast, every four frames), the price of moving it smoothly; and
+a fold, at half speed, is still the app's own quick curve (about four frames
+of real motion). Nobody has listened to it on speakers.
+
+**Rendering note.** A sheet in motion (the tear) and the moving list have
+their own shutter: up to 14 poses averaged, then ONE blur along the move
+over the average (an SVG gaussian, `Smear` in Revisit.tsx). A blur on each
+sample cost about four minutes a frame in the render's software compositor;
+one blur costs seconds. Slow moves of type ride composited layers
+(`willChange: transform`): render each range with `--concurrency=1`.
+
 ## Motion language
 
 The rules every Machina video follows, and the kit component that implements

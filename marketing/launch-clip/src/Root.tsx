@@ -11,6 +11,8 @@ import { PosterStill } from './reels/clips/savethis/PosterStill';
 import { SaveThis } from './reels/clips/savethis/SaveThis';
 import * as NEEDLE from '../clips/needle-timeline.mjs';
 import { Needle } from './reels/clips/needle/Needle';
+import * as REVISIT from '../clips/revisit-timeline.mjs';
+import { Revisit } from './reels/clips/revisit/Revisit';
 
 /**
  * Compositions:
@@ -204,6 +206,26 @@ export const RemotionRoot: React.FC = () => (
       width={SAVETHIS.WIDTH}
       height={SAVETHIS.HEIGHT}
       defaultProps={{ withAudio: true, withCaptions: true, fades: false }}
+    />
+    {/* TICK IT OFF, the revisit reel (src/reels/clips/revisit,
+        clips/revisit-timeline.mjs): the deliverable, and Silent for stills */}
+    <Composition
+      id="MachinaRevisit"
+      component={Revisit}
+      durationInFrames={REVISIT.TOTAL_FRAMES}
+      fps={REVISIT.FPS}
+      width={REVISIT.WIDTH}
+      height={REVISIT.HEIGHT}
+      defaultProps={{ withAudio: true, withCaptions: true }}
+    />
+    <Composition
+      id="MachinaRevisitSilent"
+      component={Revisit}
+      durationInFrames={REVISIT.TOTAL_FRAMES}
+      fps={REVISIT.FPS}
+      width={REVISIT.WIDTH}
+      height={REVISIT.HEIGHT}
+      defaultProps={{ withAudio: false, withCaptions: true }}
     />
     <Composition
       id="MachinaSaveThisPoster"

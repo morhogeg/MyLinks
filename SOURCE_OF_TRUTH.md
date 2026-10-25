@@ -2692,6 +2692,246 @@ exact-match, capped.
   35.3dB, a sheet of every changed beat. The heap costs memory: a browser
   per range now takes 2–3GB, so at most ~6 ranges at once on this machine
   (13 ran it out of memory). **Not verified:** listened to on speakers.
+- **2026-10-24 — TICK IT OFF round 7: the app framed higher, under a
+  shorter band (owner: "isn't the main area where we show the app a bit too
+  low? It seems like the captions area takes too much vertical space, no?").**
+  Branch `claude/reel-revisit`.
+  - **The band.** The lines start at 258px (were 330), their caps inside the
+    250px safe line. The paper behind them is solid to 432 and clear at 466
+    (was 505/600). It's one constant, `BAND` in `clips/revisit-list.mjs`, and
+    the safe-area gate reads it.
+  - **Every app shot framed up to it.** The card's top, "Do this" and the
+    week's banner start right under the band. The app's row above each (the
+    synthesis banner, the tab's title, "This week") sits under the paper, so
+    the edge never cuts a line. The list shots zoom about the "Do this" line,
+    held there. The to-do rows are about 250px higher, and all five are in
+    frame as they tick (three were).
+  - **Act one follows.** The spin stops 138px higher (`STOP_Y` 645), so the
+    tear still lands the card's title on the ink one. The score's slot clicks
+    follow the scroll (one more click). The landing sheet's list starts at
+    480 (was 560).
+  - **The foot.** Its paper now comes in only for the fold's last half
+    second, when the Undo toasts reach the frame. The fold zooms out to 2.86
+    (was 2.8) to keep them under it.
+
+  No new voice; the score was re-rendered for the clicks, and the whole reel
+  re-rendered.
+
+  **Verified:**
+  - gates: every line 12.5 to 23.7 dB over the music, −14.03 LUFS,
+    −1.29 dBTP, all type inside the safe area;
+  - the encode: 870 frames, 29.000 s, 23.2 MB, −13.9 LUFS and −1.2 dBTP
+    after AAC;
+  - no one-frame flash, stall, jump or jitter run. The push in and the glide
+    to the week are smoother than round 6 (largest frame-to-frame speed
+    change 1.5 and 1.7, were 2.9 and 2.2). The folds are the same app motion
+    as before; the tracker now reads them at 42 (was 26) only because more
+    of the list is in frame;
+  - stills of every shot: no line of the app cut by the band's edge, and no
+    Undo toast in frame (the foot stays flat paper while they exist).
+
+  **Not verified:** watched on a phone or inside Instagram; listened to on
+  speakers.
+- **2026-10-23 — TICK IT OFF round 6: the benefit, said outright and in
+  order (owner: "it should be clear to the user that Machina creates an
+  action item or to do from each card, and then we have the weekly
+  synthesis"; round 5's to-do line "sounds very sped up and not natural").**
+  Branch `claude/reel-revisit`.
+  - **The story is re-ordered.** Card, then "For every save you can act on,
+    it writes you a to-do.", then "Even the procrastination one." with the
+    ticks, then "And every Sunday, it writes up your week." with this week's
+    synthesis, tapped open in Revisit right under "All done.". Before, the
+    synthesis came first, on Home, and the to-dos got half a sentence.
+  - **"Every save you can act on", on purpose.** The analysis writes a to-do
+    only when a save supports a concrete action (functions/ai_service.py,
+    "include only when genuine"), so "every save" would overclaim; the
+    picture shows 5 of 42.
+  - **Natural pace.** The two lines were voiced at an easy pace via narration
+    run 24: about 5 and 4 syllables a second, against round 5's 7, which had
+    been directed "quick" twice.
+  - **Capture.** The Home synthesis expansion and the scroll-to-top are
+    dropped; the synthesis is opened in Revisit.
+  - **Score.** Re-ordered; the bell after "Machina watched it." is gone, and
+    the "All done" bells are shortened, so the explaining lines stay clear.
+  - The ticks now start at 60%, where they were at 68%; the synthesis runs
+    70–83%. The Instagram caption follows the new line.
+
+  53 words. Re-rendered whole.
+
+  **Verified:**
+  - gates: every line 12.7 to 23.2 dB over the music, −14.02 LUFS,
+    −1.28 dBTP;
+  - the encode: 870 frames, 29.000 s, 21.3 MB, −13.9 LUFS and −1.2 dBTP after
+    AAC;
+  - no one-frame flash, stall, jump or jitter run; the move down to the
+    synthesis and its reveal are smooth (largest frame-to-frame speed change
+    2.2).
+
+  **Not verified:** listened to on speakers or a phone.
+- **2026-10-23 — TICK IT OFF round 5: the to-dos come with each save, a
+  gap closed, "You" restored (owner: "To do items are actually added
+  automatically immediately with an added card, not once a week"; "a weird
+  gap between every Sunday it writes up your week and the pulls out what";
+  "the you word is barely audible").** Branch `claude/reel-revisit`.
+  - **The facts.** The line "Every Sunday, it writes up your week, and pulls
+    out what to actually do." said the to-dos were weekly. Checked:
+    `actionableTakeaway` is written by the analysis that makes the card
+    (`_build_link_data`, functions/main.py), and Revisit's "Do this" lists the
+    open ones. The second half is now "and the moment you save, it pulls out
+    what to actually do." (Gemini TTS via narration run 23; the session holds
+    no key.) The Instagram caption is corrected the same way.
+  - **The gap.** It was that sentence split around 1.4 s of silence. The new
+    line follows "your week," after a 0.3 s comma pause. The picture is
+    re-timed to it: the sheet lands on "and the moment you save," the five
+    light up on "pulls" and fly on "what", and the underline finishes as
+    "your week" ends.
+  - **"You".** It was missing, not quiet. `to_the_words`
+    (audio/gemini_tts.py) took the take's quick "You", 50 ms of silence before
+    "even", for a breath in and trimmed it. It now reaches back across a pause
+    of up to 80 ms to anything word-loud. Only four of the 87 committed takes
+    trim differently, and only this one is used by a current script. The word
+    is lifted 3 dB (`lift`, synth-vo.py). In the score, the spin's clicks step
+    back under the voice and the kick before "You" is softened. The spin's stop
+    moves to 241 so it still lands on "procrastination".
+
+  52 words. Re-rendered whole.
+
+  **Verified:**
+  - gates: every line 11.8 to 22.4 dB over the music, −14.01 LUFS,
+    −1.25 dBTP, the loop seam;
+  - the encode: 870 frames, 29.000 s, 21.7 MB, −13.9 LUFS and −1.3 dBTP after
+    AAC;
+  - no one-frame flash, stall, jump or jitter run; "You" sits about 10 dB over
+    the music around it in the speech band.
+
+  **Not verified:** listened to on speakers or a phone.
+- **2026-10-23 — TICK IT OFF round 4: the polish (owner: "it needs a full
+  round of refinements and polishes to make Apple grade … fix lags,
+  bitterness, abrupt cuts etc").** Branch `claude/reel-revisit`. Measured
+  first (optical flow on every frame pair of round 3), then fixed at each
+  cause:
+  - The app camera is one monotone spline through its keys (`smooth.ts`), so
+    nothing jolts or stops dead between moves. The kit's per-segment
+    EASE_MODAL leaves at 2.25 times its average speed: the push-in jumped
+    2.5% of zoom in a frame, and the camera stopped dead at the synthesis tap.
+  - The ratchet steps are a damped spring from rest (the app's spring curve
+    jumped 50 to 80 px in a step's first frame). The slot spin is one speed
+    curve.
+  - The ink list moves as one composited layer (`willChange: transform`).
+    Resizing its type each frame made the text step about 0.5 px either way
+    on every slow push. The sign-off's push gets the same treatment.
+  - Motion blur: samples at most 3 px apart, melted by a blur along the move.
+    Before, nine copies read as stripes.
+  - The synthesis's page unrolls from the tap. The app opens it in one frame,
+    which read as a cut.
+  - The tear rips, then the sheet is pulled away picking up speed; the
+    landing sheet drops onto the pad instead of slamming down.
+  - The payoff is re-shot at 120 fps and played at half speed. At the app's
+    speed each row's 280 ms fold was two frames. The ticks stay an 8th apart,
+    and the reel is two beats longer: 29.0 s, the payoff at 68%.
+  - The tab defocuses under the paper while the mark draws in over it.
+    Before, there were bare paper frames between them.
+
+  Re-captured `revisitClip`; re-voiced nothing (the takes are cached); score
+  and mix rebuilt; re-rendered whole.
+
+  **Verified:**
+  - all gates: 336 strings, voice 12.4 to 23.1 dB over the music,
+    −14.01 LUFS, −1.27 dBTP, the loop seam;
+  - the encode: 870 frames, 29.000 s, H.264 High BT.709, AAC 48 kHz, 22.0 MB,
+    −13.9 LUFS and −1.3 dBTP after AAC;
+  - no one-frame flash, stall, lone jump or alternating-speed run; the seams
+    are clean;
+  - the largest frame-to-frame speed change against round 3: push-in 31 → 3,
+    ratchet 50 → 26, folds 47 → 26, pull-back 24 → 14, landing 13 → 3;
+  - the last frame is the logo and the tagline.
+
+  **Left as is (measured):** composited type gets about 2% crisper each time
+  it crosses a whole pixel on a slow push; a fold is still the app's quick
+  curve, about four frames at half speed.
+
+  **Not verified:** watched on a phone; listened to on speakers.
+- **2026-10-23 — TICK IT OFF round 3: the foot of the frame no longer
+  jumps while the list ticks off (owner: "The final second of the frame
+  shown while narration finished 'even the procrastination one' is jumpy at
+  the bottom").** Branch `claude/reel-revisit`. The cause was the real app's
+  page: it ended right under "Do this", so as the five rows folded the
+  browser re-clamped the scroll in uneven jumps (once back up 54pt), the
+  camera's tracking of the list moved everything else with them, and the
+  paper at the frame's foot was recomputed from the stacking Undo toasts each
+  frame. Fixed at the source: the demo account has nine days of past Daily
+  Brews under the list (a lived-in Revisit tab), so the page never moves
+  under the ticks (the list header sits at the same point on all 150
+  captured frames) and the rows fold up on their own; the camera makes one
+  slow drift onto "All done." instead of a pull-back and push-in that
+  stopped dead between them; the foot's paper is a fixed fade; the mouse is
+  moved off the toasts (a hovered toast holds itself open); the wide shot is
+  the app scrolling itself back to the top in 2pt steps after the toasts
+  time out, not a cross-dissolve to a later frame. Re-captured, re-rendered
+  240–699. **Verified:** gates; the encode (840 frames, 28.000s, −13.9 LUFS,
+  −1.3 dBTP), no one-frame flash, no isolated jump at the foot of the frame
+  from the tick to the sign-off (the bottom third's frame-to-frame change
+  follows the folds and the scroll, never a lone spike), the range seams
+  clean, the last frame the logo and the tagline. **Not verified:** watched
+  on a phone; listened to on speakers.
+- **2026-10-23 — TICK IT OFF round 2: the reel ends on the logo (owner:
+  "The final frame is the to do list again - it should be the Machina logo
+  and tagline").** Branch `claude/reel-revisit`. The lockup (the app's own
+  mark, the wordmark, "Everything you save, finally useful.") now holds to
+  the last frame on a slow push; the fresh sheet that landed as frame 0 is
+  gone, and the loop cuts on the beat from the logo back to the hook (as SAVE
+  THIS round 13). The score's last bar leans to vi with a bell over the cut,
+  in place of the sheet's whoosh and pat. Also: the set's paper and the
+  sign-off's paper carry the kit's dither (the longer static hold showed
+  8-bit gradient banding). Re-rendered from frame 240 on. **Verified:** gates
+  (every line 11.8 to 22.5dB over the music, −14.00 LUFS, −1.25 dBTP, the
+  loop's audio seam); the encode (840 frames, 28.000s, H.264 High yuv420p
+  BT.709, AAC 48kHz 320k, 23.6MB, −13.9 LUFS and −1.3 dBTP after AAC), every
+  frame pair scanned (no one-frame flash, the range seams clean), the last
+  frame is the logo and the tagline. **Not verified:** listened to on
+  speakers; the Instagram app; the owner's review of round 2.
+- **2026-10-23 — TICK IT OFF, a new organic Reel about Revisit (owner:
+  "another video, but a different idea and way of showing the apps abilities
+  … focus on the revisit aspects - the weekly synthesis, the to do items etc.
+  also with a youtube video").** Branch `claude/reel-revisit` (built on
+  `claude/reel-find-the-book`'s kit; the capture is today's `main`). The idea:
+  your saves are a to-do list you never get to, and Machina turns them into a
+  Sunday read and a few things to actually do. Frame 0: "Your saves are a
+  to-do list." over an ink list of the account's real saves (Watch, Read, Try,
+  Visit), each with an empty circle; it ratchets, spins like a slot reel and
+  stops on Mark Manson's "How to Beat Procrastination Like It Owes You Money"
+  ("You even saved a video on procrastination."); "Relax. Machina watched
+  it.": the sheet tears off the pad onto the real card; the real synthesis
+  tapped open ("Every Sunday, it writes up your week,"); "and pulls out what
+  to actually do": a new sheet lands, five saves fly onto the real "Do this"
+  rows and are rewritten as their tasks; the payoff at 70%, "Even the
+  procrastination one.": the real ticks, an 8th apart, folding to "All done.
+  New tasks arrive with your saves."; the whole Revisit tab; the sign-off; a
+  fresh sheet lands as frame 0 (the loop). Pitched against THE RECEIPT and
+  SUNDAY MORNING (README). The video is checked on GitHub (`video-facts.yml`
+  run 6: oEmbed title and channel, the channel's 11:45, Machina's own
+  `analyze_youtube` summary, key moments and "Do this" line, verbatim, and two
+  transcribed spans); no thumbnail. New: `REVISIT` in `capture/library.mjs`
+  and `revisitClip` in `capture/shoot.mjs` (plus a phrase measure in
+  `capture/recorder.mjs`), `clips/revisit-timeline.mjs`,
+  `clips/revisit-list.mjs` (the ink list and its scroll, shared by picture,
+  score and gates), `src/reels/clips/revisit/`, `audio/revisit-score.mjs`
+  (the slot clicks read off the picture's scroll; synthesized foley: ratchet,
+  rip, sheet, pen), `audio/revisit-verify.mjs`, `scripts/revisit-stills.mjs`;
+  one-line entries in `Root.tsx`, `synth-vo.py`, `mix-vo.mjs`. Voice: Gemini
+  TTS, Sulafat, run 22 (the sign-off reuses FIND THE BOOK's take). 47 words,
+  28.0s. Pro note for the owner: the full weekly synthesis and video
+  understanding are Pro (and the 14-day trial); the reel names no plan.
+  **Verified:** gates (brand bans on 326 strings; the 42 list items are the
+  account's saves, titled as saved; the video's title, channel, 11:45, key
+  moments and "Do this" line match YouTube and Machina's analysis; windows;
+  safe area; every line 11.8 to 22.6dB over the music; −14.01 LUFS, −1.27
+  dBTP; the loop's audio seam); stills of every beat; the encode (840 frames,
+  28.000s, H.264 High yuv420p BT.709, AAC 48kHz 320k, 23.6MB, −13.9 LUFS and
+  −1.3 dBTP after AAC), every frame pair scanned (no one-frame flash, the
+  range seams clean), frame 839 against frame 0 at 42.3dB PSNR. **Not
+  verified:** listened to on speakers; seen in the Instagram app; the owner
+  has not seen it. Nothing merges to `main` until the owner reviews.
 - **2026-10-23 — FIND THE BOOK round 3: a YouTube version beside the book
   (owner: "replace a screenshot as the main thing with a YouTube video? …
   a Mark Manson video", both versions to compare).** Branch

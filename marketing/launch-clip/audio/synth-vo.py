@@ -222,12 +222,41 @@ WORD_TIMING["needle"] = os.path.join(ROOT, "src", "reels", "clips", "needle", "n
 SCRIPTS["needle-video"] = (lambda: needle_script("video"), os.path.join(VO, "needle-video"))
 WORD_TIMING["needle-video"] = os.path.join(ROOT, "src", "reels", "clips", "needle", "needle-video-vo.json")
 
+# ── TICK IT OFF, the revisit reel ──────────────────────────────────────────
+# Read from clips/revisit-timeline.mjs as FIND THE BOOK's are, voiced the same
+# way: out/vo/revisit/ + src/reels/clips/revisit/revisit-vo.json
+def revisit_script():
+    js = "import('./clips/revisit-timeline.mjs').then(m => console.log(JSON.stringify({ fps: m.FPS, captions: m.CAPTIONS })))"
+    raw = subprocess.run(["node", "-e", js], cwd=ROOT, check=True, capture_output=True, text=True).stdout
+    data = json.loads(raw)
+    return [
+        {
+            "frame": c["at"],
+            "start": c["at"] / data["fps"],
+            "window": (c["to"] - c["at"]) / data["fps"],
+            "text": " ".join((c.get("say") or c["text"]).split()).replace("Machina", SAY_NAME),
+            "speed": SPEED,
+            "style": c.get("style"),
+            "tts": " ".join((c.get("tts") or c.get("say") or c["text"]).split()),
+            "max_pause": c.get("maxPause"),
+            "tempo": c.get("tempo"),
+            "run_gap": c.get("runGap"),
+            "pace": c.get("pace"),
+            "lift": c.get("lift"),
+        }
+        for c in data["captions"]
+    ]
+
+
+SCRIPTS["revisit"] = (revisit_script, os.path.join(VO, "revisit"))
+WORD_TIMING["revisit"] = os.path.join(ROOT, "src", "reels", "clips", "revisit", "revisit-vo.json")
+
 # a script's own engine (VO_ENGINE overrides): the FIND clip is voiced by
 # Gemini TTS, Sulafat, with its own tone and line-by-line direction (owner,
 # 2026-10-03: each video gets its own tone); everything else stays on Kokoro
-ENGINE = {"find": "gemini", "savethis": "gemini", "needle": "gemini", "needle-video": "gemini"}
+ENGINE = {"find": "gemini", "savethis": "gemini", "needle": "gemini", "needle-video": "gemini", "revisit": "gemini"}
 # and its Gemini model (GEMINI_TTS_MODEL overrides)
-GEMINI_MODEL = {"find": "gemini-3.8-flash-tts", "savethis": "gemini-3.8-flash-tts", "needle": "gemini-3.8-flash-tts", "needle-video": "gemini-3.8-flash-tts"}
+GEMINI_MODEL = {"find": "gemini-3.8-flash-tts", "savethis": "gemini-3.8-flash-tts", "needle": "gemini-3.8-flash-tts", "needle-video": "gemini-3.8-flash-tts", "revisit": "gemini-3.8-flash-tts"}
 
 
 def speech_runs(samples, sr, gap=0.09):
@@ -420,6 +449,18 @@ def main():
     ok = True
     for i, line in enumerate(make()):
         samples, sr = speak(line)
+        if line.get("lift"):
+            # (2026-10-23, TICK IT OFF round 5) a line's quiet first word
+            # brought up by `db` over its first `sec` seconds, easing back over
+            # 30ms (inside the pause after it): "You even saved…" opens on an
+            # unstressed "You" that the spin's beat buried
+            sec, db = line["lift"]
+            k = int(sec * sr)
+            r = min(int(0.03 * sr), max(0, len(samples) - k))
+            g = 10 ** (db / 20)
+            samples = samples.copy()
+            samples[:k] *= g
+            samples[k:k + r] *= [g + (1 - g) * j / r for j in range(r)]
         path = os.path.join(out_dir, f"line-{i:02d}.wav")
         sf.write(path, samples, sr)
         dur = len(samples) / sr

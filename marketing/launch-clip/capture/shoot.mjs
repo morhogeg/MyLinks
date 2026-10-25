@@ -36,7 +36,7 @@ import { fileURLToPath } from 'node:url';
 import { startServer } from './server.mjs';
 import { openDevice } from './device.mjs';
 import { Take } from './recorder.mjs';
-import { ASK, CAPTURE_USER, CARDS, NEEDLE, NEEDLE_VIDEO, SAVE, SAVETHIS, SEARCH, SYNTHESIS } from './library.mjs';
+import { ASK, CAPTURE_USER, CARDS, NEEDLE, NEEDLE_VIDEO, REVISIT, SAVE, SAVETHIS, SEARCH, SYNTHESIS } from './library.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.join(here, '..', 'public', 'reel', 'app');
@@ -262,6 +262,66 @@ async function needleCards(N, dirName, jsonName) {
   fs.writeFileSync(dest, JSON.stringify({ dpr: DPR, cards }, null, 1) + '\n');
   console.log(`wrote ${cards.length} cards → ${path.relative(path.join(here, '..'), dir)}`);
   return { frames: cards, marks: {} };
+}
+
+/**
+ * REVISIT's account (library.mjs `REVISIT`): FIND THE BOOK's haystack without
+ * Sam's screenshot, plus the Mark Manson video, this week's saves dated into
+ * this week; then what the Revisit tab reads: the open "Do this" lines (in
+ * the card's metadata, where every save path writes it), a reminder that has
+ * come due, and this week's synthesis, written as the server writes it
+ * (users/{uid}/syntheses/{weekId}). Today's Daily Brew stays: its review row
+ * is part of the tab.
+ */
+async function prepareRevisit(V = REVISIT) {
+  await prepareNeedle(V);
+  const all = [...CARDS, ...V.extra];
+  const refs = [...new Set([...V.synthesis.themes.flatMap((x) => x.cardIds), V.synthesis.standoutCardId])].map((id) => {
+    const c = all.find((x) => x.id === id);
+    return { id, title: c.title, category: c.category };
+  });
+  // (round 3) the Daily Brews of the days before today: Revisit lists them
+  // under "This week", and the page needs that length: with nothing below
+  // "Do this", ticking the list off made the page re-clamp its scroll in
+  // jumps as the rows folded (the owner saw the foot of the frame jump)
+  const older = all.filter((c) => !V.without.includes(c.id) && (c.age ?? 0) > 30);
+  const brews = Array.from({ length: 9 }, (_, k) => ({
+    days: k + 1,
+    cards: [0, 1, 2, 3, 4].map((j) => older[(k * 5 + j * 3) % older.length]).map((c) => ({
+      id: c.id,
+      title: c.title,
+      category: c.category,
+      summary: c.summary,
+      sourceName: c.youtubeChannel ?? c.sourceName ?? null,
+      url: c.url,
+    })),
+  }));
+  await page.evaluate(
+    ([uid, v, syn, brews]) => {
+      const C = window.__capture;
+      const now = Date.now();
+      for (const b of brews) {
+        const d = new Date(now - b.days * 86_400_000);
+        const id = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        const at = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 8, 0).getTime();
+        C.set(`users/${uid}/digests/${id}`, { createdAt: at, mode: 'smart', frequency: 'daily', title: 'Your Daily Brew', topics: [], cardCount: b.cards.length, cards: b.cards });
+      }
+      C.set(`users/${uid}/syntheses/${syn.weekId}`, { ...syn, createdAt: now - 3_600_000 });
+      for (const [id, text] of Object.entries(v.takeaways)) {
+        const p = `users/${uid}/links/${id}`;
+        const cur = C.get(p);
+        if (!cur) throw new Error(`prepareRevisit: no card ${id}`);
+        C.set(p, { ...cur, metadata: { ...(cur.metadata ?? {}), actionableTakeaway: text } });
+      }
+      // the reminder came due ten minutes ago (the sweep's in-app flag)
+      for (const id of v.reminders) {
+        const p = `users/${uid}/links/${id}`;
+        const cur = C.get(p);
+        C.set(p, { ...cur, reminderStatus: 'pending', reminderDue: true, reminderDueAt: now - 600_000, nextReminderAt: now - 600_000, reminderCount: 1 });
+      }
+    },
+    [UID, V, { ...V.synthesis, weekId: isoWeekId(new Date()), cards: refs }, brews],
+  );
 }
 
 // Element rects the reel's camera aims at, by take. [selector, text filter?]
@@ -1100,6 +1160,114 @@ const takes = {
     }
     await t.thaw();
     return t.save({ later: later.map(([p]) => p.split('/').pop()) });
+  },
+
+  // ───────────────────────────────────────────────────────────── REVISIT
+  // One continuous use of the app on REVISIT's account (TICK IT OFF):
+  //  home    the feed: the video's card on top, summed up, and this week's
+  //          synthesis waiting above it
+  //  expand  the synthesis tapped open in place (the app's own unfolding),
+  //          its first paragraph naming the video
+  //  open    the Revisit tab: its sections dealing in (the review row, the
+  //          reminder that came due, "Do this")
+  //  list    scrolled so "Do this" fills the screen: five lines, five saves
+  //  tick    every line ticked, an 8th note apart (120 BPM), the video's
+  //          first: each circle fills, its line is struck and held, the rows
+  //          fold away one after another, and the list says "All done."
+  async revisitClip() {
+    await fresh(() => prepareRevisit());
+    const V = REVISIT;
+    const head = (id) => V.takeaways[id].slice(0, 24);
+    const title = (id) => [...CARDS, ...V.extra].find((c) => c.id === id).title;
+    const ids = Object.keys(V.takeaways);
+    const RV = {
+      revisitTab: R.revisitTab,
+      // Home
+      videoCard: ['main article.surface-card', title(V.video)],
+      videoTitle: ['main article.surface-card h3', title(V.video)],
+      banner: ['button[aria-expanded]', 'This week in Machina'],
+      recapTitle: ['div', V.synthesis.title],
+      para1: ['p', 'Six saves this week'],
+      phrase: ['::phrase', 'p', 'the smallest step you can take today'],
+      // Revisit
+      review: ['button', 'Review'],
+      remindersHead: ['button[aria-expanded]', 'Reminders'],
+      doHead: ['button[aria-expanded]', 'Do this'],
+      todo: ['div[class*="rounded-2xl"][class*="overflow-hidden"]', head(ids[1])],
+      allDone: ['p', 'All done.'],
+      doneBtn: ['button[aria-expanded]', 'Done'],
+      weekHead: ['button[aria-expanded]', 'This week'],
+      reminder: ['button', 'Yoga For Complete Beginners'],
+      toast: ['[role=status]'],
+      ...Object.fromEntries(
+        ids.flatMap((id, k) => [
+          [`row${k}`, ['div[class*="ps-1.5"][class*="pe-3"]', head(id)]],
+          [`task${k}`, ['div[class*="text-[14.5px]"]', head(id)]],
+          [`card${k}`, ['div[class*="text-[12px]"]', title(id)]],
+          [`tick${k}`, [`button[role=checkbox][aria-label*="${head(id)}"]`]],
+        ]),
+      ),
+    };
+    const t = new Take(dev, OUT, 'clips/revisit/app');
+    const roll60 = (n, every) => t.roll(n, { rects: RV, step: 1000 / 60, every });
+    const roll120 = (n, every) => t.roll(n, { rects: RV, step: 1000 / 120, every });
+    t.mark('home');
+    await t.snap({ rects: RV });
+    // (round 6: this week's synthesis is no longer opened on Home; the reel
+    // opens it in Revisit, under "All done.", as its last beat)
+    // the Revisit tab: its sections deal in (the app's staggered entrance)
+    await t.freeze();
+    await tab('Revisit').click();
+    t.mark('open');
+    await roll60(60);
+    await t.thaw();
+    await page.waitForTimeout(400);
+    // "Do this" to the top of the screen, under the header
+    await t.freeze();
+    await tagScroller('Do this');
+    t.mark('scroll');
+    await rollScroll(t, await scrollTargetFor('Do this', 126), 4, RV);
+    t.mark('list');
+    await t.snap({ rects: RV });
+    await t.thaw();
+    await page.waitForTimeout(300);
+    // (the mouse off the foot of the screen: a toast under the pointer holds
+    // itself open, and the wide shot waits for all five to time out)
+    await page.mouse.move(200, 40);
+    // the ticks, for the reel's half-speed payoff (round 4: at the app's own
+    // speed a row's 280ms fold is two frames at 30fps, and the list snapped
+    // up five times): rolled at 120fps, a click every 15 frames (125ms of the
+    // app's time), so at half speed they land an 8th note (7.5 output frames)
+    // apart and each fold plays over about 17 output frames; 210 frames run
+    // past the last fold to "All done."
+    await t.freeze();
+    t.mark('tick');
+    await roll120(210, async (k) => {
+      if (k % 15 === 0 && k / 15 < ids.length) {
+        // (the tab renders a second, hidden copy for desktop: the visible one)
+        await visible(page.locator(RV[`tick${k / 15}`][0])).dispatchEvent('click');
+      }
+    });
+    await t.thaw();
+    await page.waitForTimeout(600);
+    t.mark('after');
+    await t.snap({ rects: RV });
+    // the same tab once the five Undo toasts have timed out (8s each)
+    await page.waitForTimeout(9000);
+    // the same scroll as `after`, the toasts gone (the reel dissolves to it)
+    t.mark('rest');
+    await t.snap({ rects: RV });
+    // (round 6) "And every Sunday, it writes up your week.": this week's
+    // synthesis, right under "All done.", tapped open in place
+    await t.freeze();
+    await visible(page.locator(RV.banner[0]).filter({ hasText: 'This week in Machina' })).click();
+    t.mark('weekOpen');
+    await roll60(24);
+    await t.thaw();
+    await page.waitForTimeout(400);
+    t.mark('weekRead');
+    await t.snap({ rects: RV });
+    return t.save();
   },
 
   // ─────────────────────────────────────────────────── FIND THE BOOK: cards

@@ -107,6 +107,34 @@ const PAGE_HELPERS = () => {
       const b = els[0].b;
       return { x: b.x, y: b.y, w: b.width, h: b.height };
     },
+    /** The on-screen boxes of a PHRASE inside the first visible element
+     *  matching `selector` that contains it: one box per line it wraps
+     *  onto (a Range's client rects, merged per line). */
+    phrase(selector, text) {
+      const el = [...document.querySelectorAll(selector)].find((e) => e.textContent.includes(text) && e.checkVisibility());
+      if (!el) return null;
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      let n;
+      while ((n = walker.nextNode())) {
+        const at = n.textContent.indexOf(text);
+        if (at < 0) continue;
+        const r = document.createRange();
+        r.setStart(n, at);
+        r.setEnd(n, at + text.length);
+        const lines = [];
+        for (const b of r.getClientRects()) {
+          if (b.width < 1) continue;
+          const l = lines.find((x) => Math.abs(x.y - b.y) < 3);
+          if (l) {
+            const x1 = Math.max(l.x + l.w, b.x + b.width);
+            l.x = Math.min(l.x, b.x);
+            l.w = x1 - l.x;
+          } else lines.push({ x: b.x, y: b.y, w: b.width, h: b.height });
+        }
+        return lines;
+      }
+      return null;
+    },
   };
 };
 
@@ -143,7 +171,13 @@ export class Take {
     await this.page.screenshot({ path: path.join(this.dir, file), animations: 'allow', caret });
     const text = await this.page.evaluate(() => window.__rec.visibleText());
     const measured = {};
-    for (const [k, [sel, txt]] of Object.entries(rects)) {
+    for (const [k, [sel, txt, more]] of Object.entries(rects)) {
+      // ['::phrase', selector, text]: a phrase's line boxes, `k#0`, `k#1`…
+      if (sel === '::phrase') {
+        const lines = await this.page.evaluate(([s, t]) => window.__rec.phrase(s, t), [txt, more]);
+        (lines ?? []).forEach((b, j) => (measured[`${k}#${j}`] = b));
+        continue;
+      }
       measured[k] = await this.page.evaluate(([s, t]) => window.__rec.rect(s, t), [sel, txt ?? null]);
     }
     this.frames.push({ file, text, rects: measured, ...(note ? { note } : {}) });
