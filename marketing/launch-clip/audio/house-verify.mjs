@@ -18,7 +18,9 @@
  *  3. its type is the kit's: no fontFamily, no font import, no own easing
  *     curve (bezier / Easing) in its scene files;
  *  4. its final mix carries the signature take, sample for sample in shape,
- *     at the signature's voice frame (when the mix exists).
+ *     at the signature's voice frame (when the mix exists);
+ *  5. its captions sit in the house band (kit HOUSE_BAND, the compact band
+ *     the owner asked for twice) and its frame-0 hook is the kit HookTitle.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -55,6 +57,11 @@ for (const [name, v] of Object.entries(HOUSE)) {
   }
   for (const [f, s] of Object.entries(src)) if (s.includes(TAGLINE)) bad.push(`${f} sets the tagline itself`);
 
+  // 5. the house band and the house hook
+  const all = Object.values(src).join('\n');
+  if (!/\bHOUSE_BAND\b/.test(all)) bad.push('captions are not in the kit HOUSE_BAND');
+  if ((T.CAPTIONS ?? []).some((c) => c.place === 'hook') && !/\bHookTitle\b/.test(all)) bad.push('the hook is not the kit HookTitle');
+
   // 2–3. colours, type and curves from the kit only
   for (const [f, s] of Object.entries(src)) {
     const code = s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
@@ -90,6 +97,6 @@ for (const [name, v] of Object.entries(HOUSE)) {
   if (bad.length) {
     failed++;
     console.log(`✗ ${name}\n  - ${bad.join('\n  - ')}`);
-  } else console.log(`✓ ${name}: ends on the Signature; colours, type and curves from the kit`);
+  } else console.log(`✓ ${name}: ends on the Signature; the house band and hook; colours, type and curves from the kit`);
 }
 process.exit(failed ? 1 : 0);
