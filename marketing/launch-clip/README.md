@@ -1480,8 +1480,11 @@ and spoken differ by design (the owner's script): `text` is the screen,
 **Measured.** Score loudness by section (RMS): hook −32dB, the hunt building
 −30 → −14dB, "Nothing." −26dB, then −29 to −34dB, the turn −25dB, the gather
 −23dB, the logo −19dB. The mix −14.01 LUFS, −1.21 dBTP; the Signature's take
-found in the mix at its frame (correlation 0.83). Nobody has listened to it
-on speakers.
+found in the mix at its frame (correlation 0.83). The last frame, rendered
+lossless, is pixel-identical to `MachinaSignature`'s above the footer
+(PSNR ∞; the posting encode 44.2dB). The encode: 900 frames, 30.000s,
+H.264 High yuv420p BT.709, AAC 48kHz 320k, 13.1MB; no brightness jump at the
+three range seams. Nobody has listened to it on speakers.
 
 ## Motion language
 

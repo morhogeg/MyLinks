@@ -2683,8 +2683,10 @@ exact-match, capped.
   (no recipes), the platform grids are generic, it ends on the Signature
   with "Coming soon · mymachina.app" (`MachinaPovStore` swaps in the store
   line on launch day, no re-voice). Voice: narration-tts run 27 (7 takes).
-  Verified: tsc 0, house-verify ✓, mix −14.01 LUFS / −1.21 dBTP, review
-  stills checked by eye. Not verified: listened on speakers, played in the
+  Verified: tsc 0, house-verify ✓, mix −14.01 LUFS / −1.21 dBTP, the last
+  frame pixel-identical to `MachinaSignature` above the footer, review
+  stills checked by eye; the encode is 900 frames, 30.000s, 13.1MB
+  (`marketing/launch-clip/out/pov/final_reel.mp4`, gitignored). Not verified: listened on speakers, played in the
   Instagram/TikTok apps. **Owner:** review `out/pov/final_reel.mp4`.
 - **2026-10-24 — FIND THE BOOK round 6: what Machina does; the quote,
   struck; no timer bar (owner notes on round 5, both versions).** Branch
