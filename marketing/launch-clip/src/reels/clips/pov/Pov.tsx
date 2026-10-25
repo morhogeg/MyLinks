@@ -2,8 +2,9 @@ import React from 'react';
 import { AbsoluteFill, Audio, random, staticFile, useCurrentFrame } from 'remotion';
 import { CAPTIONS, ENDINGS, FPS, HITS, QUERY, SIGNATURE_AT } from '../../../../clips/pov-timeline.mjs';
 import { SaveChip, type SaveKind } from '../../kit/Brand';
-import { BandScrim, SLOTS } from '../../kit/Captions';
-import { EASE_GATHER, EASE_IN_OUT, EASE_MODAL, EASE_SPRING, prog } from '../../kit/curves';
+import { BandScrim, HOUSE_BAND } from '../../kit/Captions';
+import { EASE_FLING, EASE_GATHER, EASE_IN_OUT, EASE_MODAL, EASE_SPRING, prog } from '../../kit/curves';
+import { HookTitle } from '../../kit/Hook';
 import { Lens, Paper } from '../../kit/Paper';
 import { Signature } from '../../kit/Signature';
 import { SIGNATURE, signatureWordAt } from '../../kit/signature.mjs';
@@ -29,10 +30,11 @@ type Ending = keyof typeof ENDINGS;
 
 /** ── the clock of each place ─────────────────────────────────────────── */
 
-/** Instagram: a beat on its header, then a whip up the grid */
-const instaY = (f: number) => 3400 * prog(f, HITS.insta + 6, HITS.tiktok - 2, EASE_IN_OUT);
-/** TikTok: arrives on a whip-pan, then its own whip */
-const tiktokY = (f: number) => 2600 * prog(f, HITS.tiktok + 12, HITS.shots - 2, EASE_IN_OUT);
+/** Instagram: a beat on its header, then a thumb's flick up the grid (round 2:
+ *  a flick is thrown, fast off the thumb and a long slow-down: EASE_FLING) */
+const instaY = (f: number) => 3400 * prog(f, HITS.insta + 6, HITS.tiktok - 2, EASE_FLING);
+/** TikTok: arrives on a whip-pan, then its own flick */
+const tiktokY = (f: number) => 2600 * prog(f, HITS.tiktok + 12, HITS.shots - 2, EASE_FLING);
 const panX = (f: number) => prog(f, HITS.tiktok - 2, HITS.tiktok + 10, EASE_IN_OUT);
 /** the screenshots fly up, too fast to read, faster and faster */
 const shotsY = (f: number) => 5600 * prog(f, HITS.shots + 4, HITS.chat, (t) => t * t * (2 - t) * 0.6 + t * 0.4);
@@ -85,8 +87,8 @@ const Hunt: React.FC<{ f: number }> = ({ f }) => {
   if (f < HITS.insta) {
     const push = 1 + 0.035 * prog(f, 0, HITS.insta, (t) => t);
     return (
-      <AbsoluteFill style={{ transform: `scale(${push})`, transformOrigin: '540px 980px' }}>
-        <SearchBar query="" caret={caretOn(f)} none={0} />
+      <AbsoluteFill style={{ transform: `scale(${push})`, transformOrigin: '540px 900px' }}>
+        <SearchBar query="" caret={caretOn(f)} none={0} recents={1} />
       </AbsoluteFill>
     );
   }
@@ -129,7 +131,13 @@ const Searching: React.FC<{ f: number }> = ({ f }) => {
   const done = query.length === QUERY.length;
   return (
     <AbsoluteFill>
-      <SearchBar query={query} caret={!done || caretOn(f)} none={f >= HITS.none2 ? none2 : none1} noneShake={shake} />
+      <SearchBar
+        query={query}
+        caret={!done || caretOn(f)}
+        none={f >= HITS.none2 ? none2 : none1}
+        noneShake={shake}
+        recents={1 - prog(f, HITS.type, HITS.type + 8, EASE_IN_OUT)}
+      />
       {cover > 0 && (
         <AbsoluteFill style={{ transform: `translateY(${Math.round((1 - cover) * 1920)}px)` }}>
           <Blurred f={f} pos={scrollY} render={(y) => <Grid kind="insta" y={y + 900} />} />
@@ -141,11 +149,11 @@ const Searching: React.FC<{ f: number }> = ({ f }) => {
 
 /** the hunt's scenes at a held moment, for the turn's five panels */
 const PANELS: { place: (f: number) => React.ReactNode; x: number; y: number; dir: [number, number]; rot: number }[] = [
-  { place: () => <Grid kind="insta" y={1200} />, x: 248, y: 860, dir: [-1, -0.7], rot: -4 },
-  { place: () => <Grid kind="tiktok" y={900} />, x: 832, y: 860, dir: [1, -0.7], rot: 4 },
-  { place: () => <ScreenshotWall y={1400} />, x: 248, y: 1420, dir: [-1, 0.8], rot: 3 },
-  { place: () => <SelfChat y={600} />, x: 832, y: 1420, dir: [1, 0.8], rot: -3 },
-  { place: () => <SearchBar query={QUERY} caret={false} none={1} />, x: 540, y: 1140, dir: [0, 1], rot: 0 },
+  { place: () => <Grid kind="insta" y={1200} />, x: 248, y: 870, dir: [-1, -0.7], rot: -4 },
+  { place: () => <Grid kind="tiktok" y={900} />, x: 832, y: 870, dir: [1, -0.7], rot: 4 },
+  { place: () => <ScreenshotWall y={1400} />, x: 248, y: 1430, dir: [-1, 0.8], rot: 3 },
+  { place: () => <SelfChat y={600} />, x: 832, y: 1430, dir: [1, 0.8], rot: -3 },
+  { place: (f) => <SearchBar query={QUERY} caret={caretOn(f)} none={1} />, x: 540, y: 1150, dir: [0, 1], rot: 0 },
 ];
 const PANEL_S = 0.3;
 
@@ -193,7 +201,7 @@ const Turn: React.FC<{ f: number }> = ({ f }) => {
 
 /** ── the gather: the saves rush back from every side into one point ──── */
 const SAVES: { kind: SaveKind; title: string }[] = [
-  { kind: 'instagram', title: 'That Lisbon café' },
+  { kind: 'web', title: 'Read before you sign a lease' },
   { kind: 'youtube', title: 'Stanford commencement address' },
   { kind: 'screenshot', title: 'Read Atomic Habits, start small' },
   { kind: 'x', title: 'Thread: the two-minute rule' },
@@ -217,7 +225,44 @@ const gatherOf = (i: number) => {
   return { a, start, end: start + 30 + Math.round(random(`gd${i}`) * 8), r0: 640 + 460 * random(`gr${i}`), size: 0.8 + 0.45 * random(`gz${i}`) };
 };
 
-const LAST_ARRIVAL = Math.max(...Array.from({ length: GATHER_N }, (_, i) => gatherOf(i).end));
+/**
+ * (round 2) The save you couldn't find is the last one home: it glides in
+ * from the left, slows so it can be read, then joins the point. The point's
+ * last pulse is its arrival.
+ */
+const HERO = { kind: 'instagram' as SaveKind, title: 'That Lisbon café', in: HITS.gather + 60, read: HITS.gather + 80, end: HITS.point + 4, scale: 1.3, from: { x: -340, y: 1060 }, rest: { x: 400, y: 1010 } };
+const LAST_ARRIVAL = HERO.end;
+
+const Hero: React.FC<{ f: number }> = ({ f }) => {
+  if (f < HERO.in || f >= HERO.end) return null;
+  const at = (ff: number) => {
+    // glide in and settle (an arrival), drift while read, then rush into the point
+    const glide = prog(ff, HERO.in, HERO.read, EASE_MODAL);
+    const join = prog(ff, HERO.read + 8, HERO.end, EASE_GATHER);
+    const x0 = HERO.from.x + (HERO.rest.x - HERO.from.x) * glide + 14 * prog(ff, HERO.read, HERO.read + 8, (t) => t);
+    const y0 = HERO.from.y + (HERO.rest.y - HERO.from.y) * glide;
+    return { x: x0 + (POINT.x - x0) * join, y: y0 + (POINT.y - y0) * join, s: HERO.scale * (1 - 0.9 * join), t: join };
+  };
+  const p = at(f);
+  const q = at(f - 1);
+  return (
+    <Smear dx={(p.x - q.x) * 0.5} dy={(p.y - q.y) * 0.5}>
+      {(ox, oy) => (
+        <div
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            transform: `translate(${(p.x + ox).toFixed(1)}px, ${(p.y + oy).toFixed(1)}px) translate(-50%, -50%) scale(${p.s.toFixed(3)}) rotate(${(-3 * (1 - p.t)).toFixed(2)}deg)`,
+            opacity: 1 - prog(f, HERO.end - 3, HERO.end, (t) => t),
+          }}
+        >
+          <SaveChip kind={HERO.kind} title={HERO.title} />
+        </div>
+      )}
+    </Smear>
+  );
+};
 
 const Gather: React.FC<{ f: number }> = ({ f }) => (
   <AbsoluteFill>
@@ -292,19 +337,21 @@ const Lines: React.FC<{ f: number }> = ({ f }) => (
         const s = cue === undefined ? -(c.at + HEAD_LEAD + 12) : Math.round((t?.words[cue] ?? 0) * FPS);
         return line.split(' ').map(() => s);
       });
-      const hook = c.place === 'hook';
+      if (c.place === 'hook') {
+        const [kicker, ...big] = lines;
+        return <HookTitle key={c.at} kicker={kicker} lines={big} frame={f} to={c.to} />;
+      }
       return (
-        <div key={c.at} style={{ position: 'absolute', left: 0, right: 0, top: hook ? SLOTS.top - 40 : SLOTS.top, display: 'flex', justifyContent: 'center' }}>
+        <div key={c.at} style={{ position: 'absolute', left: 0, right: 0, top: HOUSE_BAND.top, display: 'flex', justifyContent: 'center' }}>
           <KineticLine
             text={c.text}
             frame={f}
             from={c.at}
             to={c.to}
             starts={starts}
-            size={56}
-            sizes={hook ? [60, 104] : undefined}
-            weight={hook ? 620 : 600}
-            width={hook ? 980 : 980}
+            size={HOUSE_BAND.size}
+            weight={HOUSE_BAND.weight}
+            width={HOUSE_BAND.width}
           />
         </div>
       );
@@ -322,7 +369,8 @@ export const Pov: React.FC<{ withAudio?: boolean; withCaptions?: boolean; ending
       {f < HITS.drift && <Hunt f={f} />}
       {f >= HITS.drift && f < HITS.white + 6 && <Turn f={f} />}
       {f >= HITS.gather && f < SIGNATURE_AT + 2 && <Gather f={f} />}
-      {scrim > 0 && <BandScrim opacity={scrim} tone={TOKENS.paper} />}
+      {f >= HITS.gather && f < SIGNATURE_AT + 2 && <Hero f={f} />}
+      {scrim > 0 && <BandScrim opacity={scrim} tone={TOKENS.paper} band={HOUSE_BAND} />}
       {withCaptions && <Lines f={f} />}
       <Lens vignette={0.35} grain={0.035} />
       <Signature from={SIGNATURE_AT} footer={ENDINGS[ending]} />

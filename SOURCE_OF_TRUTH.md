@@ -2659,6 +2659,22 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-25 — POV round 2 (owner: "perfect… the captions area is too
+  high… more space for showing", an Apple-grade pass, and "should we
+  populate the Instagram/TikTok items with actual media?").** Same branch.
+  Captions moved to the new **house band** (`kit/Captions.tsx`
+  `HOUSE_BAND` = FIND THE BOOK r5's: top 268px, 60/650, scrim clear by
+  550px) and the hook to the **house hook** (`kit/Hook.tsx`, FIND THE
+  BOOK's dare); the places moved up 160px. Media: no real media (rights,
+  faces read as endorsements, house rule) and no generated photos (credits,
+  uncanny); instead every tile and screenshot is filled with type-led
+  content (Instagram text covers, TikTok caption pills, a chat, a map pin, a
+  list, a boarding pass), and the café hides in both grids. Polish: the
+  hook's "Recent" failed searches, a "No results" empty state, chat clipped
+  under its header, the grid header's zero width fixed, thrown flicks, the
+  café as the last save home in the gather. Timing, voice and score
+  unchanged. Verified: tsc 0, house-verify ✓, stills checked by eye. Not
+  verified: speakers, in-app playback.
 - **2026-10-25 — ONE VIDEO KIT + THE SHARED ENDING; POV: YOU SAVED IT
   (owner: "all the product videos must match… some things must be the
   same, e.g. the final frame with the Machina logo and the narration";

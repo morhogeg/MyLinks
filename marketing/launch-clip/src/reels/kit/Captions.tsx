@@ -35,12 +35,22 @@ export const BAND = { solid: 510, clear: 720 };
 export const clearOf = (hex: string) =>
   `rgba(${parseInt(hex.slice(1, 3), 16)},${parseInt(hex.slice(3, 5), 16)},${parseInt(hex.slice(5, 7), 16)},0)`;
 
-export const BandScrim: React.FC<{ opacity?: number; tone?: string }> = ({ opacity = 1, tone = '#EEF0F4' }) => (
+/**
+ * THE HOUSE BAND (every video from 2026-10-25 on): FIND THE BOOK's round-5
+ * band, made the standard (owner, on it and again on POV: the captions took
+ * too much of the frame). The line high in the safe area (Meta keeps the top
+ * 14%, 269px, clear) a size down, weight 650, on a shallow paper scrim
+ * (solid to 410px, clear by 550px), so the picture owns everything below
+ * 550px. Two lines at most.
+ */
+export const HOUSE_BAND = { top: 268, size: 60, weight: 650, width: 1000, solid: 410, clear: 550 };
+
+export const BandScrim: React.FC<{ opacity?: number; tone?: string; band?: { solid: number; clear: number } }> = ({ opacity = 1, tone = '#EEF0F4', band = BAND }) => (
   <AbsoluteFill
     style={{
       pointerEvents: 'none',
       opacity,
-      background: `linear-gradient(180deg, ${tone} 0px, ${tone} ${BAND.solid}px, ${clearOf(tone)} ${BAND.clear}px)`,
+      background: `linear-gradient(180deg, ${tone} 0px, ${tone} ${band.solid}px, ${clearOf(tone)} ${band.clear}px)`,
     }}
   />
 );

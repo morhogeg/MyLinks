@@ -1423,9 +1423,17 @@ checks it (a new video adds itself to `HOUSE` in that file):
   kit's inks, the app's platform hues, the kit's shadows, paper tile
   tints). No hex, rgb or fontFamily in a video's own scene files.
 - **Motion uses the kit's curves** (`kit/curves.ts`); no new easing.
-- **Captions are the kit's `KineticLine`** in the kit's slots, over the
-  kit's `BandScrim`; the voice is Gemini TTS Sulafat with per-line
-  direction; the mix is mastered to −14 LUFS, ≤ −1 dBTP.
+- **Captions are the kit's `KineticLine` in the house band**
+  (`kit/Captions.tsx` `HOUSE_BAND`: FIND THE BOOK's round-5 band, top 268px,
+  60px weight 650, over a paper scrim solid to 410px and clear by 550px), so
+  the picture owns everything below 550px. The frame-0 hook is the house
+  hook (`kit/Hook.tsx` `HookTitle`: FIND THE BOOK's dare, a kicker over
+  96px type). The voice is Gemini TTS Sulafat with per-line direction; the
+  mix is mastered to −14 LUFS, ≤ −1 dBTP.
+- **Never a blank placeholder.** Anything standing in for another app's
+  content is filled with what that place is really full of, built from type,
+  line icons and paper tints (POV round 2), never grey skeleton boxes, and
+  never real third-party media.
 
 One kit, too: this branch merged the newest video branches (SAVE THIS,
 TICK IT OFF, the highlight reel round 16) onto FIND THE BOOK's kit, so
@@ -1464,12 +1472,34 @@ done; wait   # (--browser-executable="" on the Mac only)
 
 **What is schematic.** None of it is the Machina app: the places are the
 other apps, drawn as their layouts (the platform named in type, the only
-mark the app's own Instagram glyph, tiles in paper tints, no third-party
-thumbnails, invented short links), and un-branded on purpose, as in the
-launch film's act one. The gathered saves are the kit's `SaveChip` with the
+mark the app's own Instagram glyph, no third-party thumbnails, invented
+short links), and un-branded on purpose, as in the launch film's act one.
+(Round 2, owner: the blank tiles showed.) Every tile carries what those
+grids are really full of, made of type, line icons and paper: Instagram's
+text-led carousel covers ("10 things to do in Lisbon"), TikTok's white
+caption pills over a line-icon subject with a view count; the screenshots
+are a chat, a map pin, a list, a post, a boarding pass. Real media was
+ruled out: other people's work and faces (rights, and a face reads as an
+endorsement), and generated photos cost credits and look uncanny at this
+speed. The café hides in plain sight in both grids (Instagram row 3, which
+whips past; TikTok's top-right cover on the pan), once each, never on the
+desperate scroll's freeze. The gathered saves are the kit's `SaveChip` with the
 demo account's titles. No recipe or cooking content (owner, 2026-10-02): the
 lost save is a café. The tagline is said once, by the Signature; "Coming
 soon" is on screen only, so the launch-day ending needs no new voice.
+
+**Round 2 (owner: "the captions area is too high… more space for showing",
+and an Apple-grade pass).** The house band and hook (above): the places
+moved up 160px (`HEADER_Y` 576, the search bar at 700). The hook frame
+gained the bar's "Recent" history, every way you already tried ("that café
+with the blue tiles"); it gives way as the query is typed. "No results" is
+an empty state (a faint magnifier). The self-chat's messages scroll under
+its fixed header, not over it. The grid's header row had collapsed to zero
+width in round 1 (its back and more icons never drew); it spans the frame.
+The flicks up the grids are thrown (`EASE_FLING`). In the gather the café is
+no longer one of the crowd: it is the last save home, gliding in from the
+left, slowing to be read ("That Lisbon café"), then joining the point on its
+last pulse. Timing, voice and score are unchanged.
 
 **Voice.** Gemini TTS Sulafat, warm and a little wry, quick at the start and
 slower from "Saving was never the hard part." Seven lines, voiced by
