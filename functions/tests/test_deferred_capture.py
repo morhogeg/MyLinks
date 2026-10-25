@@ -81,7 +81,7 @@ def world(monkeypatch):
         monkeypatch.setattr(main, "_apply_post_thumbnail", lambda *a, **k: None)
         monkeypatch.setattr(main, "_analyze_scraped", lambda ai, s, tags, **kw: {
             "title": "Analyzed", "summary": "S", "concepts": [], "tags": ["ai"], "category": "Tech"})
-        monkeypatch.setattr(scraper, "scrape_url", lambda url, body=None: {
+        monkeypatch.setattr(scraper, "scrape_url", lambda url, body=None, page_preview=None: {
             "html": "<p>x</p>", "title": "The Post", "text": "the post body " * 20,
             "source_url": url, "final_url": url})
         return db
@@ -315,7 +315,7 @@ def test_a_non_save_429_is_not_mistaken_for_the_save_wall():
 
 def test_scrape_only_job_snapshots_the_page_and_keeps_the_card_waiting(world, monkeypatch):
     db = world.make(limit=100, used=100)
-    monkeypatch.setattr(scraper, "scrape_url", lambda url, body=None: {
+    monkeypatch.setattr(scraper, "scrape_url", lambda url, body=None, page_preview=None: {
         "html": "<huge/>" * 10, "title": "A post about tides", "text": "Tides are " * 50,
         "image_urls": ["https://cdn.example/1.jpg"], "image_primary": True,
         "final_url": "https://www.instagram.com/p/abc/", "source_url": url})
@@ -344,7 +344,7 @@ def test_a_snapshot_that_lands_after_the_release_is_dropped(world, monkeypatch):
     live), so the late snapshot and its copied images are not kept."""
     db = world.make(limit=100, used=100)
     monkeypatch.setattr(main, "_fetch_post_images", lambda urls: [(b"jpg", "image/jpeg")] if urls else [])
-    monkeypatch.setattr(scraper, "scrape_url", lambda url, body=None: {
+    monkeypatch.setattr(scraper, "scrape_url", lambda url, body=None, page_preview=None: {
         "title": "T", "text": "body " * 50, "image_urls": ["https://cdn.example/1.jpg"]})
     deleted = []
     monkeypatch.setattr(main, "_owned_blob_deleter", lambda uid: deleted.append)

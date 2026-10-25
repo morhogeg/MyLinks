@@ -412,7 +412,7 @@ def _drive_worker(monkeypatch, *, queue, card_exists=True, scraped=None, analysi
     monkeypatch.setattr(main, "_apply_post_thumbnail", lambda *a, **k: None)
     monkeypatch.setattr(main, "refund_quota", lambda uid, kind, amount=1: refunds.append(kind))
     monkeypatch.setattr(main, "_apply_reminder_intent", lambda uid, lid, body: reminders.append(body))
-    monkeypatch.setattr(scraper, "scrape_url", lambda url, body=None: dict(scraped or {
+    monkeypatch.setattr(scraper, "scrape_url", lambda url, body=None, page_preview=None: dict(scraped or {
         "html": "", "title": "Scraped", "text": "body text " * 20}))
     snap = MagicMock()
     snap.to_dict.return_value = queue

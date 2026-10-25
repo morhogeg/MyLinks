@@ -3516,8 +3516,51 @@ def _split_shared_text(*candidates) -> tuple:
     return "", "", []
 
 
+# Post data the iOS share extension read ON THE PHONE for an Instagram or
+# TikTok link (scraper.PAGE_PREVIEW_FIELDS). Those sites serve our Cloud
+# Functions a login page / an empty app shell, while a phone gets the post, so
+# the extension loads it in a signed-out web view and sends what the page
+# showed. It is the user's own capture (no more trusted than shared text, and
+# no less): every field is a bounded string, the URL must be the platform's
+# own, and the image must be on the platform's CDN over https (it is fetched
+# for vision / the banner through the SSRF-guarded safe_get either way).
+_PAGE_PREVIEW_HOSTS = ("instagram.com", "tiktok.com")
+_PAGE_PREVIEW_IMAGE_HOSTS = ("cdninstagram.com", "fbcdn.net", "tiktokcdn.com",
+                             "tiktokcdn-us.com", "tiktokcdn-eu.com")
+_PAGE_PREVIEW_LIMITS = {"title": 500, "description": 5000, "author": 64,
+                        "authorName": 200, "image": MAX_URL_LENGTH, "url": MAX_URL_LENGTH}
+
+
+def _host_matches(url: str, domains: tuple) -> bool:
+    from urllib.parse import urlparse
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        return False
+    host = (parsed.hostname or "").lower()
+    return parsed.scheme == "https" and any(host == d or host.endswith("." + d) for d in domains)
+
+
+def _clean_page_preview(raw, url: str) -> Optional[dict]:
+    """The phone's post read for `url`, sanitized, or None when there is none
+    or `url` is not an Instagram/TikTok link."""
+    if not isinstance(raw, dict) or not _host_matches(url or "", _PAGE_PREVIEW_HOSTS):
+        return None
+    out = {}
+    for key, limit in _PAGE_PREVIEW_LIMITS.items():
+        v = raw.get(key)
+        if isinstance(v, str) and v.strip():
+            out[key] = v.strip()[:limit]
+    if out.get("image") and not _host_matches(out["image"], _PAGE_PREVIEW_IMAGE_HOSTS):
+        out.pop("image")
+    if out.get("url") and not _host_matches(out["url"], _PAGE_PREVIEW_HOSTS):
+        out.pop("url")
+    return out if (out.get("title") or out.get("description")) else None
+
+
 def _pending_url_doc(uid: str, url: str, *, card_id: Optional[str] = None,
-                     body: str = "", source: str = "share") -> dict:
+                     body: str = "", source: str = "share",
+                     page_preview: Optional[dict] = None) -> dict:
     """Build the ``pending_processing`` queue doc for a URL capture.
 
     Shared by the iOS share sheet (``source='share'``) and the durable
@@ -3543,6 +3586,8 @@ def _pending_url_doc(uid: str, url: str, *, card_id: Optional[str] = None,
         doc["urlKey"] = key
     if card_id:
         doc["cardId"] = card_id
+    if page_preview:
+        doc["pagePreview"] = page_preview
     return doc
 
 
@@ -3592,7 +3637,8 @@ def _claim_offline_enqueue(uid: str, card_id) -> Optional[bool]:
 
 def _defer_url_capture(uid: str, url: str, card_id, over: dict, headers: dict, *,
                        body: str = "", explicit_note: str = "", shared_rest: str = "",
-                       note_kind=None, extra_urls=None) -> https_fn.Response:
+                       note_kind=None, extra_urls=None,
+                       page_preview: Optional[dict] = None) -> https_fn.Response:
     """Keep a link saved past the monthly wall: a `waiting` card now (the
     client's placeholder when it sent `card_id`, else a new card), the share's
     own text kept beside it, any reminder in the note set from NOW, and a
@@ -3612,7 +3658,8 @@ def _defer_url_capture(uid: str, url: str, card_id, over: dict, headers: dict, *
     })
     if note_kind != 'quote' and explicit_note.strip():
         _apply_reminder_intent(uid, card_ref.id, explicit_note.strip())
-    job = _pending_url_doc(uid, url, card_id=card_ref.id, body=body, source=source)
+    job = _pending_url_doc(uid, url, card_id=card_ref.id, body=body, source=source,
+                           page_preview=page_preview)
     job["snapshotOnly"] = True
     if shared_rest:
         job["userNoteText"] = shared_rest[:MAX_NOTE_LENGTH]
@@ -3637,8 +3684,11 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
     Authenticates with a per-user ingest token, then queues the shared URL
     into the existing background processing pipeline.
 
-    Accepts JSON: { "url" | "text" | "shared": <string>, "token"?: <string> }
-    Token may also be provided via the 'X-Ingest-Token' header.
+    Accepts JSON: { "url" | "text" | "shared": <string>, "token"?: <string>,
+    "pagePreview"?: {title, description, image, author, authorName, url} }
+    (`pagePreview`: an Instagram/TikTok post as read on the phone, see
+    _clean_page_preview). Token may also be provided via the 'X-Ingest-Token'
+    header.
 
     CORS also admits browser-extension origins here (and only here), so the
     browser extension can save without a host permission (Safari never
@@ -4112,6 +4162,7 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
         # an instruction: it must never be parsed for a reminder ("tomorrow").
         note_kind = 'quote' if (data.get('noteKind') == 'quote'
                                 or data.get('source') == 'extension-selection') else None
+        page_preview = _clean_page_preview(data.get('pagePreview'), url)
 
         # Dedup: skip if already saved or already queued for this user.
         #
@@ -4166,14 +4217,15 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
                 return q
             return _defer_url_capture(uid, url, card_id, over, headers, body=body,
                                       explicit_note=explicit_note, shared_rest=shared_rest,
-                                      note_kind=note_kind, extra_urls=extra_urls)
+                                      note_kind=note_kind, extra_urls=extra_urls,
+                                      page_preview=page_preview)
         charged = (uid, "saves")
 
         db = get_db()
         process_ref = db.collection('pending_processing').document()
         queue_doc = _pending_url_doc(
             uid, url, card_id=card_id, body=body,
-            source="web" if card_id else "share",
+            source="web" if card_id else "share", page_preview=page_preview,
         )
         queue_doc[capture_charge.CHARGE_FIELD] = capture_charge.token("saves")
         if note_kind:
@@ -6469,7 +6521,7 @@ def _snapshot_capture(ref, uid: str, data: dict) -> None:
         if not card_id or not isinstance(url, str):
             return
         card_ref = db.collection('users').document(uid).collection('links').document(card_id)
-        scraped = scrape_url(url, data.get("body"))
+        scraped = scrape_url(url, data.get("body"), data.get("pagePreview"))
         snap = deferred_capture.snapshot_from_scrape(scraped)
         stored = []
         if snap is not None:
@@ -6709,7 +6761,7 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
                 scraped_raw = deferred_capture.scrape_from_snapshot(stored["scrape"])
                 scraped_raw.setdefault("source_url", url)
             else:
-                scraped_raw = scrape_url(url, original_body)
+                scraped_raw = scrape_url(url, original_body, data.get("pagePreview"))
 
             # Ensure scraped is a dict
             if isinstance(scraped_raw, dict):

@@ -579,7 +579,8 @@ def _extract_article_text(soup) -> str:
     return block_text
 
 
-def scrape_url(url: str, message_body: Optional[str] = None) -> dict:
+def scrape_url(url: str, message_body: Optional[str] = None,
+               page_preview: Optional[dict] = None) -> dict:
     """
     Fetch and extract content from a URL.
     Handles Twitter/X and Instagram URLs specially.
@@ -591,7 +592,7 @@ def scrape_url(url: str, message_body: Optional[str] = None) -> dict:
         'fetch_error_message' (see _fetch_failure) — callers must not analyze
         those.
     """
-    result = _scrape_url(url, message_body)
+    result = _scrape_url(url, message_body, page_preview)
     if not isinstance(result, dict):
         return result
     result.setdefault("source_url", url)
@@ -614,7 +615,8 @@ def scrape_url(url: str, message_body: Optional[str] = None) -> dict:
     return result
 
 
-def _scrape_url(url: str, message_body: Optional[str] = None) -> dict:
+def _scrape_url(url: str, message_body: Optional[str] = None,
+                page_preview: Optional[dict] = None) -> dict:
     try:
         # SSRF guard: block private/internal/metadata targets before any fetch.
         validate_public_url(url)
@@ -637,7 +639,12 @@ def _scrape_url(url: str, message_body: Optional[str] = None) -> dict:
 
         # Special handling for Instagram URLs
         if _host_is('instagram.com'):
-            return _scrape_instagram_url(url, message_body)
+            return _scrape_instagram_url(url, message_body, page_preview)
+
+        # TikTok (vt./vm. short links included): never the generic reader,
+        # which only ever saw the app shell ("TikTok - Make Your Day").
+        if _host_is('tiktok.com'):
+            return _scrape_tiktok_url(url, message_body, page_preview)
 
         # Special handling for YouTube URLs
         if _host_is('youtube.com', 'youtu.be'):
@@ -1669,8 +1676,7 @@ def _ig_url_is_video(url: str) -> bool:
 def _extract_og_image(soup) -> str:
     """Return the og:image / twitter:image URL from a parsed page, or "".
 
-    Instagram exposes the post's cover photo as og:image (the bridge services
-    proxy the real media there too). Only http(s) URLs are returned so a relative
+    Instagram exposes the post's cover photo as og:image. Only http(s) URLs are returned so a relative
     or data: value can't reach the SSRF-guarded fetch as something unexpected.
     """
     for tag_name in ("og:image", "og:image:secure_url", "twitter:image"):
@@ -1759,11 +1765,51 @@ def _instagram_poster_without_play_badge(image_url: str) -> str:
     return image_url
 
 
-def _scrape_instagram_url(url: str, message_body: Optional[str] = None) -> dict:
-    """
-    Scrape Instagram URLs using direct scraping first (reliable with mobile headers),
-    then fall back to bridges.
-    """
+# Instagram's logged-out boilerplate. Since late October 2026 Instagram serves
+# its login page (not the post) to requests from Google Cloud addresses, and the
+# page's og:description is a >100-character CTA, so it used to sail through as a
+# caption and become an "Instagram Login Page" card. Matched on the exact
+# phrases only: a real caption that mentions logging in is not a wall.
+_IG_WALL_PHRASES = (
+    "welcome back to instagram. sign in to check out",
+    "sign in to check out what your friends, family & interests",
+    "create an account or log in to instagram",
+    "log in to see photos and videos from friends",
+)
+_IG_WALL_TITLES = frozenset({"login • instagram", "log in • instagram", "instagram"})
+
+
+def _looks_like_ig_login_wall(title: Optional[str], desc: Optional[str]) -> bool:
+    """True when the og title/description are Instagram's login page, not a
+    post. A bare "Instagram" title counts only with no description (the app
+    shell); with a real description it is just a post whose title was dropped."""
+    t = (title or "").split("|")[0].strip().lower()
+    d = (desc or "").strip().lower()
+    if any(p in d for p in _IG_WALL_PHRASES):
+        return True
+    return t in _IG_WALL_TITLES and not d
+
+
+# Post data read ON THE PHONE (the iOS share extension loads the post in a
+# signed-out web view and sends what the page showed it). Servers in Google
+# Cloud get Instagram's login page and TikTok's empty shell, a phone gets the
+# post. Sanitized again in main.py before it reaches the queue; these are the
+# fields the scrapers read.
+PAGE_PREVIEW_FIELDS = ("title", "description", "image", "author", "authorName", "url")
+
+
+def _preview(page_preview, key: str) -> str:
+    if not isinstance(page_preview, dict):
+        return ""
+    v = page_preview.get(key)
+    return v.strip() if isinstance(v, str) else ""
+
+
+def _scrape_instagram_url(url: str, message_body: Optional[str] = None,
+                          page_preview: Optional[dict] = None) -> dict:
+    """Read an Instagram post: the post page's own og tags first, then the post
+    data the phone captured (`page_preview`), then the caption shared with the
+    link. A login page is never read as the post."""
     logger.info(f"Analyzing Instagram URL: {url}")
 
     metadata_lines = []
@@ -1772,13 +1818,15 @@ def _scrape_instagram_url(url: str, message_body: Optional[str] = None) -> dict:
     best_image = ""  # og:image (post cover photo) — fed to vision for photo posts
     raw_html = ""   # kept for embedded-author signals (JSON "username"/"owner")
     og_url = ""     # og:url/canonical often carries a profile-scoped path
+    walled = False  # the server got Instagram's login page instead of the post
     # Reels/IGTV expose only a poster frame as og:image — skip vision for them.
     is_video = _ig_url_is_video(url)
     generic_titles = ["Instagram Post", "Instagram", "Open in App", "Login • Instagram", "Instagram Video", "Instagram Reel"]
 
     MOBILE_USER_AGENT = "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1"
 
-    # 1. Try direct scrape first
+    d_title, d_desc = "", ""
+    # 1. The post page itself.
     try:
         logger.info("Trying direct Instagram scrape...")
         headers = {
@@ -1789,91 +1837,52 @@ def _scrape_instagram_url(url: str, message_body: Optional[str] = None) -> dict:
         response = safe_get(url, headers=headers, timeout=10)
         if response.ok:
             from bs4 import BeautifulSoup
-            raw_html = response.text or ""
             soup = BeautifulSoup(response.text, 'html.parser')
 
-            og_tag = soup.find('meta', property='og:url') or soup.find('meta', attrs={'name': 'og:url'})
-            if og_tag and og_tag.get('content'):
-                og_url = og_tag['content']
-
-            # Cover photo + a secondary video signal (og:type=video) so a reel
-            # served from a profile-style URL is still gated out of vision.
-            best_image = _extract_og_image(soup) or best_image
-            type_tag = soup.find('meta', property='og:type') or soup.find('meta', attrs={'name': 'og:type'})
-            if type_tag and 'video' in (type_tag.get('content') or '').lower():
-                is_video = True
-
-            meta_sources = {
-                'title': ['og:title', 'twitter:title', 'title'],
-                'desc': ['og:description', 'twitter:description', 'description']
-            }
-
-            results = {'title': None, 'desc': None}
-            for key, tags in meta_sources.items():
-                for tag_name in tags:
-                    tag = soup.find('meta', property=tag_name) or soup.find('meta', attrs={'name': tag_name})
+            def _meta(*names):
+                for name in names:
+                    tag = soup.find('meta', property=name) or soup.find('meta', attrs={'name': name})
                     if tag and tag.get('content'):
-                        content = tag['content']
-                        if "Likes," in content and "Comments" in content and "Instagram" in content:
-                            results[key] = content
-                            break
-                        results[key] = content
-                        break
+                        return tag['content']
+                return ""
 
-            d_title = results['title'].split('|')[0].strip() if results['title'] else ""
-            d_desc = results['desc'] if results['desc'] else ""
-
-            if d_title and d_title not in generic_titles:
-                best_title = d_title
-            if d_desc and len(d_desc) > 20:
-                best_desc = d_desc
-                metadata_lines.append(f"CONTENT DESCRIPTION:\n{d_desc}")
+            title_raw = _meta('og:title', 'twitter:title', 'title')
+            desc_raw = _meta('og:description', 'twitter:description', 'description')
+            if _looks_like_ig_login_wall(title_raw, desc_raw):
+                # Nothing on this page is the post: not its text, not its
+                # image (the Instagram logo), not its embedded "username".
+                walled = True
+                logger.info("Instagram served its login page, not the post")
+            else:
+                raw_html = response.text or ""
+                og_url = _meta('og:url')
+                # Cover photo + a secondary video signal (og:type=video) so a reel
+                # served from a profile-style URL is still gated out of vision.
+                best_image = _extract_og_image(soup) or best_image
+                if 'video' in _meta('og:type').lower():
+                    is_video = True
+                d_title = title_raw.split('|')[0].strip()
+                d_desc = desc_raw
     except Exception as e:
         logger.warning(f"Direct scrape failed: {e}")
 
-    # 2. Try bridge services only if direct scrape was "thin"
-    if len(best_desc) < 100:
-        bridges = ['instagramez.com', 'kkinstagram.com', 'ddinstagram.com']
-        for bridge in bridges:
-            try:
-                bridge_url = _relay_url(url, bridge)
-                logger.info(f"Trying Instagram bridge: {bridge_url}")
-                headers = {"User-Agent": MOBILE_USER_AGENT}
-                response = safe_get(bridge_url, headers=headers, timeout=5)
-                if response.ok:
-                    from bs4 import BeautifulSoup
-                    soup = BeautifulSoup(response.text, 'html.parser')
+    # 2. What the phone saw, when the server's own read came back empty.
+    used_preview = False
+    if len(d_desc) <= 20 and page_preview:
+        p_title, p_desc = _preview(page_preview, "title"), _preview(page_preview, "description")
+        if (p_title or p_desc) and not _looks_like_ig_login_wall(p_title, p_desc):
+            used_preview = True
+            d_title = p_title.split('|')[0].strip()
+            d_desc = p_desc
+            best_image = _preview(page_preview, "image") or best_image
+            og_url = _preview(page_preview, "url") or og_url
+            logger.info("Instagram: using the post as read on the phone")
 
-                    results = {'title': None, 'desc': None}
-                    meta_tags = soup.find_all('meta')
-                    for tag in meta_tags:
-                        prop = tag.get('property', '') or tag.get('name', '')
-                        if prop in ['og:description', 'twitter:description', 'description']:
-                            results['desc'] = tag.get('content')
-                        if prop in ['og:title', 'twitter:title', 'title']:
-                            results['title'] = tag.get('content')
-
-                    b_title = results['title'].split('|')[0].strip() if results['title'] else ""
-                    b_desc = results['desc'] if results['desc'] else ""
-
-                    if "AliExpress" in b_title or "AliExpress" in b_desc or "Open in App" in b_title:
-                        continue
-
-                    # The bridge's og:image is NOT used: these are unaffiliated
-                    # sites (one served AliExpress spam, hence the check above),
-                    # and the image would be analyzed into the summary and kept
-                    # as the card's picture (launch audit CAP-10). Their text
-                    # is still a fallback for the caption, nothing more.
-
-                    if b_desc and len(b_desc) > len(best_desc):
-                        best_desc = b_desc
-                        metadata_lines.append(f"SECONDARY SOURCE DESCRIPTION:\n{b_desc}")
-                        if b_title and b_title not in generic_titles:
-                            best_title = b_title
-                        if len(best_desc) > 200:
-                            break
-            except Exception as e:
-                logger.warning(f"Instagram bridge {bridge} failed: {e}")
+    if d_title and d_title not in generic_titles:
+        best_title = d_title
+    if d_desc and len(d_desc) > 20:
+        best_desc = d_desc
+        metadata_lines.append(f"CONTENT DESCRIPTION:\n{d_desc}")
 
     # 3. Incorporate original message body. share_ingest has usually removed
     # the URL from it already, so it is not required to be there (with that
@@ -1896,7 +1905,7 @@ def _scrape_instagram_url(url: str, message_body: Optional[str] = None) -> dict:
         # way Facebook and LinkedIn do so the card can admit the capture is
         # partial rather than presenting an empty read as a finished one.
         return {"html": "", "title": "Instagram Link", "text": "Instagram content (metadata extraction failed)",
-                "source_name": _instagram_source_name(url, best_title, best_desc, html=raw_html, og_url=og_url),
+                "source_name": _instagram_source_name(url, best_desc, best_title, html=raw_html, og_url=og_url),
                 "truncated": True, "capture_reason": "login_wall"}
 
     # Final Title fallback
@@ -1917,11 +1926,15 @@ def _scrape_instagram_url(url: str, message_body: Optional[str] = None) -> dict:
     # missing images yield no image_urls, so those cards stay text-only.
     image_urls = [best_image] if (best_image and not is_video) else []
 
-    return {
+    result = {
         "html": final_text,
         "title": best_title,
         "text": final_text,
-        "source_name": _instagram_source_name(url, best_title, best_desc, html=raw_html, og_url=og_url),
+        # Description before title: og:description names the USERNAME
+        # ("… - nann.recipe on September 3, 2026: …") while og:title names the
+        # display name ("Apoorva on Instagram: …"), and a one-word display name
+        # passes the handle check.
+        "source_name": _instagram_source_name(url, best_desc, best_title, html=raw_html, og_url=og_url),
         "image_urls": image_urls,
         # Instagram is image-first: the cover is usually a screenshot carrying the
         # post's real text, and the caption we scraped is a teaser. Signals the
@@ -1933,6 +1946,141 @@ def _scrape_instagram_url(url: str, message_body: Optional[str] = None) -> dict:
         # so video posts get a thumbnail like YouTube. Photo posts leave this empty
         # (their cover already flows through image_urls → the vision thumbnail).
         "video_thumbnail_url": _instagram_poster_without_play_badge(best_image) if (is_video and best_image) else "",
+    }
+    if walled and not used_preview:
+        # Only the caption shared with the link: a real read, but not the post.
+        result["truncated"] = True
+        result["capture_reason"] = "login_wall"
+    return result
+
+
+# TikTok usernames: letters, digits, dot, underscore; ≤24 characters.
+_TT_HANDLE_RE = re.compile(r"[A-Za-z0-9._]{1,24}")
+# The share sheet's own boilerplate, never the post's words.
+_TT_SHARE_NOISE = ("Watch this video on TikTok", "Check out this video on TikTok",
+                   "shared a video with you", "Watch on the app!")
+
+
+def _tiktok_item_from_html(html: str) -> dict:
+    """The video's `itemStruct` from TikTok's embedded page data, or {}.
+
+    A browser gets the post in `__UNIVERSAL_DATA_FOR_REHYDRATION__`; a server
+    fetch gets the same block WITHOUT the `webapp.video-detail` entry (verified
+    2026-10-25), so on the server this is usually {} and the phone's read is
+    what fills the card. Kept because the shape is the same either way."""
+    import json
+    m = re.search(r'<script[^>]+id="__UNIVERSAL_DATA_FOR_REHYDRATION__"[^>]*>(.{1,2000000}?)</script>',
+                  html or "", re.S)
+    if not m:
+        return {}
+    try:
+        scope = json.loads(m.group(1)).get("__DEFAULT_SCOPE__") or {}
+        item = (((scope.get("webapp.video-detail") or {}).get("itemInfo") or {}).get("itemStruct") or {})
+        return item if isinstance(item, dict) else {}
+    except (ValueError, AttributeError):
+        return {}
+
+
+def _tiktok_handle(*candidates: str) -> str:
+    """The first candidate that is a valid TikTok username (an "@" is
+    tolerated, and a /@handle/ URL path is read too), else ""."""
+    for c in candidates:
+        c = (c or "").strip()
+        if not c:
+            continue
+        m = re.search(r"/@([A-Za-z0-9._]{1,24})(?:/|$)", c)
+        if m:
+            return m.group(1)
+        c = c.lstrip("@")
+        if _TT_HANDLE_RE.fullmatch(c):
+            return c
+    return ""
+
+
+def _scrape_tiktok_url(url: str, message_body: Optional[str] = None,
+                       page_preview: Optional[dict] = None) -> dict:
+    """Read a TikTok post: the page's embedded data when the server is served
+    it, else the post as read on the phone (`page_preview`), else the caption
+    shared with the link. TikTok's empty app shell ("TikTok - Make Your Day")
+    is never read as the post: with nothing else it is an honest partial card.
+    Video posts are not run through vision; the cover is the card banner."""
+    logger.info(f"Analyzing TikTok URL: {url}")
+    headers = {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1"
+    }
+    final_url = url
+    desc, author, nickname, cover = "", "", "", ""
+    og_teaser = ""  # og title/description, when the shell carries real ones
+    try:
+        response = safe_get(url, headers=headers, timeout=10)
+        final_url = getattr(response, "url", None) or url
+        if response.ok:
+            item = _tiktok_item_from_html(response.text)
+            desc = (item.get("desc") or "").strip()
+            author_obj = item.get("author") if isinstance(item.get("author"), dict) else {}
+            author = author_obj.get("uniqueId") or ""
+            nickname = author_obj.get("nickname") or ""
+            video = item.get("video") if isinstance(item.get("video"), dict) else {}
+            cover = video.get("cover") or video.get("originCover") or ""
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup((response.text or "")[:MAX_PARSE_BYTES], "html.parser")
+            og = [(tag.get('content') or '').strip() for name in ('og:title', 'og:description')
+                  for tag in [soup.find('meta', property=name) or soup.find('meta', attrs={'name': name})] if tag]
+            og = [t for t in og if t and not t.lower().startswith("tiktok")
+                  and not any(n.lower() in t.lower() for n in _TT_SHARE_NOISE)]
+            og_teaser = "\n".join(og)
+    except Exception as e:
+        logger.warning(f"TikTok scrape failed: {e}")
+
+    if not desc and page_preview:
+        p_desc = _preview(page_preview, "description")
+        if p_desc and not any(n.lower() in p_desc.lower() for n in _TT_SHARE_NOISE):
+            desc = p_desc
+            cover = _preview(page_preview, "image") or cover
+            author = author or _preview(page_preview, "author")
+            nickname = nickname or _preview(page_preview, "authorName")
+            final_url = _preview(page_preview, "url") or final_url
+            logger.info("TikTok: using the post as read on the phone")
+
+    teaser_only = False
+    if not desc and og_teaser:
+        # A social-preview line only (better than nothing), flagged partial.
+        desc, teaser_only = og_teaser, True
+
+    handle = _tiktok_handle(author, final_url, url)
+    source_name = f"@{handle}" if handle else "TikTok"
+
+    lines = []
+    if desc:
+        lines.append(f"TIKTOK VIDEO CAPTION:\n{desc}")
+    if message_body:
+        shared = message_body.replace(url, "").strip()
+        for n in _TT_SHARE_NOISE:
+            shared = shared.replace(n, "").strip()
+        if len(shared) > 5 and shared not in desc:
+            lines.append(f"SHARED CAPTION:\n{shared}")
+    if handle or nickname:
+        lines.append("POSTED BY: " + " ".join(x for x in (nickname, f"(@{handle})" if handle else "") if x))
+
+    if not desc and not any(l.startswith("SHARED CAPTION") for l in lines):
+        return {"html": "", "title": "TikTok video", "text": "",
+                "source_name": source_name, "final_url": final_url,
+                "truncated": True, "capture_reason": "login_wall"}
+
+    text = "\n\n---\n\n".join(lines)
+    first_line = next((l for l in (desc or "").split("\n") if l.strip()), "")
+    title = first_line[:100] or "TikTok video"
+    partial = {"truncated": True, "capture_reason": "teaser"} if teaser_only else (
+        {} if desc else {"truncated": True, "capture_reason": "login_wall"})
+    return {
+        **partial,
+        "html": text,
+        "title": title,
+        "text": text,
+        "source_name": source_name,
+        "final_url": final_url,
+        "image_urls": [],
+        "video_thumbnail_url": cover if cover.startswith("https://") else "",
     }
 
 

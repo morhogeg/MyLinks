@@ -183,7 +183,7 @@ def env(monkeypatch):
         return db
 
     def set_scrape(scraped):
-        monkeypatch.setattr(scraper, "scrape_url", lambda url, body=None: dict(scraped or {
+        monkeypatch.setattr(scraper, "scrape_url", lambda url, body=None, page_preview=None: dict(scraped or {
             "html": "", "title": "Scraped", "text": "body text " * 20}))
 
     def run_worker(job_path=JOB):

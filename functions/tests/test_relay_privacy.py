@@ -1,10 +1,8 @@
 """Third-party relays and shared captions (launch audit CAP-10, CAP-16).
 
-- X posts are read through api.fxtwitter.com / api.vxtwitter.com and thin
-  Instagram posts through viewer "bridges". They get the post's PATH only:
-  the query string is the sharer's tracking (?s=, ?t=, ?igsh=).
-- A bridge's og:image is not used (it would be analyzed into the summary and
-  kept as the card's picture); its text is only a caption fallback.
+- X posts are read through api.fxtwitter.com / api.vxtwitter.com. They get
+  the post's PATH only: the query string is the sharer's tracking (?s=, ?t=).
+- Instagram posts are no longer sent to viewer "bridges" at all.
 - The text shared with an Instagram or Facebook link reaches the analysis
   even though share_ingest has already removed the URL from it.
 """
@@ -57,23 +55,18 @@ def test_the_x_scraper_sends_no_query_string_to_a_relay(monkeypatch):
     assert relays and all("?" not in u and "sharer-token" not in u for u in relays)
 
 
-def test_a_bridge_image_is_never_used(monkeypatch):
-    bridge_html = ('<html><head><meta property="og:image" content="https://bridge.example/spam.jpg">'
-                   '<meta property="og:description" content="' + ("A long real caption about bread. " * 8)
-                   + '"></head></html>')
+def test_instagram_is_never_sent_to_a_bridge(monkeypatch):
+    # The bridges died in October 2026 (one now redirects to an ad network):
+    # a thin Instagram read must not reach any third-party host.
+    seen = []
 
     def fake_get(u, **k):
-        if "instagram.com" in u and "instagramez" not in u and "kkinstagram" not in u and "ddinstagram" not in u:
-            return _Resp(text="<html><head><title>Instagram</title></head></html>")
-        if "instagramez" in u:
-            return _Resp(text=bridge_html)
-        return _Resp(ok=False)
+        seen.append(u)
+        return _Resp(text="<html><head><title>Instagram</title></head></html>")
 
     monkeypatch.setattr(scraper, "safe_get", fake_get)
-    r = scraper._scrape_instagram_url("https://www.instagram.com/p/ABC/?igsh=tok")
-    assert "bread" in r["text"]                       # the caption fallback still works
-    assert r["image_urls"] == []                      # but never the bridge's picture
-    assert "spam.jpg" not in str(r)
+    scraper._scrape_instagram_url("https://www.instagram.com/p/ABC/?igsh=tok")
+    assert seen == ["https://www.instagram.com/p/ABC/?igsh=tok"]
 
 
 def test_an_instagram_caption_reaches_analysis_without_the_url(monkeypatch):

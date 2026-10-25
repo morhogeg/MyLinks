@@ -92,7 +92,7 @@ def test_a_janitor_tick_mid_run_no_longer_fails_a_long_queued_import(env, monkey
     })
     ticks = []
 
-    def scrape_during_a_tick(url, body=None):
+    def scrape_during_a_tick(url, body=None, page_preview=None):
         ticks.append(env.janitor())
         return {"html": "", "title": "Scraped", "text": "body text " * 20}
     monkeypatch.setattr(tcc.scraper, "scrape_url", scrape_during_a_tick)
@@ -108,7 +108,7 @@ def test_a_job_doc_removed_mid_run_does_not_fail_the_capture(env, monkeypatch):
     db = env.make({"users/u1/links/c1": {"status": "processing", "processingStartedAt": tcc.NOW_MS},
                    tcc.JOB: tcc._job(charge={"kind": "saves"})})
 
-    def scrape_then_lose_the_job(url, body=None):
+    def scrape_then_lose_the_job(url, body=None, page_preview=None):
         db.docs.pop(tcc.JOB, None)  # an operator cleared the queue, say
         return {"html": "", "title": "Scraped", "text": "body text " * 20}
     monkeypatch.setattr(tcc.scraper, "scrape_url", scrape_then_lose_the_job)
@@ -158,7 +158,7 @@ def test_overlapping_deliveries_run_the_job_once(env, monkeypatch):
     calls = _count_analyses(monkeypatch)
     nested = []
 
-    def scrape_while_a_duplicate_arrives(url, body=None):
+    def scrape_while_a_duplicate_arrives(url, body=None, page_preview=None):
         if not nested:
             nested.append(1)
             _deliver(db, tcc.JOB, event)  # the second delivery, mid-run
@@ -672,7 +672,7 @@ def test_analyze_link_reads_the_video_budget_only_for_a_video(monkeypatch):
             return None
     monkeypatch.setattr(main, "GeminiService", AI)
 
-    def scrape(url, body=None):
+    def scrape(url, body=None, page_preview=None):
         if "youtube" in url:
             return {"html": "x", "text": "YOUTUBE VIDEO", "title": "V", "content_type": "youtube",
                     "youtube_metadata": {"video_id": "abcdefghijk", "length_seconds": 600,

@@ -853,6 +853,17 @@ The multi-user auth work described below **was** fully written but not live:
 
 ### 🔴 P0 — launch blockers (in order)
 
+- **[ ] Instagram + TikTok capture: read the post ON THE PHONE (1.0.1, found
+  2026-10-25).** Instagram serves its LOGIN PAGE to Cloud Functions addresses
+  (since between Oct 16 and Oct 25), and TikTok only ever served the server its
+  app shell. A browser on a non-cloud address gets both posts in full (verified).
+  Backend half shipped 2026-10-25 (§9): walls become honest `login_wall`
+  partial cards, and `share_ingest` accepts `pagePreview` (the post as read on
+  the phone). **Left:** the share extension loads Instagram/TikTok links in a
+  signed-out `WKWebView`, sends `pagePreview`; TestFlight; owner verifies on
+  device (real IG post, IG reel, TikTok) that cards carry the real caption.
+  Launch waits on this. 1.0 (build 1382) stays in review, release is manual.
+
 1. **[x] Native auth build green (iOS)** *(code done 2026-07-03 — root cause was
    the Xcode 16 toolchain, not a dependency conflict; see §3. Workflow moved to
    `macos-26`/Xcode 26, `sed` strip removed, all three plugins in the committed
@@ -2694,6 +2705,37 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-25 — INSTAGRAM + TIKTOK SHARES WERE LOGIN-PAGE CARDS (backend fix
+  shipped; phone-side read pending).** Owner report: every Instagram share
+  became an "Instagram" / "Instagram Login Page" card, then the same for TikTok.
+  **Diagnosis (task_logs, verified):** all 5 Instagram shares that day (owner +
+  one other user) scraped `"Welcome back to Instagram. Sign in to check out…"`;
+  the TikTok share scraped `"TikTok - Make Your Day"`. `scraper.py` was
+  unchanged since Oct 6 and an IG save on Oct 16 worked, so **Instagram changed:
+  it now serves its login page to Cloud Functions addresses** (the same reels
+  read in full from the Mac). Its og:description is a >100-char CTA, so it
+  passed as a caption and skipped every fallback. **TikTok never had a reader:**
+  the generic reader only ever saw the app shell; oEmbed no longer returns
+  caption/author/thumbnail, `/player/v1` is JS-rendered, `/embed/v2` 503s, and a
+  server fetch gets `__UNIVERSAL_DATA_FOR_REHYDRATION__` WITHOUT
+  `webapp.video-detail`. A real browser gets both posts in full. The Instagram
+  bridges were dead (ddinstagram gone, kkinstagram empty, **instagramez
+  redirects to an ad network**). **Shipped (commit `187304e9`):**
+  `_looks_like_ig_login_wall` (exact boilerplate phrases) → walled reads are
+  honest `login_wall` partial cards ("add a screenshot"); bridges removed; new
+  `_scrape_tiktok_url` (page data if served → `pagePreview` → og teaser →
+  honest partial; cover as banner, no vision); `share_ingest` accepts
+  `pagePreview` {title, description, image, author, authorName, url},
+  sanitized by `_clean_page_preview` (IG/TikTok URLs only, bounded strings,
+  image must be https on cdninstagram/fbcdn/tiktokcdn), carried on the queue
+  doc to `scrape_url(url, body, page_preview)`; IG @handle now prefers
+  og:description (username) over og:title (display name: was `@Apoorva`, now
+  `@nann.recipe`). Tests: `tests/test_platform_walls.py`, full suite 1973 pass.
+  **Not done:** the share extension half (§4 P0 top item) — until then IG/TikTok
+  shares are honest partial cards, not real ones. **Owner call:** keep 1.0 in
+  review (manual release), launch only with the phone-side read verified on
+  device. Not verified: whether App Store Connect lets an approved-unreleased
+  version swap to a new build.
 - **2026-10-22 — Onboarding "Recall" slide copy (web now, iOS next build).**
   Owner asked to drop "in English or Hebrew" and make slide 3 clearer while
   1.0 (build 1382) is in review. `OnboardingTour.tsx` slide 3 body is now:
