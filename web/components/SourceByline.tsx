@@ -1,7 +1,7 @@
 'use client';
 
 import { Youtube, Image as ImageIcon, StickyNote, Quote } from 'lucide-react';
-import { linkPlatform, platformIcon, platformColor, xHandle, instagramHandle, linkedinDisplayName, prettyHost, screenshotSource } from '@/lib/platform';
+import { linkPlatform, platformIcon, platformColor, xHandle, instagramHandle, tiktokHandle, linkedinDisplayName, prettyHost, screenshotSource, PLATFORM_LABELS } from '@/lib/platform';
 import { CitationGlyph } from '@/components/ui/Wordmark';
 
 /** Machina's own hosts — the ONLY place a "Machina" source name is legitimate
@@ -94,6 +94,7 @@ export default function SourceByline({
         && !['facebook', 'screenshot', 'none'].includes(link.sourceName.trim().toLowerCase())
         ? link.sourceName : null;
     const igAuthor = platform === 'instagram' ? instagramHandle(link.sourceName) : null;
+    const ttAuthor = platform === 'tiktok' ? tiktokHandle(link.sourceName) : null;
 
     if (isYouTube && youtubeChannel) {
         return (
@@ -135,6 +136,14 @@ export default function SourceByline({
             </span>
         );
     }
+    if (ttAuthor) {
+        return (
+            <span dir="ltr" className={wrap} title={`@${ttAuthor}`}>
+                {icon(<span className="shrink-0 inline-flex" style={{ color: platformColor('tiktok') }}>{platformIcon('tiktok', iconCls)}</span>)}
+                {label(<span className={nameCls}>@{ttAuthor}</span>)}
+            </span>
+        );
+    }
     if (link.sourceType === 'image') {
         // A screenshot whose author handle was read off the image reads like
         // the post it shows: the app's mark and the @handle. A small screenshot
@@ -143,7 +152,7 @@ export default function SourceByline({
         // leads, as on a plain screenshot, and the handle is the label.
         const shot = screenshotSource(link);
         if (shot) {
-            const where = shot.platform ? ` on ${shot.platform === 'x' ? 'X' : shot.platform[0].toUpperCase() + shot.platform.slice(1)}` : '';
+            const where = shot.platform ? ` on ${PLATFORM_LABELS[shot.platform]}` : '';
             const title = `Screenshot of @${shot.handle}${where}`;
             return (
                 <span dir="ltr" className={wrap} title={title} aria-label={title}>

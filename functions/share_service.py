@@ -310,8 +310,10 @@ def _md_to_html(value) -> str:
 # Icon geometry is lucide-react v0.563.0's, copied from
 # `web/node_modules/lucide-react/dist/esm/icons/*.js` so the marks are identical
 # to the app's rather than redrawn by hand; the X mark is the repo's own
-# `XLogo` (`web/lib/platform.tsx`), since lucide still ships the old bird.
-# Brand colours are `PLATFORM_RGB` from the same file.
+# `XLogo` (`web/lib/platform.tsx`), since lucide still ships the old bird, and
+# the TikTok mark its `TikTokLogo` (Simple Icons). Brand colours are
+# `PLATFORM_RGB` from the same file; TikTok's is the theme ink there, which on
+# this dark-only page is the page's own text colour.
 #
 # This is a PORT, not a shared module — the functions runtime cannot import from
 # `web/`. If the byline rules change there, change them here too.
@@ -359,6 +361,17 @@ _PLATFORM_ICONS = {
         '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 '
         '8.26 8.502 11.24h-6.66l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 '
         '6.231 5.45-6.231Zm-1.161 17.52h1.833L7.084 4.126H5.117l11.966 15.644Z"/></svg>',
+    ),
+    "tiktok": (
+        "#E5E5E5",
+        '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12.525.02c1.31-.02 2.61-.01 '
+        '3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35'
+        '-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 '
+        '3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65'
+        '-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 '
+        '1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 '
+        '1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06'
+        '.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg>',
     ),
 }
 
@@ -410,6 +423,8 @@ def _platform_of(url: str) -> Optional[str]:
         return "x"
     if is_("instagram.com"):
         return "instagram"
+    if is_("tiktok.com"):
+        return "tiktok"
     if is_("linkedin.com"):
         return "linkedin"
     if is_("facebook.com") or is_("fb.com") or is_("fb.watch"):
@@ -438,6 +453,12 @@ def _instagram_handle(source_name: str) -> Optional[str]:
     return m.group(1) if m else None
 
 
+def _tiktok_handle(source_name: str) -> Optional[str]:
+    """Bare TikTok handle from a stored `@handle` sourceName. Mirrors `tiktokHandle`."""
+    m = re.fullmatch(r"@([A-Za-z0-9._]{1,24})", (source_name or "").strip())
+    return m.group(1) if m else None
+
+
 def _screenshot_handle(source_handle) -> Optional[str]:
     """Bare handle from a screenshot card's stored `@handle` (main._apply_screenshot_source)."""
     m = re.fullmatch(r"@([A-Za-z0-9._-]{1,100})", str(source_handle or "").strip())
@@ -454,8 +475,8 @@ def _source_byline(card: dict) -> str:
     """The card's source line, matching the app's `SourceByline`.
 
     Order matters and follows the component exactly: YouTube channel, X handle,
-    LinkedIn, Facebook, Instagram handle, screenshot, note, then a plain
-    publisher name (which renders as bare text with no icon).
+    LinkedIn, Facebook, Instagram handle, TikTok handle, screenshot, note, then
+    a plain publisher name (which renders as bare text with no icon).
     """
     url = card.get("url") or ""
     source_name = (card.get("sourceName") or "").strip()
@@ -483,6 +504,11 @@ def _source_byline(card: dict) -> str:
         handle = _instagram_handle(source_name)
         color, svg = _PLATFORM_ICONS["instagram"]
         return _byline_html(svg, color, f"@{handle}" if handle else "Instagram")
+
+    if platform == "tiktok":
+        handle = _tiktok_handle(source_name)
+        color, svg = _PLATFORM_ICONS["tiktok"]
+        return _byline_html(svg, color, f"@{handle}" if handle else "TikTok")
 
     if source_type == "image":
         # A screenshot whose author handle was read off the image: the app's

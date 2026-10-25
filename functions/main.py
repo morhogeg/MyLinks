@@ -1056,6 +1056,7 @@ _PLATFORM_HOSTS = (
     ("linkedin", ("linkedin.com", "lnkd.in")),
     ("x", ("x.com", "twitter.com")),
     ("instagram", ("instagram.com",)),
+    ("tiktok", ("tiktok.com",)),
     ("facebook", ("facebook.com", "fb.com", "fb.watch")),
     ("youtube", ("youtube.com", "youtu.be")),
 )

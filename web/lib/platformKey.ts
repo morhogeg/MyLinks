@@ -5,12 +5,13 @@
  * Recognized content platforms we can detect from a link's URL. Generic web
  * pages return null — their publisher name already conveys origin.
  */
-export type PlatformKey = 'youtube' | 'x' | 'instagram' | 'linkedin' | 'facebook' | 'github';
+export type PlatformKey = 'youtube' | 'x' | 'instagram' | 'tiktok' | 'linkedin' | 'facebook' | 'github';
 
 export const PLATFORM_LABELS: Record<PlatformKey, string> = {
     youtube: 'YouTube',
     x: 'X',
     instagram: 'Instagram',
+    tiktok: 'TikTok',
     linkedin: 'LinkedIn',
     facebook: 'Facebook',
     github: 'GitHub',
@@ -29,6 +30,9 @@ export function getPlatform(url?: string): PlatformKey | null {
     if (is('youtube.com') || is('youtu.be')) return 'youtube';
     if (is('twitter.com') || is('x.com')) return 'x';
     if (is('instagram.com')) return 'instagram';
+    // The TikTok app shares short links (vt.tiktok.com, vm.tiktok.com), so
+    // every form TikTok hands over is still a tiktok.com host.
+    if (is('tiktok.com')) return 'tiktok';
     // lnkd.in is LinkedIn's own shortener: a share can hand over that form, and
     // the card keeps the URL as shared, so it must read as LinkedIn too.
     if (is('linkedin.com') || is('lnkd.in')) return 'linkedin';
@@ -37,7 +41,7 @@ export function getPlatform(url?: string): PlatformKey | null {
     return null;
 }
 
-const STAMPABLE_PLATFORMS = new Set<PlatformKey>(['youtube', 'x', 'instagram', 'linkedin', 'facebook']);
+const STAMPABLE_PLATFORMS = new Set<PlatformKey>(['youtube', 'x', 'instagram', 'tiktok', 'linkedin', 'facebook']);
 
 /**
  * The platform of a saved LINK card: its URL's host first, else the platform

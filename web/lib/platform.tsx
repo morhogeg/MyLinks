@@ -12,6 +12,17 @@ function XLogo({ className = 'w-3 h-3' }: { className?: string }) {
     );
 }
 
+/** TikTok's note, solid like the X mark — lucide ships no TikTok glyph, and
+    its outline variants don't read as TikTok at byline size. Path from Simple
+    Icons (CC0). */
+function TikTokLogo({ className = 'w-3 h-3' }: { className?: string }) {
+    return (
+        <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden="true">
+            <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z" />
+        </svg>
+    );
+}
+
 // Pure URL → platform detection lives in platformKey.ts (no JSX, so the
 // node:test suite can import it); re-exported here for existing callers.
 export { PLATFORM_LABELS, getPlatform, linkPlatform, type PlatformKey } from './platformKey';
@@ -29,6 +40,8 @@ export function platformIcon(key: PlatformKey, className = 'w-3 h-3'): ReactNode
             return <XLogo className={className} />;
         case 'instagram':
             return <Instagram className={className} />;
+        case 'tiktok':
+            return <TikTokLogo className={className} />;
         case 'linkedin':
             return <Linkedin className={className} />;
         case 'facebook':
@@ -45,6 +58,10 @@ const PLATFORM_RGB: Record<PlatformKey, string> = {
     youtube: '255, 0, 0',
     x: '191, 201, 214',
     instagram: '225, 48, 108',
+    // TikTok's own rule for its mark is black on light, white on dark, so it
+    // takes the theme's ink (globals.css --mark-ink-rgb) rather than a fixed
+    // colour. Its red would read as Instagram's pink beside it.
+    tiktok: 'var(--mark-ink-rgb)',
     linkedin: '10, 102, 194',
     facebook: '24, 119, 242',
     github: '139, 148, 158',
@@ -100,12 +117,24 @@ export function instagramHandle(sourceName?: string | null): string | null {
     return m ? m[1] : null;
 }
 
+/**
+ * The TikTok author @handle for a card, read back from `sourceName` the same
+ * way as Instagram's: the backend's TikTok reader stores "@handle" there (from
+ * the landed /@handle/video/… URL or the post as read on the phone), or
+ * "TikTok" when it found none. Validates TikTok's charset (`[A-Za-z0-9._]`,
+ * ≤24), else null.
+ */
+export function tiktokHandle(sourceName?: string | null): string | null {
+    const m = /^@([A-Za-z0-9._]{1,24})$/.exec((sourceName || '').trim());
+    return m ? m[1] : null;
+}
+
 /** The apps the backend may stamp on a screenshot card as `sourcePlatform`,
-    mapped to the platforms this module can draw. Threads and TikTok are read
-    by the backend but have no mark here yet, so they resolve to null and the
-    card shows its handle with the screenshot glyph. */
+    mapped to the platforms this module can draw. Threads is read by the
+    backend but has no mark here yet, so it resolves to null and the card shows
+    its handle with the screenshot glyph. */
 const SCREENSHOT_PLATFORMS: Record<string, PlatformKey> = {
-    x: 'x', instagram: 'instagram', youtube: 'youtube', linkedin: 'linkedin', facebook: 'facebook',
+    x: 'x', instagram: 'instagram', tiktok: 'tiktok', youtube: 'youtube', linkedin: 'linkedin', facebook: 'facebook',
 };
 
 /** A screenshot card's own provenance — the @handle the vision pass read off

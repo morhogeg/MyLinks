@@ -12,6 +12,7 @@
 //   1. X / Twitter post  → the author @handle
 //   2. LinkedIn post     → the author's name (from the stored name or the URL slug)
 //   2b. Instagram post   → the author @handle the scraper stored in sourceName
+//   2c. TikTok post      → the same, for TikTok
 //   3. A real sourceName → the AI/scraper-extracted publisher (skips the generic
 //                          "None"/"Screenshot" placeholders)
 //   4. A known platform  → the platform label (YouTube/Instagram/…)
@@ -23,6 +24,7 @@ import {
     PLATFORM_LABELS,
     xHandle,
     instagramHandle,
+    tiktokHandle,
     linkedinDisplayName,
     prettyHost,
     screenshotSource,
@@ -93,6 +95,15 @@ export function getSourceInfo(link: SourceLink): SourceInfo {
         }
     }
 
+    // 2c. TikTok → the author @handle, keyed like a TikTok screenshot of the
+    // same account (step 0) so the two share one facet.
+    if (platform === 'tiktok') {
+        const ttHandle = tiktokHandle(link.sourceName);
+        if (ttHandle) {
+            return { key: `tiktok:@${ttHandle.toLowerCase()}`, label: `@${ttHandle}`, platform: 'tiktok', isScreenshot: false };
+        }
+    }
+
     // 3. A real publisher name (news sites, blogs, YouTube channels, …).
     const name = cleanSourceName(link.sourceName);
     if (name) {
@@ -125,6 +136,7 @@ const PLATFORM_ALIASES: Record<PlatformKey, string[]> = {
     youtube: ['youtube', 'yt'],
     x: ['x', 'twitter', 'tweet'],
     instagram: ['instagram', 'insta', 'ig'],
+    tiktok: ['tiktok'],
     linkedin: ['linkedin'],
     facebook: ['facebook', 'fb'],
     github: ['github'],

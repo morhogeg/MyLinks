@@ -36,8 +36,31 @@ test('a lookalike host is not LinkedIn', () => {
 test('backend stamp gives the mark when the URL host names no platform', () => {
     assert.equal(linkPlatform({ url: 'https://redirect.example/abc', sourceType: 'web', sourcePlatform: 'linkedin' }), 'linkedin');
     assert.equal(linkPlatform({ url: 'https://redirect.example/abc', sourceType: 'web', sourcePlatform: 'LinkedIn ' }), 'linkedin');
+    assert.equal(linkPlatform({ url: 'https://redirect.example/abc', sourceType: 'web', sourcePlatform: 'tiktok' }), 'tiktok');
     assert.equal(linkPlatform({ url: 'https://redirect.example/abc', sourceType: 'web' }), null);
-    assert.equal(linkPlatform({ url: 'https://redirect.example/abc', sourceType: 'web', sourcePlatform: 'tiktok' }), null);
+    // A platform the backend may name but the byline has no mark for.
+    assert.equal(linkPlatform({ url: 'https://redirect.example/abc', sourceType: 'web', sourcePlatform: 'threads' }), null);
+});
+
+// The TikTok app hands over vt./vm. short links; the card keeps that form.
+const TIKTOK_URLS = [
+    'https://vt.tiktok.com/ZSgx3txGb/',
+    'https://vm.tiktok.com/ZMabcdef/',
+    'https://www.tiktok.com/@madebythewa/video/7560000000000000000?_r=1',
+    'https://tiktok.com/@madebythewa',
+    'https://m.tiktok.com/v/7560000000000000000.html',
+];
+
+test('every TikTok URL form reads as TikTok', () => {
+    for (const url of TIKTOK_URLS) {
+        assert.equal(getPlatform(url), 'tiktok', url);
+        assert.equal(linkPlatform({ url, sourceType: 'web' }), 'tiktok', url);
+    }
+});
+
+test('a lookalike host is not TikTok', () => {
+    assert.equal(getPlatform('https://tiktok.com.evil.test/@x/video/1'), null);
+    assert.equal(getPlatform('https://nottiktok.com/@x'), null);
 });
 
 test('the URL host wins over the stamp', () => {

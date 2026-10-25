@@ -6,7 +6,10 @@ import { Globe, Image as ImageIcon, Check, ChevronDown } from 'lucide-react';
 import { PlatformKey, PLATFORM_LABELS, platformIcon, platformColor } from '@/lib/platform';
 import type { SourceFacet } from '@/lib/source';
 
-const PLATFORM_ORDER: PlatformKey[] = ['youtube', 'x', 'instagram', 'linkedin', 'facebook', 'github'];
+// PLATFORM_LABELS' order, which by its type names every platform: buildGroups
+// emits only the platforms listed here, so a hand-kept list that missed one
+// would drop that platform's sources from the list entirely.
+const PLATFORM_ORDER = Object.keys(PLATFORM_LABELS) as PlatformKey[];
 
 interface Group {
     id: string;
