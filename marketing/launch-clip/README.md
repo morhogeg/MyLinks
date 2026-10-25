@@ -1398,6 +1398,91 @@ sample cost about four minutes a frame in the render's software compositor;
 one blur costs seconds. Slow moves of type ride composited layers
 (`willChange: transform`): render each range with `--concurrency=1`.
 
+## The house rules (every video from 2026-10-25 on)
+
+Owner, 2026-10-25: all the product videos share one design language, and
+some parts are identical in every one, starting with the ending. The videos
+made before (the ads, the feature clips, the highlight reel, SAVE THIS,
+FIND THE BOOK, TICK IT OFF) stay as they were rendered; they are **not**
+re-done. Every new video follows these, and `node audio/house-verify.mjs`
+checks it (a new video adds itself to `HOUSE` in that file):
+
+- **It ends on the Signature** (`src/reels/kit/Signature.tsx`,
+  `kit/signature.mjs`): FIND THE BOOK's approved sign-off made fixed. The
+  house paper rises over the last shot, the app's launch mark draws in and
+  strikes on the spoken "Machina", the wordmark wipes in, the tagline
+  arrives word by word. It is the last `SIGNATURE.frames` (150, 5.0s) of
+  the video, its layout is fixed, and its voice is ONE take, voiced once
+  (`public/signature/signature-vo.wav`, from `vo-takes/ac1864b4dc285da306b9`),
+  that `mix-vo` lays in at the signature's frame (`signature: true`). The
+  video says nothing over it and never says the tagline itself. The only
+  thing a video chooses is the **footer** under it ("Coming soon ·
+  mymachina.app" today, the store on launch day), so an ending can be
+  updated without re-voicing anything. `MachinaSignature` renders it alone.
+- **Colours and UI type come from `kit/tokens.ts`** (the film's paper, the
+  kit's inks, the app's platform hues, the kit's shadows, paper tile
+  tints). No hex, rgb or fontFamily in a video's own scene files.
+- **Motion uses the kit's curves** (`kit/curves.ts`); no new easing.
+- **Captions are the kit's `KineticLine`** in the kit's slots, over the
+  kit's `BandScrim`; the voice is Gemini TTS Sulafat with per-line
+  direction; the mix is mastered to −14 LUFS, ≤ −1 dBTP.
+
+One kit, too: this branch merged the newest video branches (SAVE THIS,
+TICK IT OFF, the highlight reel round 16) onto FIND THE BOOK's kit, so
+`kit/Type.tsx` carries both the strike and the clean/plate lines. The older
+ad and clip branches were not merged: their kit changes are earlier
+versions of what the kit already has, and their videos are not re-rendered.
+
+## POV: YOU SAVED IT
+
+`MachinaPov` is a 30s vertical Reel/TikTok (2026-10-25, the owner's
+script), the first video on the house rules. **The idea: saving was never
+the hard part, finding it again is.** Frame 0 is a blank search bar and a
+blinking caret under "POV: you saved it." The hunt runs through every place
+a save hides, quicker each time over a ticking pulse: an Instagram-style
+saved grid whips up, a whip-pan to a TikTok-style favorites grid, a wall of
+screenshots flies past too fast to read, the chat you send yourself links
+in. The search types "that Lisbon café" and finds nothing, a desperate
+scroll stops dead, nothing again, and the music drops to almost nothing.
+Then, slower: every place pulls back into a panel, drifts apart and
+bleaches into the paper ("Saving was never the hard part. Finding it again
+is."). The saves rush back from every side into one point of ink, and the
+point becomes the logo: the Signature, footer "Coming soon ·
+mymachina.app".
+
+```bash
+python3 audio/synth-vo.py pov            # the takes are cached (narration-tts run 27)
+node audio/pov-score.mjs && node audio/mix-vo.mjs pov
+node audio/house-verify.mjs pov          # the Signature, the kit's colours/type/curves, the take in the mix
+node scripts/pov-stills.mjs              # review stills + sheet → out/pov-stills/
+for r in a:0-224 b:225-449 c:450-674 d:675-899; do
+  npx remotion render src/index.ts MachinaPovSilent out/pov/seg-${r%%:*}.mp4 --frames=${r#*:} --concurrency=2 --muted --crf=14 --browser-executable="" &
+done; wait   # (--browser-executable="" on the Mac only)
+# join and mux as FIND THE BOOK does, with public/clips/pov/score-vo.wav → out/pov/final_reel.mp4
+# launch day: render MachinaPovStore (footer "Now on the App Store · mymachina.app"), same audio
+```
+
+**What is schematic.** None of it is the Machina app: the places are the
+other apps, drawn as their layouts (the platform named in type, the only
+mark the app's own Instagram glyph, tiles in paper tints, no third-party
+thumbnails, invented short links), and un-branded on purpose, as in the
+launch film's act one. The gathered saves are the kit's `SaveChip` with the
+demo account's titles. No recipe or cooking content (owner, 2026-10-02): the
+lost save is a café. The tagline is said once, by the Signature; "Coming
+soon" is on screen only, so the launch-day ending needs no new voice.
+
+**Voice.** Gemini TTS Sulafat, warm and a little wry, quick at the start and
+slower from "Saving was never the hard part." Seven lines, voiced by
+`narration-tts.yml` run 27, plus the Signature's shared take. On screen
+and spoken differ by design (the owner's script): `text` is the screen,
+`say` the voice, and `cues` picks the word each screen line arrives on.
+
+**Measured.** Score loudness by section (RMS): hook −32dB, the hunt building
+−30 → −14dB, "Nothing." −26dB, then −29 to −34dB, the turn −25dB, the gather
+−23dB, the logo −19dB. The mix −14.01 LUFS, −1.21 dBTP; the Signature's take
+found in the mix at its frame (correlation 0.83). Nobody has listened to it
+on speakers.
+
 ## Motion language
 
 The rules every Machina video follows, and the kit component that implements

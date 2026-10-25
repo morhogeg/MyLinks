@@ -14,6 +14,8 @@ import { Needle } from './reels/clips/needle/Needle';
 import * as REVISIT from '../clips/revisit-timeline.mjs';
 import { Revisit } from './reels/clips/revisit/Revisit';
 import { Signature } from './reels/kit/Signature';
+import * as POV from '../clips/pov-timeline.mjs';
+import { Pov } from './reels/clips/pov/Pov';
 import { SIGNATURE } from './reels/kit/signature.mjs';
 
 /**
@@ -246,6 +248,35 @@ export const RemotionRoot: React.FC = () => (
       fps={SIGNATURE.fps}
       width={1080}
       height={1920}
+    />
+    {/* POV: YOU SAVED IT (src/reels/clips/pov, clips/pov-timeline.mjs): the
+        deliverable, Silent for stills, and the launch-day ending */}
+    <Composition
+      id="MachinaPov"
+      component={Pov}
+      durationInFrames={POV.TOTAL_FRAMES}
+      fps={POV.FPS}
+      width={POV.WIDTH}
+      height={POV.HEIGHT}
+      defaultProps={{ withAudio: true, withCaptions: true, ending: 'soon' as const }}
+    />
+    <Composition
+      id="MachinaPovSilent"
+      component={Pov}
+      durationInFrames={POV.TOTAL_FRAMES}
+      fps={POV.FPS}
+      width={POV.WIDTH}
+      height={POV.HEIGHT}
+      defaultProps={{ withAudio: false, withCaptions: true, ending: 'soon' as const }}
+    />
+    <Composition
+      id="MachinaPovStore"
+      component={Pov}
+      durationInFrames={POV.TOTAL_FRAMES}
+      fps={POV.FPS}
+      width={POV.WIDTH}
+      height={POV.HEIGHT}
+      defaultProps={{ withAudio: true, withCaptions: true, ending: 'store' as const }}
     />
   </>
 );

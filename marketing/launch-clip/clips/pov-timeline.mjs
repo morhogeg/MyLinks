@@ -36,6 +36,7 @@ export const HEIGHT = 1920;
 export const BEAT_FRAMES = 15;
 export const BPM = (60 * FPS) / BEAT_FRAMES; // 120
 export const BAR_FRAMES = BEAT_FRAMES * 4; // 60
+export const BEAT = BEAT_FRAMES / FPS; // 0.5s
 
 /** Beat (quarter note, may be fractional) → frame. */
 export const beat = (n) => Math.round(n * BEAT_FRAMES);
@@ -62,12 +63,12 @@ export const HITS = {
   search: beat(24), // CUT: back to the search bar
   type: beat(24.5), // "that Lisbon café", typed
   none1: beat(26.5), // "No results"
-  scroll: beat(27.5), // a desperate scroll through the grid…
-  freeze: beat(29), // …that stops dead
+  scroll: beat(28), // "You scroll.": a desperate scroll through the grid…
+  freeze: beat(29.5), // …that stops dead
   none2: beat(30), // "No results", again
   drift: beat(32), // the turn: every place drifts apart and bleaches out
   white: beat(40), // only paper is left
-  gather: beat(42), // the saves rush back from every side…
+  gather: beat(41.6), // the saves rush back from every side…
   point: beat(49), // …into one point of ink
   signature: SIGNATURE_AT, // beat 50: the point becomes the logo
 };
@@ -81,7 +82,9 @@ export const QUERY = 'that Lisbon café';
  * been there too. Quick at the start; it slows down at "Saving was never the
  * hard part." `text` is what the screen shows, `say` what is spoken (the
  * owner's script sets different words for each); `style` is the line's
- * acting note and `pace` its tempo (audio/gemini_tts.py). The take's key is
+ * acting note and `pace` its tempo (audio/gemini_tts.py). `cues`: for each
+ * line on screen, the spoken word it arrives on (the hook's are empty: it is
+ * on screen from frame 0, the cover). The take's key is
  * text + style + pace, so changing any of them re-voices the line.
  *
  * The tagline is NOT here: the Signature says it, in its one shared take.
@@ -92,13 +95,13 @@ const SLOW = 'Slower and warmer for this line, about 125 words a minute; a real,
 
 export const CAPTIONS = [
   // the hook, on screen from frame 0 (the scene sets it big): the cover
-  { at: 6, to: 84, place: 'hook', text: 'POV:\nyou saved it.', say: 'You saved it. You know you did.', style: 'Warm and a little wry, like a friend who has been there too: "You saved it" as a knowing nudge, then "You know you did" with a small, rueful smile.', pace: QUICK },
-  { at: 96, to: 174, text: 'Instagram?\nTikTok?', say: 'Was it on Instagram? TikTok?', style: 'Quick and searching, half to yourself: "Was it on Instagram?" a real question, "TikTok?" quicker, already doubting.', pace: QUICK },
-  { at: 186, to: 264, text: 'Your screenshots?', say: 'Buried somewhere in your screenshots?', style: 'Wry, a little amused at the mess: "Buried somewhere" with a knowing lilt, "in your screenshots?" landing lightly.', pace: QUICK },
-  { at: 276, to: 354, text: 'That chat\nwith yourself?', say: 'Or that chat where you send yourself links?', style: 'Warm and teasing, the friend who does this too: a fond eye-roll on "send yourself links".', pace: QUICK },
-  { at: 372, to: 474, text: 'Nothing.', say: 'You search. Nothing. You scroll. Still nothing.', style: 'Deflating, dry and wry: "You search." quick, "Nothing." flat and small; "You scroll." quick again, "Still nothing." flatter, a tiny sigh in it. Short gaps, nothing dramatic.', pace: QUICK },
-  { at: 492, to: 624, text: 'Saving was never\nthe hard part.', say: 'Saving was never the hard part. Finding it again is.', style: 'The turn: slow down, warm and sincere, close to the listener, the friend who has figured it out; "Finding it again is." quietly, with weight on "Finding".', pace: SLOW },
-  { at: 636, to: 744, text: 'One place.\nEvery save. Any app.', say: 'So we’re building one place for everything you save, from any app.', style: 'Bright and warm, quietly excited, letting the listener in on it; "one place" lifted a little, "from any app" landing with a smile.', pace: QUICK },
+  { at: 6, to: 84, place: 'hook', cues: [], text: 'POV:\nyou saved it.', say: 'You saved it. You know you did.', style: 'Warm and a little wry, like a friend who has been there too: "You saved it" as a knowing nudge, then "You know you did" with a small, rueful smile.', pace: QUICK },
+  { at: 96, to: 174, cues: [0, 4], text: 'Instagram?\nTikTok?', say: 'Was it on Instagram? TikTok?', style: 'Quick and searching, half to yourself: "Was it on Instagram?" a real question, "TikTok?" quicker, already doubting.', pace: QUICK },
+  { at: 186, to: 264, cues: [0], text: 'Your screenshots?', say: 'Buried somewhere in your screenshots?', style: 'Wry, a little amused at the mess: "Buried somewhere" with a knowing lilt, "in your screenshots?" landing lightly.', pace: QUICK },
+  { at: 276, to: 354, cues: [0, 3], text: 'That chat\nwith yourself?', say: 'Or that chat where you send yourself links?', style: 'Warm and teasing, the friend who does this too: a fond eye-roll on "send yourself links".', pace: QUICK },
+  { at: 372, to: 476, cues: [1], text: 'Nothing.', say: 'You search. Nothing. You scroll. Still nothing.', style: 'Deflating, dry and wry: "You search." quick, "Nothing." flat and small; "You scroll." quick again, "Still nothing." flatter, a tiny sigh in it. Short gaps, nothing dramatic.', pace: QUICK },
+  { at: 486, to: 622, cues: [0, 3], text: 'Saving was never\nthe hard part.', say: 'Saving was never the hard part. Finding it again is.', style: 'The turn: slow down, warm and sincere, close to the listener, the friend who has figured it out; "Finding it again is." quietly, with weight on "Finding".', pace: SLOW },
+  { at: 624, to: 752, cues: [3, 6], text: 'One place.\nEvery save. Any app.', say: 'So we’re building one place for everything you save, from any app.', style: 'Bright and warm, quietly excited, letting the listener in on it; "one place" lifted a little, "from any app" landing with a smile.', pace: QUICK },
 ];
 
 /**

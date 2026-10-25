@@ -2640,6 +2640,15 @@ drafts; `npm run verify` has the final word on bans and fit.
    reel; do not lead with it. The recap **push** is native: device-record it
    if the notification should be in shot.
 
+*The house rules for videos (2026-10-25, owner):* every video made from now
+on shares one design language and ends on the same frames and words: the
+kit's `Signature` (the logo + "Machina. Everything you save, finally
+useful." in ONE reused voice take), colours and UI type from
+`kit/tokens.ts`, the kit's curves and captions, checked by
+`marketing/launch-clip/audio/house-verify.mjs`. The older videos are NOT
+re-done. Details: the README's "The house rules". First video on them:
+**POV: YOU SAVED IT** (branch `claude/machina-instagram-tiktok-reel-a799fc`).
+
 *Where to "advertise" for free:* X (primary), Product Hunt, Hacker News,
 r/PKMS + r/productivity (follow self-promo rules: give value first), Indie
 Hackers, a launch post on LinkedIn (the productivity-tools audience there is
@@ -2650,6 +2659,33 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-25 — ONE VIDEO KIT + THE SHARED ENDING; POV: YOU SAVED IT
+  (owner: "all the product videos must match… some things must be the
+  same, e.g. the final frame with the Machina logo and the narration";
+  "don't spend money and tokens redoing" the old ones).** Branch
+  `claude/machina-instagram-tiktok-reel-a799fc`, not merged to `main`.
+  (1) Found by hashing the kit across all 14 video branches: colours
+  (`theme.ts`) and curves were identical everywhere, but `kit/Type.tsx` had
+  5 versions, `Brand.tsx` 5, `Captions.tsx` 4, and every video re-voiced its
+  own tagline. (2) Merged the newest video branches onto FIND THE BOOK's kit
+  (SAVE THIS r18, TICK IT OFF r7, highlight reel r16); `Type.tsx` keeps both
+  the strike and the clean/plate lines; needle's `Field.tsx` → `FieldView.tsx`
+  (it collided with `field.ts` on the Mac's case-insensitive disk: tsc
+  failed there). The 7 older ad/clip branches were NOT merged: their kit
+  changes are earlier versions of the same features, and each would need
+  6–7 shared scripts hand-merged for videos that won't be re-rendered.
+  (3) `kit/Signature.tsx` + `signature.mjs`: the ending every new video
+  shares (FIND THE BOOK's sign-off, fixed; one take,
+  `public/signature/signature-vo.wav`; a footer slot for "Coming soon" /
+  the store), `kit/tokens.ts`, `audio/house-verify.mjs`, `mix-vo`
+  `signature: true`. (4) POV: YOU SAVED IT, 30s, the owner's script with
+  the refinements approved in session: the lost save is "that Lisbon café"
+  (no recipes), the platform grids are generic, it ends on the Signature
+  with "Coming soon · mymachina.app" (`MachinaPovStore` swaps in the store
+  line on launch day, no re-voice). Voice: narration-tts run 27 (7 takes).
+  Verified: tsc 0, house-verify ✓, mix −14.01 LUFS / −1.21 dBTP, review
+  stills checked by eye. Not verified: listened on speakers, played in the
+  Instagram/TikTok apps. **Owner:** review `out/pov/final_reel.mp4`.
 - **2026-10-24 — FIND THE BOOK round 6: what Machina does; the quote,
   struck; no timer bar (owner notes on round 5, both versions).** Branch
   `claude/reel-find-the-book`. The tunnel's line now sells the capability:

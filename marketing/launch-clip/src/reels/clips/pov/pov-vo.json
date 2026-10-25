@@ -1,0 +1,98 @@
+[
+ {
+  "frame": 6,
+  "text": "You saved it. You know you did.",
+  "words": [
+   0.03,
+   0.27,
+   0.63,
+   0.87,
+   1.11,
+   1.41,
+   1.65
+  ]
+ },
+ {
+  "frame": 96,
+  "text": "Was it on Instagram? TikTok?",
+  "words": [
+   0.03,
+   0.207,
+   0.34,
+   0.473,
+   1.36
+  ]
+ },
+ {
+  "frame": 186,
+  "text": "Buried somewhere in your screenshots?",
+  "words": [
+   0.03,
+   0.312,
+   0.714,
+   0.835,
+   1.037
+  ]
+ },
+ {
+  "frame": 276,
+  "text": "Or that chat where you send yourself links?",
+  "words": [
+   0.08,
+   0.231,
+   0.484,
+   0.736,
+   1.039,
+   1.24,
+   1.493,
+   1.947
+  ]
+ },
+ {
+  "frame": 372,
+  "text": "You search. Nothing. You scroll. Still nothing.",
+  "words": [
+   0.03,
+   0.283,
+   1.0,
+   1.77,
+   1.973,
+   2.75,
+   3.006
+  ]
+ },
+ {
+  "frame": 486,
+  "text": "Saving was never the hard part. Finding it again is.",
+  "words": [
+   0.03,
+   0.489,
+   0.852,
+   1.246,
+   1.508,
+   1.836,
+   2.59,
+   3.165,
+   3.501,
+   4.032
+  ]
+ },
+ {
+  "frame": 624,
+  "text": "So we\u2019re building one place for everything you save, from any app.",
+  "words": [
+   0.03,
+   0.158,
+   0.605,
+   0.991,
+   1.162,
+   1.419,
+   1.591,
+   2.542,
+   2.713,
+   3.33,
+   3.644,
+   3.816
+  ]
+ }
+]

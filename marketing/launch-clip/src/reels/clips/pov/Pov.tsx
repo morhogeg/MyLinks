@@ -1,0 +1,333 @@
+import React from 'react';
+import { AbsoluteFill, Audio, random, staticFile, useCurrentFrame } from 'remotion';
+import { CAPTIONS, ENDINGS, FPS, HITS, QUERY, SIGNATURE_AT } from '../../../../clips/pov-timeline.mjs';
+import { SaveChip, type SaveKind } from '../../kit/Brand';
+import { BandScrim, SLOTS } from '../../kit/Captions';
+import { EASE_GATHER, EASE_IN_OUT, EASE_MODAL, EASE_SPRING, prog } from '../../kit/curves';
+import { Lens, Paper } from '../../kit/Paper';
+import { Signature } from '../../kit/Signature';
+import { SIGNATURE, signatureWordAt } from '../../kit/signature.mjs';
+import { TOKENS } from '../../kit/tokens';
+import { HEAD_LEAD, KineticLine } from '../../kit/Type';
+import { Grid, ScreenshotWall, SearchBar, SelfChat } from './Places';
+import VO from './pov-vo.json';
+
+/**
+ * POV: YOU SAVED IT. 30s, 1080 × 1920 (clips/pov-timeline.mjs).
+ *
+ * The hunt (a blank search bar; an Instagram-style saved grid and a
+ * TikTok-style favorites grid whipping past; a wall of screenshots; the
+ * chat you send yourself links in; the search that finds nothing, twice),
+ * the turn (every place drifts apart and bleaches into the paper), the
+ * gather (the saves rush back from every side into one point of ink), and
+ * the kit's Signature, the ending every new video shares, with today's
+ * footer. Everything is drawn from the kit: Paper, tokens, KineticLine,
+ * SaveChip, the curves (audio/house-verify.mjs checks).
+ */
+
+type Ending = keyof typeof ENDINGS;
+
+/** ── the clock of each place ─────────────────────────────────────────── */
+
+/** Instagram: a beat on its header, then a whip up the grid */
+const instaY = (f: number) => 3400 * prog(f, HITS.insta + 6, HITS.tiktok - 2, EASE_IN_OUT);
+/** TikTok: arrives on a whip-pan, then its own whip */
+const tiktokY = (f: number) => 2600 * prog(f, HITS.tiktok + 12, HITS.shots - 2, EASE_IN_OUT);
+const panX = (f: number) => prog(f, HITS.tiktok - 2, HITS.tiktok + 10, EASE_IN_OUT);
+/** the screenshots fly up, too fast to read, faster and faster */
+const shotsY = (f: number) => 5600 * prog(f, HITS.shots + 4, HITS.chat, (t) => t * t * (2 - t) * 0.6 + t * 0.4);
+/** the chat scrolls up at a reading-ish pace, then quicker */
+const chatY = (f: number) => 1500 * prog(f, HITS.chat + 6, HITS.search, (t) => t * t);
+/** the desperate scroll, and the dead stop (a damped settle) */
+const scrollY = (f: number) => {
+  if (f < HITS.scroll) return 0;
+  const run = 2600 * prog(f, HITS.scroll, HITS.freeze, (t) => t * t);
+  const settle = f >= HITS.freeze ? 26 * Math.exp(-(f - HITS.freeze) / 3) * Math.cos((f - HITS.freeze) * 1.1) : 0;
+  return run - settle;
+};
+/** the grid of the desperate scroll rises over the search, then drops */
+const scrollCover = (f: number) => prog(f, HITS.scroll - 2, HITS.scroll + 7, EASE_MODAL) * (1 - prog(f, HITS.none2 - 4, HITS.none2 + 4, EASE_IN_OUT));
+
+/** a place drawn N times along its own motion (a 180° shutter): real motion blur */
+const Smear: React.FC<{ dx: number; dy: number; children: (ox: number, oy: number) => React.ReactNode }> = ({ dx, dy, children }) => {
+  const len = Math.hypot(dx, dy);
+  const k = len < 1.5 ? 1 : Math.min(7, Math.max(3, Math.ceil(len / 10)));
+  return (
+    <>
+      {Array.from({ length: k }, (_, i) => {
+        const t = k === 1 ? 0 : i / (k - 1) - 0.5;
+        // each sample opaque; sample i laid over the first i at 1/(i+1): the mean
+        return (
+          <AbsoluteFill key={i} style={{ opacity: 1 / (i + 1) }}>
+            {children(dx * t, dy * t)}
+          </AbsoluteFill>
+        );
+      })}
+    </>
+  );
+};
+
+/** a place at frame f, blurred by how far it moves in half a frame */
+const Blurred: React.FC<{ f: number; pos: (f: number) => number; axis?: 'x' | 'y'; render: (v: number) => React.ReactNode }> = ({ f, pos, axis = 'y', render }) => {
+  const v = (pos(f) - pos(f - 1)) * 0.5;
+  return (
+    <Smear dx={axis === 'x' ? v : 0} dy={axis === 'y' ? v : 0}>
+      {(ox, oy) => render(pos(f) + (axis === 'x' ? ox : oy))}
+    </Smear>
+  );
+};
+
+/** ── the hunt ─────────────────────────────────────────────────────────── */
+
+const caretOn = (f: number) => Math.floor(f / 15) % 2 === 0;
+
+const Hunt: React.FC<{ f: number }> = ({ f }) => {
+  if (f < HITS.insta) {
+    const push = 1 + 0.035 * prog(f, 0, HITS.insta, (t) => t);
+    return (
+      <AbsoluteFill style={{ transform: `scale(${push})`, transformOrigin: '540px 980px' }}>
+        <SearchBar query="" caret={caretOn(f)} none={0} />
+      </AbsoluteFill>
+    );
+  }
+  if (f < HITS.shots) {
+    const x = panX(f);
+    const vx = (panX(f) - panX(f - 1)) * 1080 * 0.5;
+    return (
+      <Smear dx={vx} dy={0}>
+        {(ox) => (
+          <>
+            {x < 1 && (
+              <AbsoluteFill style={{ transform: `translateX(${Math.round(-x * 1080 + ox)}px)` }}>
+                <Blurred f={f} pos={instaY} render={(y) => <Grid kind="insta" y={y} />} />
+              </AbsoluteFill>
+            )}
+            {x > 0 && (
+              <AbsoluteFill style={{ transform: `translateX(${Math.round((1 - x) * 1080 + ox)}px)` }}>
+                <Blurred f={f} pos={tiktokY} render={(y) => <Grid kind="tiktok" y={y} />} />
+              </AbsoluteFill>
+            )}
+          </>
+        )}
+      </Smear>
+    );
+  }
+  if (f < HITS.chat) return <Blurred f={f} pos={shotsY} render={(y) => <ScreenshotWall y={y} />} />;
+  if (f < HITS.search) return <Blurred f={f} pos={chatY} render={(y) => <SelfChat y={y} />} />;
+  return <Searching f={f} />;
+};
+
+/** "that Lisbon café": typed, nothing; scrolled, frozen, nothing again */
+const typed = (f: number) => QUERY.slice(0, Math.max(0, Math.min(QUERY.length, Math.floor((f - HITS.type) / 1.7))));
+const Searching: React.FC<{ f: number }> = ({ f }) => {
+  const none1 = prog(f, HITS.none1, HITS.none1 + 8, EASE_MODAL);
+  const none2 = prog(f, HITS.none2, HITS.none2 + 8, EASE_MODAL);
+  // the second "No results" lands with a small, flat shake
+  const shake = f >= HITS.none2 ? 10 * Math.exp(-(f - HITS.none2) / 4) * Math.sin((f - HITS.none2) * 1.9) : 0;
+  const cover = scrollCover(f);
+  const query = typed(f);
+  const done = query.length === QUERY.length;
+  return (
+    <AbsoluteFill>
+      <SearchBar query={query} caret={!done || caretOn(f)} none={f >= HITS.none2 ? none2 : none1} noneShake={shake} />
+      {cover > 0 && (
+        <AbsoluteFill style={{ transform: `translateY(${Math.round((1 - cover) * 1920)}px)` }}>
+          <Blurred f={f} pos={scrollY} render={(y) => <Grid kind="insta" y={y + 900} />} />
+        </AbsoluteFill>
+      )}
+    </AbsoluteFill>
+  );
+};
+
+/** the hunt's scenes at a held moment, for the turn's five panels */
+const PANELS: { place: (f: number) => React.ReactNode; x: number; y: number; dir: [number, number]; rot: number }[] = [
+  { place: () => <Grid kind="insta" y={1200} />, x: 248, y: 860, dir: [-1, -0.7], rot: -4 },
+  { place: () => <Grid kind="tiktok" y={900} />, x: 832, y: 860, dir: [1, -0.7], rot: 4 },
+  { place: () => <ScreenshotWall y={1400} />, x: 248, y: 1420, dir: [-1, 0.8], rot: 3 },
+  { place: () => <SelfChat y={600} />, x: 832, y: 1420, dir: [1, 0.8], rot: -3 },
+  { place: () => <SearchBar query={QUERY} caret={false} none={1} />, x: 540, y: 1140, dir: [0, 1], rot: 0 },
+];
+const PANEL_S = 0.3;
+
+/** ── the turn: every place drifts apart and bleaches into the paper ───── */
+const Turn: React.FC<{ f: number }> = ({ f }) => {
+  const pull = prog(f, HITS.drift, HITS.drift + 24, EASE_MODAL);
+  const drift = prog(f, HITS.drift + 10, HITS.white, (t) => t);
+  const bleach = prog(f, HITS.drift + 40, HITS.white - 6, EASE_IN_OUT);
+  return (
+    <AbsoluteFill>
+      {PANELS.map((p, i) => {
+        const search = i === PANELS.length - 1;
+        // the search, full frame, pulls back into its panel; the rest arrive
+        const s = search ? 1 + (PANEL_S - 1) * pull : PANEL_S * (1.08 - 0.08 * pull);
+        const cx = search ? 540 + (p.x - 540) * pull : p.x;
+        const cy = search ? 960 + (p.y - 960) * pull : p.y;
+        const away = 240 * drift;
+        const op = (search ? 1 : pull) * (1 - bleach);
+        return (
+          <div
+            key={i}
+            style={{
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              width: 1080,
+              height: 1920,
+              transformOrigin: '540px 960px',
+              transform: `translate(${Math.round(cx - 540 + p.dir[0] * away)}px, ${Math.round(cy - 960 + p.dir[1] * away)}px) rotate(${(p.rot * drift).toFixed(2)}deg) scale(${s.toFixed(4)})`,
+              borderRadius: 64 / s,
+              overflow: 'hidden',
+              background: TOKENS.paper,
+              boxShadow: pull > 0.02 ? TOKENS.shadow : undefined,
+              opacity: op,
+              filter: bleach > 0.01 ? `blur(${(bleach * 6).toFixed(2)}px)` : undefined,
+            }}
+          >
+            {p.place(f)}
+          </div>
+        );
+      })}
+    </AbsoluteFill>
+  );
+};
+
+/** ── the gather: the saves rush back from every side into one point ──── */
+const SAVES: { kind: SaveKind; title: string }[] = [
+  { kind: 'instagram', title: 'That Lisbon café' },
+  { kind: 'youtube', title: 'Stanford commencement address' },
+  { kind: 'screenshot', title: 'Read Atomic Habits, start small' },
+  { kind: 'x', title: 'Thread: the two-minute rule' },
+  { kind: 'web', title: 'Why you forget most of what you read' },
+  { kind: 'instagram', title: 'Cala Goloritzé, Sardinia' },
+  { kind: 'youtube', title: 'A 20-minute mobility routine' },
+  { kind: 'screenshot', title: 'Gift idea for Dana' },
+  { kind: 'web', title: 'Studio apartment, Alfama' },
+  { kind: 'instagram', title: 'Tokyo in five days' },
+  { kind: 'x', title: 'The best note-taking advice I got' },
+  { kind: 'youtube', title: 'Life is a video game' },
+];
+const GATHER_N = 48;
+/** the point: where the Signature's own dot strikes (layout.markY), its size */
+const POINT = { x: 540, y: SIGNATURE.layout.markY, r: (52 * SIGNATURE.layout.markW) / 576 };
+
+const gatherOf = (i: number) => {
+  const a = i * 2.39996 + 0.4;
+  // they come in waves through the line, each in view for about a second
+  const start = HITS.gather + Math.round((i / GATHER_N) * 68 + random(`gs${i}`) * 8);
+  return { a, start, end: start + 30 + Math.round(random(`gd${i}`) * 8), r0: 640 + 460 * random(`gr${i}`), size: 0.8 + 0.45 * random(`gz${i}`) };
+};
+
+const LAST_ARRIVAL = Math.max(...Array.from({ length: GATHER_N }, (_, i) => gatherOf(i).end));
+
+const Gather: React.FC<{ f: number }> = ({ f }) => (
+  <AbsoluteFill>
+    {Array.from({ length: GATHER_N }, (_, i) => {
+      const g = gatherOf(i);
+      if (f < g.start || f >= g.end) return null;
+      const at = (ff: number) => {
+        const t = prog(ff, g.start, g.end, EASE_GATHER);
+        const r = g.r0 * (1 - t);
+        return { x: POINT.x + Math.cos(g.a) * r, y: POINT.y + Math.sin(g.a) * r, s: g.size * (1 - 0.88 * t), t };
+      };
+      const p = at(f);
+      const q = at(f - 1);
+      const save = SAVES[i % SAVES.length];
+      return (
+        <Smear key={i} dx={(p.x - q.x) * 0.5} dy={(p.y - q.y) * 0.5}>
+          {(ox, oy) => (
+            <div
+              style={{
+                position: 'absolute',
+                left: 0,
+                top: 0,
+                transform: `translate(${(p.x + ox).toFixed(1)}px, ${(p.y + oy).toFixed(1)}px) translate(-50%, -50%) scale(${p.s.toFixed(3)}) rotate(${((1 - p.t) * (random(`rot${i}`) - 0.5) * 24).toFixed(1)}deg)`,
+                opacity: 1 - prog(f, g.end - 4, g.end, (t) => t),
+              }}
+            >
+              <SaveChip kind={save.kind} title={save.title} />
+            </div>
+          )}
+        </Smear>
+      );
+    })}
+  </AbsoluteFill>
+);
+
+/** the point of ink, growing as the saves arrive; it hands over to the
+ *  Signature's own dot on its strike */
+const Point: React.FC<{ f: number }> = ({ f }) => {
+  const arrived = Array.from({ length: GATHER_N }, (_, i) => gatherOf(i).end).filter((e) => e <= f).length / GATHER_N;
+  if (arrived === 0) return null;
+  const pulse = 1 + 0.18 * Math.exp(-Math.max(0, f - LAST_ARRIVAL) / 4) * (f >= LAST_ARRIVAL ? 1 : 0);
+  const r = POINT.r * (0.25 + 0.75 * EASE_SPRING(arrived)) * pulse;
+  // the Signature's dot strikes over (drawFrom + 0.44…0.68 of its 32-frame draw)
+  const strike = SIGNATURE_AT + signatureWordAt(0) - Math.round(0.56 * 32);
+  const hand = 1 - prog(f, strike + 14, strike + 22, EASE_IN_OUT);
+  if (hand <= 0) return null;
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        left: POINT.x - r,
+        top: POINT.y - r,
+        width: 2 * r,
+        height: 2 * r,
+        borderRadius: '50%',
+        background: TOKENS.ink,
+        opacity: hand,
+      }}
+    />
+  );
+};
+
+/** ── the narration on screen ──────────────────────────────────────────── */
+const Lines: React.FC<{ f: number }> = ({ f }) => (
+  <AbsoluteFill style={{ pointerEvents: 'none' }}>
+    {CAPTIONS.map((c) => {
+      const t = VO.find((v) => v.frame === c.at);
+      const lines = c.text.split('\n');
+      // each line on screen arrives on its cue word; the hook is up from frame 0
+      const starts = lines.flatMap((line, k) => {
+        const cue = c.cues[k];
+        const s = cue === undefined ? -(c.at + HEAD_LEAD + 12) : Math.round((t?.words[cue] ?? 0) * FPS);
+        return line.split(' ').map(() => s);
+      });
+      const hook = c.place === 'hook';
+      return (
+        <div key={c.at} style={{ position: 'absolute', left: 0, right: 0, top: hook ? SLOTS.top - 40 : SLOTS.top, display: 'flex', justifyContent: 'center' }}>
+          <KineticLine
+            text={c.text}
+            frame={f}
+            from={c.at}
+            to={c.to}
+            starts={starts}
+            size={56}
+            sizes={hook ? [60, 104] : undefined}
+            weight={hook ? 620 : 600}
+            width={hook ? 980 : 980}
+          />
+        </div>
+      );
+    })}
+  </AbsoluteFill>
+);
+
+export const Pov: React.FC<{ withAudio?: boolean; withCaptions?: boolean; ending?: Ending }> = ({ withAudio = true, withCaptions = true, ending = 'soon' }) => {
+  const f = useCurrentFrame();
+  // the paper band over anything that rises into the type: the places, and the saves rushing in
+  const scrim = (f >= HITS.insta && f < HITS.drift) || (f >= HITS.gather && f < SIGNATURE_AT) ? 1 : 0;
+  return (
+    <AbsoluteFill style={{ background: TOKENS.paper }}>
+      <Paper drift={f / 900} />
+      {f < HITS.drift && <Hunt f={f} />}
+      {f >= HITS.drift && f < HITS.white + 6 && <Turn f={f} />}
+      {f >= HITS.gather && f < SIGNATURE_AT + 2 && <Gather f={f} />}
+      {scrim > 0 && <BandScrim opacity={scrim} tone={TOKENS.paper} />}
+      {withCaptions && <Lines f={f} />}
+      <Lens vignette={0.35} grain={0.035} />
+      <Signature from={SIGNATURE_AT} footer={ENDINGS[ending]} />
+      <Point f={f} />
+      {withAudio && <Audio src={staticFile(`clips/pov/score-vo.wav`)} />}
+    </AbsoluteFill>
+  );
+};

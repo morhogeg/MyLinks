@@ -39,6 +39,9 @@ const SCRIPTS = {
   'needle-video': { vo: path.join(root, 'out', 'vo', 'needle-video'), score: 'clips/needle/score-video.wav', out: 'clips/needle/score-video-vo.wav', duck: 0.55 },
   // TICK IT OFF (clips/revisit-timeline.mjs, audio/revisit-score.mjs): the reel's balance
   revisit: { vo: path.join(root, 'out', 'vo', 'revisit'), score: 'clips/revisit/score.wav', out: 'clips/revisit/score-vo.wav', duck: 0.55 },
+  // POV: YOU SAVED IT (clips/pov-timeline.mjs, audio/pov-score.mjs): the reel's
+  // balance, and the kit's Signature take laid in at its own frame
+  pov: { vo: path.join(root, 'out', 'vo', 'pov'), score: 'clips/pov/score.wav', out: 'clips/pov/score-vo.wav', duck: 0.55, timeline: '../clips/pov-timeline.mjs', signature: true },
 };
 const name = process.argv[2] ?? 'film';
 const script = SCRIPTS[name];
@@ -88,6 +91,18 @@ const lineDuck =
 if (name === 'find') for (const c of (await import('../clips/find-timeline.mjs')).CAPTIONS) if (c.duck) lineDuck[c.at] = c.duck;
 if (name === 'savethis') for (const c of (await import('../clips/savethis-timeline.mjs')).CAPTIONS) if (c.duck) lineDuck[c.at] = c.duck;
 if (name === 'revisit') for (const c of (await import('../clips/revisit-timeline.mjs')).CAPTIONS) if (c.duck) lineDuck[c.at] = c.duck;
+// a house video (2026-10-25 on) ends on the kit's Signature: its ONE shared
+// take goes in at the signature's own voice frame, ducking as the signature says
+if (script.timeline) {
+  const T = await import(script.timeline);
+  for (const c of T.CAPTIONS) if (c.duck) lineDuck[c.at] = c.duck;
+  if (script.signature) {
+    const { SIGNATURE } = await import('../src/reels/kit/signature.mjs');
+    const frame = T.SIGNATURE_AT + SIGNATURE.voiceAt;
+    manifest.push({ frame, path: path.join(root, SIGNATURE.voicePath), start: frame / T.FPS });
+    lineDuck[frame] = SIGNATURE.duck;
+  }
+}
 if (name === 'needle' || name === 'needle-video') {
   for (const c of (await import('../clips/needle-timeline.mjs')).NEEDLES[name === 'needle' ? 'book' : 'video'].captions) if (c.duck) lineDuck[c.at] = c.duck;
 }
@@ -99,7 +114,7 @@ const duck = new Float64Array(N).fill(1);
 const voL = new Float64Array(N);
 
 for (const line of manifest) {
-  const wav = readWav(path.join(voDir, line.file));
+  const wav = readWav(line.path ?? path.join(voDir, line.file));
   // the film's manifest places lines by bar (kept exactly as it always was,
   // so the film's mix stays bit-identical); other scripts carry seconds
   const startSec = line.bar !== undefined ? line.bar * BAR : line.start;
@@ -142,7 +157,7 @@ let g = peak > 0.98 ? 0.98 / peak : 1;
 // Shorts and YouTube expect a finished mix (the round-12 mix measured −15.8).
 // A global gain, then a look-ahead limiter on the few transients that would
 // pass the ceiling. The film's mix is untouched (it has no MASTER).
-const MASTER = { reel: { lufs: -14, truePeak: -1 }, find: { lufs: -14, truePeak: -1 }, savethis: { lufs: -14, truePeak: -1 }, needle: { lufs: -14, truePeak: -1 }, 'needle-video': { lufs: -14, truePeak: -1 }, revisit: { lufs: -14, truePeak: -1 } }[name];
+const MASTER = { reel: { lufs: -14, truePeak: -1 }, find: { lufs: -14, truePeak: -1 }, savethis: { lufs: -14, truePeak: -1 }, needle: { lufs: -14, truePeak: -1 }, 'needle-video': { lufs: -14, truePeak: -1 }, revisit: { lufs: -14, truePeak: -1 }, pov: { lufs: -14, truePeak: -1 } }[name];
 if (MASTER) {
   let gain = 10 ** ((MASTER.lufs - lufs(L, R, SR)) / 20);
   let ceiling = 10 ** ((MASTER.truePeak - 0.3) / 20);
