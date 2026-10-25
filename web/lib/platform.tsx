@@ -56,7 +56,9 @@ export function platformIcon(key: PlatformKey, className = 'w-3 h-3'): ReactNode
 /** Brand RGB per platform, so each source filter lights up its own color. */
 const PLATFORM_RGB: Record<PlatformKey, string> = {
     youtube: '255, 0, 0',
-    x: '191, 201, 214',
+    // Theme-aware (globals.css --mark-x-rgb): blue-grey on dark, TikTok's ink
+    // on light, where the grey washed out.
+    x: 'var(--mark-x-rgb)',
     instagram: '225, 48, 108',
     // TikTok's own rule for its mark is black on light, white on dark, so it
     // takes the theme's ink (globals.css --mark-ink-rgb) rather than a fixed

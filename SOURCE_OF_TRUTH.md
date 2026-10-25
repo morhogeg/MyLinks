@@ -2764,9 +2764,12 @@ exact-match, capped.
   components server-rendered with the app's compiled CSS in light and dark,
   and the share page rendered, screenshots checked; the icon path is
   byte-identical in the app, the share page and Simple Icons. **Not verified:**
-  on device (1385). **Seen, not changed:** the X mark's fixed light grey
-  (191, 201, 214) is faint on the light theme; `--mark-ink-rgb` would fix it
-  if wanted.
+  on device (1385). **X mark on light (owner, same day):** its fixed grey
+  (191, 201, 214) was ~1.7:1 on the white card, so it now reads token
+  `--mark-x-rgb`: that grey on dark (unchanged, owner's call), TikTok's ink
+  (17, 24, 39) on light. TikTok's dark white is unchanged too; the share page
+  is dark-only, so it didn't change. Computed colours checked in both themes
+  on the real components; shipped in the next TestFlight build (see git).
 - **2026-10-25 — BUILD 1383 SHARE SHEET DEAD ON TAP; FIXED IN 1384.** Owner
   report: tapping Machina in the share sheet did nothing, in every app.
   **Cause (verified in source):** commit `f1e0bee` inserted
