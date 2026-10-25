@@ -859,8 +859,9 @@ The multi-user auth work described below **was** fully written but not live:
   app shell. A browser on a non-cloud address gets both posts in full (verified).
   Backend shipped 2026-10-25 (§9): walls become honest `login_wall` partial
   cards, `share_ingest` accepts `pagePreview`. Share extension
-  (`PagePreviewReader` in `ShareViewController.swift`) built the same day and
-  sent to TestFlight. **Left:** owner verifies ON DEVICE (an IG photo post, an
+  (`PagePreviewReader` in `ShareViewController.swift`) built the same day:
+  **TestFlight build 1383** (run #383, commit `52b421e3`, version 1.0 — the
+  upload was accepted while 1.0/1382 is in review). **Left:** owner verifies ON DEVICE (an IG photo post, an
   IG reel, a TikTok from the TikTok app) that each card carries the real
   caption + handle, and that ✕ during the read still saves. Launch waits on
   this. 1.0 (build 1382) stays in review, release is manual.
