@@ -170,6 +170,30 @@ jobs:
           echo "::error::Refusing to build: the auth gate resolved to '' without an explicit legacy_no_auth dispatch. An ungated bundle cannot read the locked database — it would ship a dead app to TestFlight."
           exit 1
 
+      # iOS starts the share extension by creating the class that Info.plist's
+      # NSExtensionPrincipalClass names: "ShareViewController", the Objective-C
+      # name `@objc(ShareViewController)` gives. Put on any class other than the
+      # view controller, that attribute still compiles and archives green, and
+      # the extension dies the moment it is tapped in the share sheet. Build
+      # 1383 shipped exactly that (the attribute landed on PagePreviewReader).
+      - name: Verify the share extension's entry point
+        run: |
+          SRC=web/ios/App/ShareExt/ShareViewController.swift
+          PLIST=web/ios/App/ShareExt/Info.plist
+          grep -A1 '<key>NSExtensionPrincipalClass</key>' "$PLIST" | grep -q '<string>ShareViewController</string>' || {
+            echo "::error::$PLIST no longer names ShareViewController as its NSExtensionPrincipalClass. Update this check to match."
+            exit 1
+          }
+          COUNT="$(grep -c '^@objc(ShareViewController)$' "$SRC" || true)"
+          NEXT="$(grep -A1 '^@objc(ShareViewController)$' "$SRC" | sed -n 2p)"
+          case "$COUNT:$NEXT" in
+            "1:class ShareViewController: UIViewController"*)
+              echo "Share extension entry point OK: @objc(ShareViewController) is on the view controller." ;;
+            *)
+              echo "::error::$SRC must have exactly one '@objc(ShareViewController)' line, directly above 'class ShareViewController: UIViewController' (found $COUNT; the line after it is '$NEXT'). On any other class the extension compiles but does nothing when tapped in the share sheet."
+              exit 1 ;;
+          esac
+
       - name: Build web bundle + Capacitor sync
         working-directory: web
         env:
