@@ -168,6 +168,14 @@ surface in the category and a knowledge graph computed on every save. The path t
   every app. Put new classes above the entry point's doc comment or below the
   view controller; the TestFlight workflow's "Verify the share extension's
   entry point" step fails a build that gets this wrong.
+- **Instagram and TikTok can't be read from Cloud Functions.** Instagram
+  serves Google Cloud addresses its login page (since late Oct 2026), TikTok an
+  empty app shell; a phone gets both posts. What works is the share extension
+  reading the post on the phone (`PagePreviewReader` → `pagePreview`, verified
+  on device 2026-10-25). Don't revive server-side "bridges": ddinstagram is
+  gone, kkinstagram empty, instagramez redirected to an ad network. Captures
+  with no phone read (the in-app + sheet, the web app, the browser extension)
+  still land as honest partial cards for these two sites.
 - **Two parallel Claude sessions:** TestFlight runs share one concurrency group
   and one build-number sequence (1000 + run number) — runs queue, numbers never
   collide, but a build only contains its own branch's code. Sync with
@@ -861,24 +869,25 @@ The multi-user auth work described below **was** fully written but not live:
 
 ### 🔴 P0 — launch blockers (in order)
 
-- **[ ] Instagram + TikTok capture: read the post ON THE PHONE (1.0.1, found
-  2026-10-25).** Instagram serves its LOGIN PAGE to Cloud Functions addresses
-  (since between Oct 16 and Oct 25), and TikTok only ever served the server its
-  app shell. A browser on a non-cloud address gets both posts in full (verified).
-  Backend shipped 2026-10-25 (§9): walls become honest `login_wall` partial
-  cards, `share_ingest` accepts `pagePreview`. Share extension
-  (`PagePreviewReader` in `ShareViewController.swift`) built the same day:
-  **TestFlight build 1383** (run #383, commit `52b421e3`, version 1.0 — the
-  upload was accepted while 1.0/1382 is in review). **1383's share extension
-  died on tap, from every app** (its `@objc(ShareViewController)` landed on
-  `PagePreviewReader`, §9); **fixed in build 1384** (run #384, merge
-  `33aaf40`), which also makes the phone read ask for English and treat
-  Instagram `/accounts/` + `/challenge/` pages as the wall. 1382 (in review)
-  never had the bug. **Left:** owner verifies ON DEVICE on 1384: the share
-  sheet opens again (any link, any app), then an IG photo post, an IG reel and
-  a TikTok from the TikTok app each land with the real caption + handle, and ✕
-  during the read still saves. Launch waits on this. 1.0 (build 1382) stays in
-  review, release is manual.
+- **[x] Instagram + TikTok capture: read the post ON THE PHONE (found and
+  fixed 2026-10-25; VERIFIED ON DEVICE on build 1384).** Instagram serves its
+  LOGIN PAGE to Cloud Functions addresses (since between Oct 16 and Oct 25), and
+  TikTok only ever served the server its app shell, so every share became an
+  "Instagram Login Page" / "TikTok video content" card. **What fixed it:** the
+  share extension (`PagePreviewReader`, `ShareViewController.swift`) reads the
+  post on the phone, which both sites serve in full, and sends it as
+  `pagePreview`; the backend uses it when its own read hits the wall, and with
+  no phone read the card is an honest `login_wall` partial (§2 note, §9 ×3 on
+  2026-10-25). Build 1383 carried the reader but its extension died on tap;
+  1384 fixed that. **Owner on 1384: "Everything works perfectly"**: an IG reel
+  landed as a real Hebrew recipe card (@einavhakounfood) and a TikTok as
+  "Creamy Lemon Chicken" (@madebythewa). **Still open, owner's call: which
+  build reaches the App Store.** 1.0 is in review with build 1382, which
+  predates the phone read: its IG/TikTok shares make honest partial cards (the
+  backend half is live for every build), not real ones. Either take 1382 out
+  of review and resubmit 1.0 with the newest build, or release 1.0 and follow
+  with 1.0.1. Not verified here which of those App Store Connect allows in
+  1.0's current review state.
 
 1. **[x] Native auth build green (iOS)** *(code done 2026-07-03 — root cause was
    the Xcode 16 toolchain, not a dependency conflict; see §3. Workflow moved to
@@ -2721,6 +2730,43 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-25 — INSTAGRAM + TIKTOK VERIFIED ON DEVICE (1384); TIKTOK GETS ITS
+  MARK.** Owner on build 1384: "Everything works perfectly". An Instagram reel
+  became a real card (Hebrew recipe, @einavhakounfood, Instagram mark) and a
+  TikTok became "Creamy Lemon Chicken" (@madebythewa). §4 P0 item closed.
+  **What worked, end to end:** Instagram serves Google Cloud its login page and
+  TikTok serves it an empty shell, so the post is read where it IS served, on
+  the phone. The share extension loads the shared link in a hidden, signed-out
+  `WKWebView` (`PagePreviewReader`: ≤7 s, asks for English, an Instagram
+  `/accounts/` or `/challenge/` page counts as the wall) and sends the og tags,
+  or TikTok's embedded post data, as `pagePreview`. `share_ingest` sanitizes it
+  (`_clean_page_preview`), the queue doc carries it, and the scrapers use it
+  only when the server's own read hits the wall (`_looks_like_ig_login_wall`,
+  `_scrape_tiktok_url`). With no phone read, the card is an honest `login_wall`
+  partial, never the login page. On the way: the server had read Instagram's
+  >100-char login CTA as a caption, and 1383's extension died on tap (attribute
+  on the wrong class, now a CI check). **TikTok mark (owner ask):** TikTok
+  cards showed a bare @handle. `tiktok` is now a `PlatformKey` (any
+  `tiktok.com` host incl. vt./vm. short links, label "TikTok", backend landing
+  stamp in `_PLATFORM_HOSTS`), drawn as TikTok's solid note (Simple Icons path,
+  CC0) in the theme's ink via new token `--mark-ink-rgb`: black on light,
+  white on dark, as TikTok draws it (its red read as Instagram's pink beside
+  it; outline variants didn't read as TikTok at 14px). On the card byline
+  (@handle, like Instagram), list rows, TikTok screenshots, the Sources list
+  and search alias "tiktok", and in `share_service`'s byline port (#E5E5E5,
+  that page is dark-only). `SourceFacetList`'s `PLATFORM_ORDER` now comes from
+  `PLATFORM_LABELS`: the hand-kept list would have silently dropped TikTok
+  sources from the filter. Screenshot titles use `PLATFORM_LABELS` ("on
+  TikTok", was "Tiktok"). **Shipped:** commit `a1653f8`, merge `0bf9613`
+  (`Deploy-Functions: share_page,process_link_background,analyze_link`,
+  deploy-functions #143), Vercel, TestFlight run #385 → build 1385.
+  **Verified:** web tsc, unit tests (86), backend suite 1982 (6 new); the real
+  components server-rendered with the app's compiled CSS in light and dark,
+  and the share page rendered, screenshots checked; the icon path is
+  byte-identical in the app, the share page and Simple Icons. **Not verified:**
+  on device (1385). **Seen, not changed:** the X mark's fixed light grey
+  (191, 201, 214) is faint on the light theme; `--mark-ink-rgb` would fix it
+  if wanted.
 - **2026-10-25 — BUILD 1383 SHARE SHEET DEAD ON TAP; FIXED IN 1384.** Owner
   report: tapping Machina in the share sheet did nothing, in every app.
   **Cause (verified in source):** commit `f1e0bee` inserted
