@@ -73,7 +73,7 @@ def _drive_url_pipeline(monkeypatch, *, stage_update_raises=False):
     monkeypatch.setattr(main, "handle_reminder_intent", lambda body: None)
 
     import scraper
-    monkeypatch.setattr(scraper, "scrape_url", lambda url, body=None: {
+    monkeypatch.setattr(scraper, "scrape_url", lambda url, body=None, page_preview=None: {
         "html": "", "title": "Scraped Title", "text": "body text", "source_name": "example.com",
     })
 
