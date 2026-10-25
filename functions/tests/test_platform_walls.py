@@ -165,3 +165,45 @@ def test_tiktok_mobile_page_data_key_is_read():
     html = TT_FULL.replace('"webapp.video-detail"', '"webapp.reflow.video.detail"')
     item = scraper._tiktok_item_from_html(html)
     assert item["author"]["uniqueId"] == "dadsfoodtoday"
+
+
+# ── TikTok's mark: the platform stamp and the share page's byline ───────────
+# The app draws TikTok's note beside the @handle (web/lib/platform.tsx); the
+# share page's server-side port of the byline (share_service) must too.
+
+@pytest.mark.parametrize("final_url", [
+    "https://www.tiktok.com/@madebythewa/video/7560000000000000000",
+    "https://vt.tiktok.com/ZSgx3txGb/",
+])
+def test_tiktok_landing_is_stamped(final_url):
+    import main
+    assert main._scrape_extras("", {"final_url": final_url})["sourcePlatform"] == "tiktok"
+
+
+def test_share_byline_tiktok_handle_gets_the_mark():
+    import share_service
+    html = share_service._source_byline({"url": "https://vt.tiktok.com/ZSgx3txGb/",
+                                         "sourceName": "@madebythewa"})
+    assert "@madebythewa" in html
+    assert share_service._PLATFORM_ICONS["tiktok"][1] in html
+
+
+def test_share_byline_tiktok_without_handle_names_the_platform():
+    import share_service
+    html = share_service._source_byline({"url": "https://www.tiktok.com/@x/video/1",
+                                         "sourceName": "TikTok"})
+    assert ">TikTok<" in html
+    assert share_service._PLATFORM_ICONS["tiktok"][1] in html
+
+
+def test_share_byline_tiktok_screenshot_gets_the_mark():
+    import share_service
+    html = share_service._source_byline({"sourceType": "image", "url": "https://storage/x.jpg",
+                                         "sourceHandle": "@madebythewa", "sourcePlatform": "tiktok"})
+    assert "@madebythewa" in html
+    assert share_service._PLATFORM_ICONS["tiktok"][1] in html
+
+
+def test_tiktok_lookalike_host_is_not_tiktok():
+    import share_service
+    assert share_service._platform_of("https://tiktok.com.evil.test/@x/video/1") is None

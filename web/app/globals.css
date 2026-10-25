@@ -70,6 +70,11 @@
      ground and the black one on a light ground. Brand-mandated, not ours. */
   --apple-button: #FFFFFF;
   --apple-button-ink: #000000;
+  /* Brand marks their owner draws black on light and white on dark (TikTok's
+     note, lib/platform.tsx), in the theme's ink (--text). An "r, g, b"
+     triplet, not a colour, so the platform helpers can wrap it in rgb() and
+     rgba() like the fixed brand colours. */
+  --mark-ink-rgb: 229, 229, 229;
   /* Status colors (danger / warning / success / the favorite star). One token
      each, so light mode can darken them: Tailwind's red-400, amber-500,
      green-500 and yellow-500 read at 2-3:1 on the light ground. Light values
@@ -151,6 +156,7 @@
   --tabbar-inactive: var(--text-secondary);
   --apple-button: #000000;
   --apple-button-ink: #FFFFFF;
+  --mark-ink-rgb: 17, 24, 39;
   --danger: #DC2626;
   --warning: #B45309;
   --success: #15803D;
