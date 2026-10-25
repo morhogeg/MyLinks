@@ -2673,8 +2673,11 @@ exact-match, capped.
   hook's "Recent" failed searches, a "No results" empty state, chat clipped
   under its header, the grid header's zero width fixed, thrown flicks, the
   café as the last save home in the gather. Timing, voice and score
-  unchanged. Verified: tsc 0, house-verify ✓, stills checked by eye. Not
-  verified: speakers, in-app playback.
+  unchanged. `house-verify` now also requires `HOUSE_BAND` and `HookTitle`
+  (checked both ways: POV passes, FIND THE BOOK fails every rule it
+  predates). Verified: tsc 0, house-verify ✓, stills checked by eye, the
+  encode 900 frames / 30.000s / 23.8MB, the last frame still
+  pixel-identical to the Signature. Not verified: speakers, in-app playback.
 - **2026-10-25 — ONE VIDEO KIT + THE SHARED ENDING; POV: YOU SAVED IT
   (owner: "all the product videos must match… some things must be the
   same, e.g. the final frame with the Machina logo and the narration";

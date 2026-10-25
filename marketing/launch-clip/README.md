@@ -1513,8 +1513,9 @@ and spoken differ by design (the owner's script): `text` is the screen,
 found in the mix at its frame (correlation 0.83). The last frame, rendered
 lossless, is pixel-identical to `MachinaSignature`'s above the footer
 (PSNR ∞; the posting encode 44.2dB). The encode: 900 frames, 30.000s,
-H.264 High yuv420p BT.709, AAC 48kHz 320k, 13.1MB; no brightness jump at the
-three range seams. Nobody has listened to it on speakers.
+H.264 High yuv420p BT.709, AAC 48kHz 320k, 23.8MB in round 2 (13.1MB in
+round 1: the filled tiles carry more detail); no brightness jump at the
+three range seams; the last frame still pixel-identical to the Signature. Nobody has listened to it on speakers.
 
 ## Motion language
 
