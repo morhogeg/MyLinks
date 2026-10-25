@@ -857,12 +857,13 @@ The multi-user auth work described below **was** fully written but not live:
   2026-10-25).** Instagram serves its LOGIN PAGE to Cloud Functions addresses
   (since between Oct 16 and Oct 25), and TikTok only ever served the server its
   app shell. A browser on a non-cloud address gets both posts in full (verified).
-  Backend half shipped 2026-10-25 (§9): walls become honest `login_wall`
-  partial cards, and `share_ingest` accepts `pagePreview` (the post as read on
-  the phone). **Left:** the share extension loads Instagram/TikTok links in a
-  signed-out `WKWebView`, sends `pagePreview`; TestFlight; owner verifies on
-  device (real IG post, IG reel, TikTok) that cards carry the real caption.
-  Launch waits on this. 1.0 (build 1382) stays in review, release is manual.
+  Backend shipped 2026-10-25 (§9): walls become honest `login_wall` partial
+  cards, `share_ingest` accepts `pagePreview`. Share extension
+  (`PagePreviewReader` in `ShareViewController.swift`) built the same day and
+  sent to TestFlight. **Left:** owner verifies ON DEVICE (an IG photo post, an
+  IG reel, a TikTok from the TikTok app) that each card carries the real
+  caption + handle, and that ✕ during the read still saves. Launch waits on
+  this. 1.0 (build 1382) stays in review, release is manual.
 
 1. **[x] Native auth build green (iOS)** *(code done 2026-07-03 — root cause was
    the Xcode 16 toolchain, not a dependency conflict; see §3. Workflow moved to
@@ -2731,8 +2732,20 @@ exact-match, capped.
   doc to `scrape_url(url, body, page_preview)`; IG @handle now prefers
   og:description (username) over og:title (display name: was `@Apoorva`, now
   `@nann.recipe`). Tests: `tests/test_platform_walls.py`, full suite 1973 pass.
-  **Not done:** the share extension half (§4 P0 top item) — until then IG/TikTok
-  shares are honest partial cards, not real ones. **Owner call:** keep 1.0 in
+  **Share extension half (same day):** `PagePreviewReader` loads Instagram/
+  TikTok links in a hidden `WKWebView` (non-persistent store = signed out,
+  media autoplay off, only http(s) navigations, ≤7 s), reads og tags or
+  TikTok's `__UNIVERSAL_DATA_FOR_REHYDRATION__` (mobile key
+  `webapp.reflow.video.detail`, desktop `webapp.video-detail`; a bare
+  `/@user/video/…` URL renders the caption into `[data-e2e="video-desc"]`
+  instead), sends it as `pagePreview`; a phone that also gets the IG wall sends
+  nothing. ✕ during the read uploads the bare link instead of dropping the save.
+  Verified: swiftc type-check (iOS 16.4, app-extension APIs); the exact
+  extraction script in macOS WebKit with the phone web view's UA against the
+  real links — IG photo 0.6 s, IG reel 0.6 s, TikTok `vt.` link 1.8–3.1 s, bare
+  TikTok URL 1.2–1.8 s (1 of 5 runs timed out empty). **Not verified:** on a
+  device (the share extension's memory cap, a phone's own address). Until a
+  build with this is installed, IG/TikTok shares are honest partial cards. **Owner call:** keep 1.0 in
   review (manual release), launch only with the phone-side read verified on
   device. Not verified: whether App Store Connect lets an approved-unreleased
   version swap to a new build.

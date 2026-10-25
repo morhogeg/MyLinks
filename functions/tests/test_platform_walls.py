@@ -158,3 +158,10 @@ def test_page_preview_drops_foreign_images_and_urls_and_bounds_text():
     assert "image" not in main._clean_page_preview(
         {"description": "ok caption", "image": "http://scontent.cdninstagram.com/a.jpg"},
         "https://www.instagram.com/p/X/")                                          # https only
+
+
+def test_tiktok_mobile_page_data_key_is_read():
+    # Mobile ("reflow") pages carry the post under a different key (2026-10-25).
+    html = TT_FULL.replace('"webapp.video-detail"', '"webapp.reflow.video.detail"')
+    item = scraper._tiktok_item_from_html(html)
+    assert item["author"]["uniqueId"] == "dadsfoodtoday"
