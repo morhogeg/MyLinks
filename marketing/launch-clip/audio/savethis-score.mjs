@@ -172,19 +172,23 @@ const arrange = (o) => {
   for (let k = 0; k < 5; k++) tick(t(H.phase0 + k * BEAT_FRAMES), 0.07, 1.2 + k * 0.1);
   bell(t(H.done), 88, 0.1, 0.2, 2.2);
   sub(t(H.done), 48, 0.26, 0.3);
-  // (round 4) the cut to the graph, the new save's two ties lit; (round 14)
-  // on "connects", two notes, linked, under the word
-  tick(t(H.graph), 0.08, 0.95);
-  if (!voiced(H.graph + 2, 12)) whoosh(t(H.graph) + 0.02, 0.45, 0.035, 0.15);
-  pluck(t(H.connect + 2), 76, 0.07, -0.2, 0.45);
-  pluck(t(H.connect + 6), 83, 0.06, 0.2, 0.45);
-  sub(t(H.connect), 43, 0.22, 0.3);
+  // (round 17) the card's way into the graph: a click on its ⋯ and on "See
+  // in graph"; the card lands as its dot, its two ties lit: two notes,
+  // linked, on the landing
+  tick(t(H.moreTap), 0.09, 1.1);
+  tick(t(H.graphPick), 0.1, 1.2);
+  const LANDS = H.graph + 16;
+  pluck(t(LANDS), 76, 0.07, -0.2, 0.45);
+  pluck(t(LANDS + 4), 83, 0.06, 0.2, 0.45);
+  sub(t(LANDS), 43, 0.22, 0.3);
 
   // ── (round 6) Ask: the answer streams on the band. (round 10) "Now every
-  // save is one question away": the cut from the graph to Ask opening, a
-  // light note on it, the drums out; (round 14) "So, ask it anything": the
-  // question sent on "ask", in the same shot
-  tick(t(H.knows), 0.09, 1.15);
+  // save is one question away": the graph gives way to Ask opening (round
+  // 18: a dissolve under a pull back, so air under the move, in the pause
+  // before "Now", not the click of a cut), a light note as it lands, the
+  // drums out; (round 14) "So, ask it anything": the question sent on
+  // "ask", in the same shot
+  whoosh(t(H.knows - 10), 0.42, 0.03, 0);
   pluck(t(H.knows + 1), 79, 0.05, 0, 0.5);
   sub(t(H.knows), 43, 0.2, 0.3);
   tick(t(H.asked), 0.11, 1.2);

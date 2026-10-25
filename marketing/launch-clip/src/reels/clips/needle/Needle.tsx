@@ -8,7 +8,7 @@ import { Lens } from '../../kit/Paper';
 import { INK, KineticLine } from '../../kit/Type';
 import { App } from './App';
 import { EndCard, GatherMark, signOffPaper } from './Brand';
-import { FIELD_BG, MotionField, paperAt, type FieldState } from './Field';
+import { FIELD_BG, MotionField, paperAt, type FieldState } from './FieldView';
 import { BURST, FOCAL, FRAME, READS, SEARCH_END, cameraA, cameraB, fieldA, fieldB, fieldBurst, focusA, focusB, geom, targetAt, TARGET, WARP } from './field';
 import { NEEDLE } from './variant';
 

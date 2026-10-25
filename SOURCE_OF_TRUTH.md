@@ -2769,6 +2769,107 @@ exact-match, capped.
   one core, so the README renders six frame ranges in parallel browsers
   and joins them. **Not verified:** listened to on speakers; the owner has
   not seen it. Nothing merges to `main` until the owner reviews.
+- **2026-10-23 (round 18) — SAVE THIS: a steady graph, a smooth way into
+  Ask (owner: "when the graph first appears, it's shaking and jittery";
+  "the cut to Ask chat is too sharp and sudden").** Branch
+  `claude/reel-save-this`. The shake had two causes: round 17 joined the
+  app's graph six 60fps frames in, where its layout and camera still wobble
+  as they settle (node0 swings 25pt and jumps 14pt in one frame), and the
+  reel's camera re-aimed at the three dots every frame, so it shook with
+  them. The reel now joins fifty frames in (from 24 to 48 the app also hides
+  the procrastination talk's title where it runs into the others; from 50
+  all three are titled, start to end), and the graph camera is that
+  framing eased over a gaussian window (σ 6 frames). The hard cut to Ask is
+  now a hand-off in the pause before "Now": in the main edition the graph
+  falls back into the paper (its paper still over its header) and Ask
+  opening rises out of it, settling, on a gentle curve that never empties
+  the frame; in the no-fade edition the phone screen stays put and its
+  content dissolves from the graph to Ask. The score's click on the cut is
+  now air under the move. **Verified:** gates (bans, windows, 80 words,
+  every line over the music, −14.04 LUFS, −1.26 dBTP, audio seam step 0.060
+  against the score's own 0.107); stills of both editions frame by frame
+  through the graph and the hand-off; in both encodes node0's fill tracked
+  through the graph shot (its largest frame-to-frame change of speed 2.5px
+  and 1.8px, at the tracking's noise; the round-17 model had it swinging
+  ~100px back and forth as it appeared), the per-frame picture change
+  across the old cut spread over ~12 frames, no one-frame flashes, 882
+  frames, 29.4s, −13.9 LUFS, −1.3 dBTP. **Not verified:** listened to; seen
+  on a phone.
+- **2026-10-22 (round 17) — SAVE THIS: clean caption changes, the card's
+  own way into the graph, the save cited as an X post, and a no-fade
+  edition (owner: the 0:05 caption "breaking apart reads like a rendering
+  bug"; "0:13 feed to graph is a hard cut… add a visible step… the card
+  shrinking into its node"; "Machina has no Instagram account yet"; "keep a
+  version without the fade, it looks more like the real app").** Branch
+  `claude/reel-save-this`. The captions' mask roll (lines sliced as they
+  rose) is gone: each line fades up as it is said and the line before is
+  gone first (kit `KineticLine clean`). The take now goes the card's own
+  way: its ⋯ on "topic", the app's actions sheet, "See in graph" pressed on
+  "connects"; the sheet goes at once, as in the app, and the card lifts off
+  the feed and shrinks into its own dot, taking the dot's orange, as the
+  graph opens under it, ties lit; the dot pings as it lands (a tick on
+  each press, two notes and a sub on the landing). The shrink is the reel's
+  move on the card's own pixels; in the app the graph fades in. The reel's
+  own save is now an X post from @machinaapp (`x.com/machinaapp`), on the
+  card and in Ask's citation. `MachinaSaveThisNoFade`
+  (`final_reel_nofade.mp4`) is the same reel, sound and timing with no
+  paper over the screens' edges: every screen whose top is in frame hangs
+  under the captions, status bar in view (the card, graph and proof framed
+  wider; the graph opens in the very screen the feed leaves); where the
+  pill's close framing runs the app up under the type, each caption line
+  sits on a paper pill. **Verified:** gates (bans, windows, 80 words, every
+  line 11.1 to 21.7dB over the music, −14.03 LUFS, −1.25 dBTP, audio seam
+  step 0.022 against the score's own 0.107); the changed spans frame by
+  frame in stills and in both encodes; every frame pair scanned for
+  one-frame flashes (none, either edition); both encodes 882 frames, 29.4s,
+  −13.9 LUFS, −1.3 dBTP. **Not verified:** listened to; seen on a phone.
+- **2026-10-22 (round 16) — SAVE THIS: the hook reordered, at its own pace
+  (owner: "is 'a million saves you never opened' good enough?"; "the pacing
+  of that part is too fast and not clear"; the script reviewed for clarity
+  and benefits, and the hook agreed in chat before building).** Branch
+  `claude/reel-save-this`. The opening now reads "You're going to save this
+  video. Right down there, buried with everything else you saved, and never
+  watch it again. Unless you save it to Machina." ("Unless" answers "never
+  watch it again"; the owner's order, without a "forgot" that said the same
+  thing twice). The middle line is the plainer of two reads at its natural
+  pace (3.08s, a beat after "there," and after "buried"); "and never watch
+  it again" keeps its take (`tts` keeps the key, the caption continues the
+  sentence in lowercase). The hook takes two beats more and everything from
+  the gather on follows (29.4s); the dive into the pile slows with it (its
+  largest frame step 20.0 to 15.9). The other ten lines were reviewed and
+  kept: they read naturally and carry the benefits in order (any app;
+  understood and summed up; filed by topic; connected; asked; answered
+  with sources). **Verified:** gates (bans, windows, 80 words, every line
+  11.4 to 21.8dB over the music, −14.02 LUFS, −1.26 dBTP, audio seam step
+  0.039 against the score's own 0.104); the hook every fifth frame, the
+  rest every fourteenth; every frame pair scanned for one-frame flashes
+  (none); the encode (882 frames, 29.4s, −13.9 LUFS, −1.3 dBTP). **Not
+  verified:** listened to. Then (owner: the last caption did not follow the
+  voice) "This time, / you'll watch it again." breaks on the narrator's
+  pause, so "you'll" no longer shows during it; the other captions already
+  broke at their pauses. The last 102 frames re-rendered and spliced (56dB
+  PSNR to the master where unchanged).
+- **2026-10-22 (round 15) — SAVE THIS: "with a million saves you never
+  opened", Ask opening held still (owner: "'with your saves from countless
+  apps' is not clear enough; something along the lines of with the other
+  million saves you never opened again"; "the Machina logo and the Ask word
+  in the Ask frames are jittery and clunky").** Branch
+  `claude/reel-save-this`. The heap line is "Right down there, with a
+  million saves you never opened." (the timeline's read, one breath, 6%
+  quicker; "a million" on the frame the save hits the heap; "Unless" a frame
+  later; no cut moved; 81 words, verify's ceiling one higher for it). The
+  jitter was the reel's: round 14 played Ask's opening frames, which
+  cross-fade Home's header into Ask's and launch the mark mid-way, and
+  stepped the camera with the take's 12pt layout shift (the composer losing
+  and regaining a line as the question is typed), which held the screen's
+  middle still but jumped its header ~30px twice. Ask opening now holds the
+  take's last frame before the send (the screen settled, mark whole) under
+  the slow push; measured frame to frame, the header moves at most 0.15px
+  and the mark 0.03px. **Verified:** gates (bans, windows, every line 12.9
+  to 18.4dB over the music, −14.05 LUFS, −1.25 dBTP, audio seam step 0.014
+  against the score's own 0.105); the heap and Ask shots frame by frame;
+  every frame pair scanned for one-frame flashes (none); the encode (854
+  frames, 28.47s, −14.0 LUFS, −1.3 dBTP). **Not verified:** listened to.
 - **2026-10-22 (round 14) — SAVE THIS: one graph shot, the whole Ask mark,
   one Ask shot, "with your saves from countless apps" (owner: "graph: show
   just the 2nd one, a bit longer; the jump from the first graph to the

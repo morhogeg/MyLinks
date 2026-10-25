@@ -968,22 +968,22 @@ const takes = {
       await page.locator('[role=dialog]').getByText(name, { exact: true }).first().waitFor({ timeout: 10000 });
       await page.waitForTimeout(500);
     };
-    await t.thaw();
-    await viewTo('Graph');
-    await t.freeze();
-    await page.locator('[role=dialog]').getByText('Graph', { exact: true }).first().click();
+    // (owner, round 17: the hard cut from the feed to the graph did not show
+    // how you get there) the way in, on camera, from the card itself: its ⋯,
+    // the actions sheet rising, "See in graph", and the app's graph opening
+    // focused on it, its ties to the saves before it lit (the app's own
+    // card-to-graph route; no tap on its dot needed)
+    const CARD = page.locator('main article.surface-card', { hasText: S.title });
+    const SHEET = { ...RECTS, more: ['main article.surface-card button[aria-label="Actions"]'], sheet: ['[role=menu]'], seeInGraph: ['[role=menuitem]', 'See in graph'] };
+    await t.snap({ rects: SHEET });
+    t.mark('moreTap');
+    await visible(CARD.locator('button[aria-label="Actions"]')).click();
+    await t.roll(36, { rects: SHEET, step: 1000 / 60 });
+    t.mark('graphPick');
+    await page.getByText('See in graph', { exact: true }).first().click();
     t.mark('graph');
-    await rollGraph(44);
-    // the thumb on the new save's dot: ego focus. Pressed as a pointer the
-    // canvas captures (a touch tap's follow-up click lands on whatever slid
-    // in under the finger: the focus panel's "Ask about these")
-    const me = await page.evaluate((ids) => window.__graphRects(ids).node0, GRAPH_IDS);
-    if (!me) throw new Error('savethisClip: the new save is not on the graph');
-    await page.mouse.move(me.x + me.w / 2, me.y + me.h / 2);
-    await page.mouse.down();
-    await page.mouse.up();
-    t.mark('graphTap');
-    await rollGraph(120);
+    await rollGraph(160);
+    if (!t.frames.at(-1).rects.node0) throw new Error('savethisClip: the new save is not on the graph');
     // back to the feed (not shown: the reel cuts to three weeks later)
     await t.thaw();
     await page.mouse.move(380, 120);

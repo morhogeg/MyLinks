@@ -8,7 +8,7 @@ import { CLOCK } from '../../kit/camera';
 import { EASE_IN_OUT, prog } from '../../kit/curves';
 import { Lens, Paper } from '../../kit/Paper';
 import { GRADE } from './grade';
-import { App, MARK_TO, PROOF_LINE } from './App';
+import { App, HANDOFF, PROOF_LINE, graphPaperLeft, markToFor, screenTopAt } from './App';
 import { EndCard } from './EndCard';
 import { Opening } from './Opening';
 import { POSTER } from './Poster';
@@ -31,20 +31,30 @@ export const SaveThis: React.FC<{
   withAudio?: boolean;
   withCaptions?: boolean;
   audioFile?: string;
-}> = ({ withAudio = true, withCaptions = true, audioFile = 'clips/savethis/score-vo.wav' }) => {
+  /** (owner, round 17) false: no paper fades over the app screens' edges
+   *  (MachinaSaveThisNoFade): the screens framed under the band instead,
+   *  their status bars in view (App.tsx), and where one still runs up under
+   *  the type, the captions on paper pills */
+  fades?: boolean;
+}> = ({ withAudio = true, withCaptions = true, audioFile = 'clips/savethis/score-vo.wav', fades = true }) => {
   const f = useCurrentFrame();
   // the reel runs on output frames: motion blur measures one frame
   CLOCK.perFrame = 1;
   const drift = paperDriftAt(f);
   // type never sits on UI or on the well: the paper rises behind the band
   // while either is up (to the end: under the last line it is paper on paper)
-  const scrim = prog(f, HITS.drop + 2, HITS.drop + 12, EASE_IN_OUT);
+  // (round 17) with no fades, only until the app opens: its screens hang
+  // under the band
+  const scrim = prog(f, HITS.drop + 2, HITS.drop + 12, EASE_IN_OUT) * (fades ? 1 : 1 - prog(f, HITS.iris, HITS.iris + 12, EASE_IN_OUT));
+  // …and where one runs up under the type (the pill, framed close), the
+  // captions take their pills, in as the screen's top passes under the band
+  const plate = fades || f < HITS.iris || f >= HITS.tagline - 6 ? 0 : 1 - prog(screenTopAt(f, false), 380, 480, EASE_IN_OUT);
   return (
     <AbsoluteFill style={{ fontFamily: sans }}>
       {withAudio && <Audio src={staticFile(audioFile)} />}
       <Paper drift={drift} tone={GRADE.tone} cool={GRADE.cool} />
-      <App f={f} />
-      <Opening f={f} markTo={MARK_TO} paperDrift={drift} />
+      <App f={f} fades={fades} />
+      <Opening f={f} markTo={markToFor(fades)} paperDrift={drift} />
       {/* the thumb on the poster's bookmark, on "save" */}
       <div style={{ position: 'absolute', left: 0, top: 0, width: 1080, height: 1920 }}>
         <Tap x={POSTER.bookmark.x} y={POSTER.bookmark.y + 18} t={prog(f, HITS.tapSave - 10, HITS.tapSave + 18, (t) => t)} size={120} />
@@ -52,10 +62,13 @@ export const SaveThis: React.FC<{
       <BandScrim opacity={scrim} tone={GRADE.tone} />
       {/* (round 4) on the lit ties, the paper rises further, over the
           graph's own header and legend */}
-      {f >= HITS.graph && f < HITS.knows && (
+      {fades && f >= HITS.graph - 3 && f < HANDOFF.to && (
         <AbsoluteFill
           style={{
             pointerEvents: 'none',
+            // (round 17) up just ahead of the graph, as the feed gives way to
+            // it; (round 18) down once the graph has gone into the paper
+            opacity: prog(f, HITS.graph - 3, HITS.graph, EASE_IN_OUT) * graphPaperLeft(f),
             background: `linear-gradient(180deg, ${GRADE.tone} 0px, ${GRADE.tone} 700px, ${clearOf(GRADE.tone)} 930px)`,
           }}
         />
@@ -63,17 +76,18 @@ export const SaveThis: React.FC<{
       {/* (round 11) under the graph, paper over the frame's foot (Instagram's
           caption zone, well below the dots): the app's tab bar rides just
           under the edge, and its focus panel slides up as the thumb taps */}
-      {f >= HITS.graph && f < HITS.knows && (
+      {fades && f >= HITS.graph - 3 && f < HANDOFF.to && (
         <AbsoluteFill
           style={{
             pointerEvents: 'none',
+            opacity: prog(f, HITS.graph - 3, HITS.graph, EASE_IN_OUT) * graphPaperLeft(f),
             background: `linear-gradient(0deg, ${GRADE.tone} 0px, ${GRADE.tone} 320px, ${clearOf(GRADE.tone)} 375px)`,
           }}
         />
       )}
       {/* (round 7) on the proof, the paper rises over the question bubble
           (the camera is down on the answer and its citations) */}
-      {f >= HITS.proof && f < HITS.tagline + 4 && (
+      {fades && f >= HITS.proof && f < HITS.tagline + 4 && (
         <AbsoluteFill
           style={{
             pointerEvents: 'none',
@@ -93,6 +107,8 @@ export const SaveThis: React.FC<{
         kickers={KICKERS as ReelKicker[]}
         showCaptions={withCaptions}
         showKickers={withCaptions}
+        clean
+        plate={fades ? undefined : { tone: GRADE.tone, alpha: plate }}
       />
       <Lens vignette={GRADE.vignette} grain={GRADE.grain} />
     </AbsoluteFill>

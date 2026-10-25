@@ -44,44 +44,51 @@ export const onBeat = (f) => Math.round(f / BEAT_FRAMES) * BEAT_FRAMES;
  */
 export const HITS = {
   tapSave: beat(2), // the thumb fills the bookmark on "save"
-  drop: beat(4), // "And never watch it again": it tips, and falls
-  land: beat(9), // it lands on the heap, in the beat after "there,"
-  gather: beat(12), // "Unless…": the heap rushes up into one point
-  markStrike: beat(15), // the brackets close on it, on "Machina"
-  iris: beat(16), // the point opens into the app
-  phase0: beat(17), // the real pipeline, a phase a beat…
-  done: beat(22), // …and the card, read
+  // (owner, round 16) the hook reordered and given two beats more: the line
+  // under the fall read at its own easy pace
+  drop: beat(4), // "Right down there,": the floor opens under it, and it falls
+  land: beat(9), // it lands on the heap, as it is "buried with everything else you saved"
+  gather: beat(14), // "Unless…": the heap rushes up into one point
+  markStrike: beat(17), // the brackets close on it, on "Machina"
+  iris: beat(18), // the point opens into the app
+  phase0: beat(19), // the real pipeline, a phase a beat…
+  done: beat(24), // …and the card, read
   // (owner, round 14: the cut from the whole graph to the three was too
-  // much) only the three: the new save and its ties to two older saves, lit
-  graph: beat(26), // "…by topic,": CUT to the graph, the new save's ties lit
-  connect: beat(27), // "…connects it to what you've saved before"
+  // much) only the three: the new save and its ties to two older saves, lit;
+  // (owner, round 17: the hard cut did not show how you get there) the
+  // card's own way in: its ⋯, its actions sheet's "See in graph", and the
+  // card shrinking into its dot as the app's graph opens on it
+  moreTap: beat(27.5), // "…topic,": the thumb on the card's ⋯, its actions sheet rising
+  graphPick: beat(29), // "See in graph", pressed on "connects"
+  graph: beat(29) + 4, // the sheet gone, the card shrinks into its dot as the graph opens on it, its ties lit
+  connect: beat(29), // "…connects it to what you've saved before"
   // (rounds 10, 11) the bridge: what all that reading adds up to, over
   // Ask's own opening screen, its suggestions questions about the saves
   // (owner, round 12: the graph a half second longer; round 13: a bit
   // less) half a beat more of it than round 11
-  knows: beat(31.5), // "Now every save…": CUT from the graph to Ask
+  knows: beat(33.5), // "Now every save…": CUT from the graph to Ask
   // (round 9) Ask, the solution's last word, each part on its own word;
   // (round 12) "So," said over Ask opening; (owner, round 14: no cut to the
   // composer and back) one shot: on "ask" the question is sent and Ask's
   // chat takes the opening's place, the answer streaming in
-  asked: beat(38), // "…ask": the question, sent; "and get the answer": it streams
-  proof: 603, // "with the proof": the saves it came from, cited, then each pinged in turn
+  asked: beat(40), // "…ask": the question, sent; "and get the answer": it streams
+  proof: 631, // "with the proof": the saves it came from, cited, then each pinged in turn
   // (owner, round 12: not the Ask chat under the tagline) the brand card;
   // (owner, round 13) the proof held half a second longer before it, after
   // its pings
-  tagline: beat(48), // "Machina. Everything you save, finally useful.": the app's own mark draws in
+  tagline: beat(50), // "Machina. Everything you save, finally useful.": the app's own mark draws in
   // (owner, round 13: the last frame is the logo, not the poster) the
   // promise over the logo, which holds to the loop
-  watch: beat(56), // "This time, you'll watch it again."
+  watch: beat(58), // "This time, you'll watch it again."
 };
 
 /** a whole beat, so the score's pulse runs straight through the loop */
-export const TOTAL_FRAMES = beat(61);
+export const TOTAL_FRAMES = beat(63);
 
 /** (owner, round 13) the three citations' highlights, an 8th apart from the
  *  beat after "proof" is said: as the camera settles on them, clear of the
  *  voice and of the music's duck under it (the score pings each) */
-export const CITE_PINGS = [0, 1, 2].map((k) => beat(44) + 7 * k);
+export const CITE_PINGS = [0, 1, 2].map((k) => beat(46) + 7 * k);
 
 /** (round 12) the sign-off's mark: the app's launch, a touch quicker than its
  *  39 frames, from just before the name; its point strikes at 0.56 of it */
@@ -115,22 +122,23 @@ const PACE = 'Brisk, playful and conversational, about 175 words a minute; pause
 export const CAPTIONS = [
   // the hook: the poster's own type, on screen from frame 0
   { at: 5, to: 54, place: 'scene', text: 'You’re going to\nsave this video.', duck: 0.4, style: 'A friendly, knowing call-out, half teasing, as if catching a friend in the act. Quick and light, one breath, no pause inside the line.', pace: PACE },
-  { at: 54, to: 99, text: 'And never\nwatch it again.', duck: 0.45, style: 'Wry and lightly amused, a little deadpan; landing low and certain on "again".', pace: PACE },
-  // (owner, round 14: "with all the others" said nothing; round 15: "with
-  // your saves from countless apps" not clear enough, "something along the
-  // lines of with the other million saves you never opened again") where
-  // every save goes: unopened, like the hook's "never watch it again"
-  { at: 99, to: 166, tempo: 1.06, text: 'Right down there,\nwith a million saves\nyou never opened.', style: 'Amused and quick, a wry aside, pointing down into a deep hole, then a knowing nod at the pile; light, one easy breath, no drawn-out words.', pace: PACE },
+  // (owner, round 16: the hook reordered, "Unless" answering "never watch it
+  // again"; "buried with everything else you saved" for round 15's "a
+  // million saves you never opened") one sentence with an aside: the floor
+  // opens on "Right down there", it lands "buried", the pile under "and
+  // never watch it again", "Unless" with the colour
+  { at: 54, to: 149, text: 'Right down there,\nburied with everything else you saved,', style: 'Wry and warm, pointing down into a deep hole, then letting it land: "buried with everything else you saved" said plainly, the sentence carrying on; no drawn-out words.', pace: 'Easy and conversational, about 160 words a minute; one short beat after "there,", no rush.' },
+  { at: 150, to: 194, text: 'and never\nwatch it again.', tts: 'And never watch it again.', duck: 0.45, style: 'Wry and lightly amused, a little deadpan; landing low and certain on "again".', pace: PACE },
   // (owner, round 2: no full stop after the name on screen; the voice keeps its take)
-  { at: 167, to: 236, text: 'Unless you save it\nto Machina', tts: 'Unless you save it to Machina.', duck: 0.4, style: 'The turn: bright, warm and confident, a little conspiratorial; the name lands with a smile.', pace: PACE },
-  { at: 238, to: 302, text: 'It reads every save,\nfrom any app,', style: 'Clear and easy, genuinely pleased; flowing straight on, the sentence is not finished.', pace: PACE },
+  { at: 195, to: 264, text: 'Unless you save it\nto Machina', tts: 'Unless you save it to Machina.', duck: 0.4, style: 'The turn: bright, warm and confident, a little conspiratorial; the name lands with a smile.', pace: PACE },
+  { at: 266, to: 330, text: 'It reads every save,\nfrom any app,', style: 'Clear and easy, genuinely pleased; flowing straight on, the sentence is not finished.', pace: PACE },
   // (owner, round 3: "reads" alone undersold it) what the read IS, over the
   // finished card, each named part lifting on its word
-  { at: 304, to: 370, text: 'understands it, sums it up,\nfiles it by topic,', style: 'Brisk and pleased, rattling off the list with a smile; light, no drawn-out words, the sentence carries on.', pace: PACE },
+  { at: 332, to: 398, text: 'understands it, sums it up,\nfiles it by topic,', style: 'Brisk and pleased, rattling off the list with a smile; light, no drawn-out words, the sentence carries on.', pace: PACE },
   // (owner, round 2: "remembers what's in it" was not a strong enough
   // benefit; round 4: show the graph, not the Related cards list) the app's
   // graph: the thumb taps the new save's dot and its ties to older saves light
-  { at: 372, to: 432, text: 'and connects it to\nwhat you’ve saved before.', style: 'Clear and genuinely pleased, flowing on from the line before; a little lift on "connects", landing warmly on "saved before".', pace: PACE },
+  { at: 400, to: 460, text: 'and connects it to\nwhat you’ve saved before.', style: 'Clear and genuinely pleased, flowing on from the line before; a little lift on "connects", landing warmly on "saved before".', pace: PACE },
   // (owner, round 10: "So ask it anything" came too abruptly) the bridge,
   // what the reading adds up to, said as the solution, not the problem
   // again (round 9); (owner, round 11: "better than you do" read as
@@ -150,7 +158,7 @@ export const CAPTIONS = [
   // over the logo, which holds to the loop (owner, round 13). (owner, round
   // 4: "See? You're watching it again." read as a riddle) The hook's "never
   // watch it again", answered as a promise
-  { at: HITS.watch, to: TOTAL_FRAMES + 6, text: 'This time, you’ll\nwatch it again.', duck: 0.4, style: 'Warm and sure, a small smile in the voice: a promise, not a punchline. Light and quick, a short breath after "This time", landing softly on "again".', pace: PACE },
+  { at: HITS.watch, to: TOTAL_FRAMES + 6, text: 'This time,\nyou’ll watch it again.', duck: 0.4, style: 'Warm and sure, a small smile in the voice: a promise, not a punchline. Light and quick, a short breath after "This time", landing softly on "again".', pace: PACE },
 ];
 
 /** a small letterspaced label above the line, with it (the kit's Kicker) */

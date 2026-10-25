@@ -54,7 +54,18 @@ export const KineticLine: React.FC<{
   tracking?: string;
   /** 0–1: an ink line struck through the text, drawn line by line ("no more") */
   strike?: number;
-}> = ({ text, frame, from, to, starts, size = 64, sizes, width = 940, align = 'center', color = INK, weight = 600, font = sans, tracking = '-0.028em', strike = 0 }) => {
+  /** (SAVE THIS, round 17: the mask roll's sliced letters read as a
+   *  rendering bug on a phone) no mask: each line fades up into place, the
+   *  whole line fades out over its last frames, nothing is ever cut */
+  clean?: boolean;
+  /** with `clean`: the frame the previous line is gone by; this one never
+   *  shows before it, so two lines never share the band */
+  enterAt?: number;
+  /** with `clean`: each line on a pill of this tone (at `alpha`), for type
+   *  set over UI with no paper band under it */
+  plate?: Plate;
+}> = ({ text, frame, from, to, starts, size = 64, sizes, width = 940, align = 'center', color = INK, weight = 600, font = sans, tracking = '-0.028em', strike = 0, clean = false, enterAt, plate }) => {
+  if (clean) return <CleanLine {...{ text, frame, from, to, starts, size, sizes, width, align, color, weight, font, tracking, enterAt, plate }} />;
   // (2026-10-04, owner: the word-by-word blur reveal read "dated and laggy";
   // the full captions stay, in the Headline motion) each LINE rises out of
   // its own mask in one decisive move (HEAD_IN frames, ease-out quint, no
@@ -169,6 +180,83 @@ export const Kicker: React.FC<{ text: string; frame: number; from: number; to: n
           );
         })}
       </div>
+    </div>
+  );
+};
+
+/** frames a clean line takes to fade up into place, and to fade out */
+const CLEAN_IN = 6;
+const CLEAN_OUT = 3;
+
+/** a clean line's pill: a #RRGGBB tone, and how much of it is up (0–1) */
+export type Plate = { tone: string; alpha: number };
+const rgba = (hex: string, a: number) =>
+  `rgba(${parseInt(hex.slice(1, 3), 16)},${parseInt(hex.slice(3, 5), 16)},${parseInt(hex.slice(5, 7), 16)},${a.toFixed(3)})`;
+
+const CleanLine: React.FC<{
+  text: string;
+  frame: number;
+  from: number;
+  to: number;
+  starts?: number[];
+  size: number;
+  sizes?: number[];
+  width: number;
+  align: 'center' | 'left';
+  color: string;
+  weight: number;
+  font: string;
+  tracking: string;
+  enterAt?: number;
+  plate?: Plate;
+}> = ({ text, frame, from, to, starts, size, sizes, width, align, color, weight, font, tracking, enterAt, plate }) => {
+  if (frame > to) return null;
+  // the pills (one a line, as Instagram sets type on a background) grow out
+  // of the line's own padding, so the type sits exactly where it does bare
+  const p = plate && plate.alpha > 0.002 ? plate : undefined;
+  const lines = text.split('\n').map((l) => l.split(' ').filter(Boolean));
+  const out = 1 - EASE_IN_OUT(Math.min(1, Math.max(0, (frame - (to - CLEAN_OUT)) / CLEAN_OUT)));
+  let w = -1;
+  return (
+    <div
+      style={{
+        width,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: align === 'center' ? 'center' : 'flex-start',
+        gap: 2,
+        // one shadow under the pills together
+        filter: p ? `drop-shadow(0 8px 18px rgba(16,24,40,${(0.16 * p.alpha).toFixed(3)}))` : undefined,
+      }}
+    >
+      {lines.map((words, li) => {
+        const firstWord = w + 1;
+        w += words.length;
+        const at = Math.max(from + (starts?.[firstWord] ?? li * HEAD_STAGGER) - HEAD_LEAD, enterAt ?? -Infinity);
+        const tin = OUT_QUINT(Math.min(1, Math.max(0, (frame - at + 1) / CLEAN_IN)));
+        return (
+          <div
+            key={li}
+            style={{
+              opacity: tin * out,
+              transform: `translateY(${Math.round((1 - tin) * 12)}px)`,
+              fontFamily: font,
+              fontSize: sizes?.[li] ?? size,
+              fontWeight: weight,
+              lineHeight: 1.12,
+              letterSpacing: tracking,
+              color,
+              textAlign: align,
+              padding: p ? '0.12em 0.4em 0.18em' : '0.06em 0.1em 0.14em',
+              margin: p ? '-0.12em 0 -0.18em' : '-0.06em 0 -0.14em',
+              borderRadius: p ? '0.36em' : undefined,
+              background: p ? rgba(p.tone, p.alpha) : undefined,
+            }}
+          >
+            {words.join(' ')}
+          </div>
+        );
+      })}
     </div>
   );
 };

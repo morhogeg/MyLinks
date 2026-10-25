@@ -591,8 +591,10 @@ export const SYNTHESIS = {
 };
 
 /**
- * SAVE THIS (clips/savethis-timeline.mjs): the reel's own Instagram post,
- * saved from the share sheet, as the app would file it. Its cover is the
+ * SAVE THIS (clips/savethis-timeline.mjs): the reel's own post, saved from
+ * the share sheet, as the app would file it. (owner, round 17: Machina has
+ * no Instagram account yet, so the save is the post on X, from the brand's
+ * real `@machinaapp`, not a reel from an account that does not exist.) Its cover is the
  * reel's frame 0 (public/clips/savethis/cover.jpg, served to the capture),
  * so the card reads as the video the viewer is watching. The summary is what
  * the post says, in the app's voice; its words "never", "watch" and "again"
@@ -601,7 +603,7 @@ export const SYNTHESIS = {
  */
 export const SAVETHIS = {
   id: 'savethis',
-  url: 'https://www.instagram.com/machinaapp/',
+  url: 'https://x.com/machinaapp',
   title: 'You’re going to save this video',
   summary:
     'Most saved posts never get watched again. This one follows a save into Machina, which reads it and finds it again from whatever you remember.',
@@ -634,7 +636,7 @@ export const SAVETHIS = {
   ask: {
     question: 'What connects my 3 saves about procrastination?',
     answer:
-      'All three agree: what has no deadline quietly never happens. Tim Urban’s talk shows why, Four Thousand Weeks says to choose what to neglect, and one reel puts it plainly: most saved posts never get watched again.',
+      'All three agree: what has no deadline quietly never happens. Tim Urban’s talk shows why, Four Thousand Weeks says to choose what to neglect, and one video puts it plainly: most saved posts never get watched again.',
     sources: ['procrastinator', 'fourthousand', 'savethis'],
   },
   /**
