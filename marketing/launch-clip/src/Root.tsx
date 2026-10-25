@@ -13,6 +13,8 @@ import * as NEEDLE from '../clips/needle-timeline.mjs';
 import { Needle } from './reels/clips/needle/Needle';
 import * as REVISIT from '../clips/revisit-timeline.mjs';
 import { Revisit } from './reels/clips/revisit/Revisit';
+import { Signature } from './reels/kit/Signature';
+import { SIGNATURE } from './reels/kit/signature.mjs';
 
 /**
  * Compositions:
@@ -234,6 +236,16 @@ export const RemotionRoot: React.FC = () => (
       fps={SAVETHIS.FPS}
       width={SAVETHIS.WIDTH}
       height={SAVETHIS.HEIGHT}
+    />
+    {/* THE SIGNATURE (kit/Signature.tsx): the shared ending, alone; the
+        reference every new video's last frames are checked against */}
+    <Composition
+      id="MachinaSignature"
+      component={() => <Signature from={0} withAudio />}
+      durationInFrames={SIGNATURE.frames}
+      fps={SIGNATURE.fps}
+      width={1080}
+      height={1920}
     />
   </>
 );
