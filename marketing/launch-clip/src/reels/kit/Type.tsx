@@ -50,6 +50,9 @@ export const KineticLine: React.FC<{
   align?: 'center' | 'left';
   color?: string;
   weight?: number;
+  /** a weight per line (else `weight`): a punchline set a touch heavier
+   *  than the lines above it (POV round 3: "Finding it again is.") */
+  weights?: number[];
   font?: string;
   tracking?: string;
   /** 0–1: an ink line struck through the text, drawn line by line ("no more") */
@@ -64,8 +67,8 @@ export const KineticLine: React.FC<{
   /** with `clean`: each line on a pill of this tone (at `alpha`), for type
    *  set over UI with no paper band under it */
   plate?: Plate;
-}> = ({ text, frame, from, to, starts, size = 64, sizes, width = 940, align = 'center', color = INK, weight = 600, font = sans, tracking = '-0.028em', strike = 0, clean = false, enterAt, plate }) => {
-  if (clean) return <CleanLine {...{ text, frame, from, to, starts, size, sizes, width, align, color, weight, font, tracking, enterAt, plate }} />;
+}> = ({ text, frame, from, to, starts, size = 64, sizes, width = 940, align = 'center', color = INK, weight = 600, font = sans, tracking = '-0.028em', strike = 0, clean = false, enterAt, plate, weights }) => {
+  if (clean) return <CleanLine {...{ text, frame, from, to, starts, size, sizes, width, align, color, weight, weights, font, tracking, enterAt, plate }} />;
   // (2026-10-04, owner: the word-by-word blur reveal read "dated and laggy";
   // the full captions stay, in the Headline motion) each LINE rises out of
   // its own mask in one decisive move (HEAD_IN frames, ease-out quint, no
@@ -95,7 +98,7 @@ export const KineticLine: React.FC<{
                 transform: `translateY(${Math.round(y)}%)`,
                 fontFamily: font,
                 fontSize: sizes?.[li] ?? size,
-                fontWeight: weight,
+                fontWeight: weights?.[li] ?? weight,
                 lineHeight: 1.12,
                 letterSpacing: tracking,
                 color,
@@ -205,11 +208,12 @@ const CleanLine: React.FC<{
   align: 'center' | 'left';
   color: string;
   weight: number;
+  weights?: number[];
   font: string;
   tracking: string;
   enterAt?: number;
   plate?: Plate;
-}> = ({ text, frame, from, to, starts, size, sizes, width, align, color, weight, font, tracking, enterAt, plate }) => {
+}> = ({ text, frame, from, to, starts, size, sizes, width, align, color, weight, weights, font, tracking, enterAt, plate }) => {
   if (frame > to) return null;
   // the pills (one a line, as Instagram sets type on a background) grow out
   // of the line's own padding, so the type sits exactly where it does bare
@@ -242,7 +246,7 @@ const CleanLine: React.FC<{
               transform: `translateY(${Math.round((1 - tin) * 12)}px)`,
               fontFamily: font,
               fontSize: sizes?.[li] ?? size,
-              fontWeight: weight,
+              fontWeight: weights?.[li] ?? weight,
               lineHeight: 1.12,
               letterSpacing: tracking,
               color,

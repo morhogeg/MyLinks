@@ -63,15 +63,29 @@ export const HITS = {
   search: beat(24), // CUT: back to the search bar
   type: beat(24.5), // "that Lisbon café", typed
   none1: beat(26.5), // "No results"
-  scroll: beat(28), // "You scroll.": a desperate scroll through the grid…
-  freeze: beat(29.5), // …that stops dead
-  none2: beat(30), // "No results", again
+  // the sound design's marks under the montage, kept at round 1's values so
+  // the score and its effects stay byte-identical (round 3, owner: keep the
+  // music and the effects): the scroll's tick flurry, its stop, a soft low
+  // note. The picture's montage is MONTAGE below.
+  scroll: beat(28), // the tick flurry starts ("You scroll.")
+  freeze: beat(29.5), // …and stops
+  none2: beat(30), // a soft low note
   drift: beat(32), // the turn: every place drifts apart and bleaches out
   white: beat(40), // only paper is left
   gather: beat(41.6), // the saves rush back from every side…
   point: beat(49), // …into one point of ink
   signature: SIGNATURE_AT, // beat 50: the point becomes the logo
 };
+
+/**
+ * (round 3, owner) Between the two "No results": a frantic but READABLE
+ * swipe through every place again, Instagram, TikTok, the screenshots, the
+ * chat, each on screen 13 frames (0.43s), each arriving on a thrown swipe
+ * up (5 frames, motion-blurred) instead of a hard cut. Its time came from
+ * the first "No results" hold (0.73s → 0.4s); nothing from 0:16 on moved.
+ * The search swipes back in at `again`, on the spoken "nothing.".
+ */
+export const MONTAGE = { from: 410, scene: 13, swipe: 5, again: 462 };
 
 /** the lost save, typed into the search */
 export const QUERY = 'that Lisbon café';
@@ -99,8 +113,13 @@ export const CAPTIONS = [
   { at: 96, to: 174, cues: [0, 4], text: 'Instagram?\nTikTok?', say: 'Was it on Instagram? TikTok?', style: 'Quick and searching, half to yourself: "Was it on Instagram?" a real question, "TikTok?" quicker, already doubting.', pace: QUICK },
   { at: 186, to: 264, cues: [0], text: 'Your screenshots?', say: 'Buried somewhere in your screenshots?', style: 'Wry, a little amused at the mess: "Buried somewhere" with a knowing lilt, "in your screenshots?" landing lightly.', pace: QUICK },
   { at: 276, to: 354, cues: [0, 3], text: 'That chat\nwith yourself?', say: 'Or that chat where you send yourself links?', style: 'Warm and teasing, the friend who does this too: a fond eye-roll on "send yourself links".', pace: QUICK },
-  { at: 372, to: 476, cues: [1], text: 'Nothing.', say: 'You search. Nothing. You scroll. Still nothing.', style: 'Deflating, dry and wry: "You search." quick, "Nothing." flat and small; "You scroll." quick again, "Still nothing." flatter, a tiny sigh in it. Short gaps, nothing dramatic.', pace: QUICK },
-  { at: 486, to: 622, cues: [0, 3], text: 'Saving was never\nthe hard part.', say: 'Saving was never the hard part. Finding it again is.', style: 'The turn: slow down, warm and sincere, close to the listener, the friend who has figured it out; "Finding it again is." quietly, with weight on "Finding".', pace: SLOW },
+  // (round 3, owner) on the spoken "Still" the screen line rolls over to
+  // "Still nothing." (`then`: screen only, the take is unchanged)
+  { at: 372, to: 476, cues: [1], then: { text: 'Still nothing.', cue: 5 }, text: 'Nothing.', say: 'You search. Nothing. You scroll. Still nothing.', style: 'Deflating, dry and wry: "You search." quick, "Nothing." flat and small; "You scroll." quick again, "Still nothing." flatter, a tiny sigh in it. Short gaps, nothing dramatic.', pace: QUICK },
+  // (round 3, owner) the punchline gets its own line, on its word, a touch
+  // heavier (`punch`: the line set heavier); three lines, the one caption
+  // allowed past the house band's two
+  { at: 486, to: 622, cues: [0, 3, 6], punch: 2, text: 'Saving was never\nthe hard part.\nFinding it again is.', say: 'Saving was never the hard part. Finding it again is.', style: 'The turn: slow down, warm and sincere, close to the listener, the friend who has figured it out; "Finding it again is." quietly, with weight on "Finding".', pace: SLOW },
   { at: 624, to: 752, cues: [3, 6], text: 'One place.\nEvery save. Any app.', say: 'So we’re building one place for everything you save, from any app.', style: 'Bright and warm, quietly excited, letting the listener in on it; "one place" lifted a little, "from any app" landing with a smile.', pace: QUICK },
 ];
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { AbsoluteFill, Audio, random, staticFile, useCurrentFrame } from 'remotion';
-import { CAPTIONS, ENDINGS, FPS, HITS, QUERY, SIGNATURE_AT } from '../../../../clips/pov-timeline.mjs';
+import { CAPTIONS, ENDINGS, FPS, HITS, MONTAGE, QUERY, SIGNATURE_AT } from '../../../../clips/pov-timeline.mjs';
 import { SaveChip, type SaveKind } from '../../kit/Brand';
 import { BandScrim, HOUSE_BAND } from '../../kit/Captions';
 import { EASE_FLING, EASE_GATHER, EASE_IN_OUT, EASE_MODAL, EASE_SPRING, prog } from '../../kit/curves';
@@ -38,18 +38,10 @@ const tiktokY = (f: number) => 2600 * prog(f, HITS.tiktok + 12, HITS.shots - 2, 
 const panX = (f: number) => prog(f, HITS.tiktok - 2, HITS.tiktok + 10, EASE_IN_OUT);
 /** the screenshots fly up, too fast to read, faster and faster */
 const shotsY = (f: number) => 5600 * prog(f, HITS.shots + 4, HITS.chat, (t) => t * t * (2 - t) * 0.6 + t * 0.4);
-/** the chat scrolls up at a reading-ish pace, then quicker */
-const chatY = (f: number) => 1500 * prog(f, HITS.chat + 6, HITS.search, (t) => t * t);
-/** the desperate scroll, and the dead stop (a damped settle) */
-const scrollY = (f: number) => {
-  if (f < HITS.scroll) return 0;
-  const run = 2600 * prog(f, HITS.scroll, HITS.freeze, (t) => t * t);
-  const settle = f >= HITS.freeze ? 26 * Math.exp(-(f - HITS.freeze) / 3) * Math.cos((f - HITS.freeze) * 1.1) : 0;
-  return run - settle;
-};
-/** the grid of the desperate scroll rises over the search, then drops */
-const scrollCover = (f: number) => prog(f, HITS.scroll - 2, HITS.scroll + 7, EASE_MODAL) * (1 - prog(f, HITS.none2 - 4, HITS.none2 + 4, EASE_IN_OUT));
-
+/** the chat scrolls up, quick through the middle and slow at both ends, so
+ *  its links read (round 3: speeding up into the cut, the last links blurred
+ *  double and "youtu.be" read as "youtube") */
+const chatY = (f: number) => 1250 * prog(f, HITS.chat + 6, HITS.search, EASE_IN_OUT);
 /** a place drawn N times along its own motion (a 180° shutter): real motion blur */
 const Smear: React.FC<{ dx: number; dy: number; children: (ox: number, oy: number) => React.ReactNode }> = ({ dx, dy, children }) => {
   const len = Math.hypot(dx, dy);
@@ -119,29 +111,83 @@ const Hunt: React.FC<{ f: number }> = ({ f }) => {
   return <Searching f={f} />;
 };
 
-/** "that Lisbon café": typed, nothing; scrolled, frozen, nothing again */
+/** "that Lisbon café": typed, nothing; every place again, nothing again */
 const typed = (f: number) => QUERY.slice(0, Math.max(0, Math.min(QUERY.length, Math.floor((f - HITS.type) / 1.7))));
-const Searching: React.FC<{ f: number }> = ({ f }) => {
-  const none1 = prog(f, HITS.none1, HITS.none1 + 8, EASE_MODAL);
-  const none2 = prog(f, HITS.none2, HITS.none2 + 8, EASE_MODAL);
-  // the second "No results" lands with a small, flat shake
-  const shake = f >= HITS.none2 ? 10 * Math.exp(-(f - HITS.none2) / 4) * Math.sin((f - HITS.none2) * 1.9) : 0;
-  const cover = scrollCover(f);
+/** the search, first time ("No results" on "Nothing.") or again (with a small, flat shake) */
+const SearchPage: React.FC<{ f: number; again?: boolean }> = ({ f, again = false }) => {
   const query = typed(f);
   const done = query.length === QUERY.length;
+  const land = MONTAGE.again + 2;
+  const none = again ? prog(f, land, land + 8, EASE_MODAL) : prog(f, HITS.none1, HITS.none1 + 8, EASE_MODAL);
+  const shake = again && f >= land ? 10 * Math.exp(-(f - land) / 4) * Math.sin((f - land) * 1.9) : 0;
+  return (
+    <SearchBar
+      query={query}
+      caret={!done || caretOn(f)}
+      none={none}
+      noneShake={shake}
+      recents={1 - prog(f, HITS.type, HITS.type + 8, EASE_IN_OUT)}
+    />
+  );
+};
+
+/**
+ * (round 3, owner) The montage between the two "No results": every place
+ * again, stacked like pages a thumb throws up the screen: the search,
+ * Instagram, TikTok, the screenshots, the chat, the search. Each throw is
+ * EASE_FLING (fast off the thumb, then settling), so a page is blurred only
+ * in its throw and readable for most of its 13 frames; under each, a slow
+ * drift. `thrown(f)`: how many pages have gone by (fractional mid-throw).
+ */
+const PAGES = ['search', 'insta', 'tiktok', 'shots', 'chat', 'again'] as const;
+const throwAt = (k: number) => MONTAGE.from + k * MONTAGE.scene;
+const thrown = (f: number) => PAGES.slice(1).reduce((n, _, k) => n + prog(f, throwAt(k), throwAt(k) + MONTAGE.swipe, EASE_FLING), 0);
+/** each page where it was left (no café in view), drifting while it is up */
+const pageView = (page: (typeof PAGES)[number], p: number, f: number) => {
+  const d = 60 * prog(f, throwAt(p - 1), throwAt(p) + MONTAGE.swipe, (t) => t);
+  if (page === 'insta') return <Grid kind="insta" y={2000 + d} />;
+  if (page === 'tiktok') return <Grid kind="tiktok" y={1300 + d} />;
+  if (page === 'shots') return <ScreenshotWall y={1400 + d} />;
+  if (page === 'chat') return <SelfChat y={300 + d} />;
+  // the search's page carries its own set, the same lit paper as behind it
+  return (
+    <>
+      <Paper drift={f / 900} />
+      <SearchPage f={f} again={page === 'again'} />
+    </>
+  );
+};
+
+/**
+ * A throw is a transition, not a camera move: at up to ~1000px a frame a
+ * sampled smear shows as stacked copies, so the page gets a true vertical
+ * Gaussian blur instead (an SVG filter, blurring along the throw only),
+ * σ ≈ 0.12 × its speed, capped at 60px. (The house cap of 10px is for the
+ * camera on a hold; this is the whip the owner asked for.)
+ */
+const WHIP = { k: 0.12, max: 60 };
+const Searching: React.FC<{ f: number }> = ({ f }) => {
+  if (f < MONTAGE.from) return <SearchPage f={f} />;
+  if (f >= MONTAGE.again + MONTAGE.swipe) return <SearchPage f={f} again />;
+  const n = thrown(f);
+  const speed = Math.abs(thrown(f) - thrown(f - 1)) * 1920;
+  const sigma = Math.min(WHIP.max, WHIP.k * speed);
   return (
     <AbsoluteFill>
-      <SearchBar
-        query={query}
-        caret={!done || caretOn(f)}
-        none={f >= HITS.none2 ? none2 : none1}
-        noneShake={shake}
-        recents={1 - prog(f, HITS.type, HITS.type + 8, EASE_IN_OUT)}
-      />
-      {cover > 0 && (
-        <AbsoluteFill style={{ transform: `translateY(${Math.round((1 - cover) * 1920)}px)` }}>
-          <Blurred f={f} pos={scrollY} render={(y) => <Grid kind="insta" y={y + 900} />} />
-        </AbsoluteFill>
+      <svg width={0} height={0} style={{ position: 'absolute' }}>
+        <filter id="pov-whip" x="0" y="-15%" width="100%" height="130%" colorInterpolationFilters="sRGB">
+          <feGaussianBlur stdDeviation={`0 ${sigma.toFixed(2)}`} edgeMode="duplicate" />
+        </filter>
+      </svg>
+      {PAGES.map((page, p) =>
+        Math.abs(p - n) >= 1 ? null : (
+          <AbsoluteFill
+            key={p}
+            style={{ transform: `translateY(${Math.round((p - n) * 1920)}px)`, filter: sigma > 0.6 ? 'url(#pov-whip)' : undefined }}
+          >
+            {pageView(page, p, f)}
+          </AbsoluteFill>
+        ),
       )}
     </AbsoluteFill>
   );
@@ -149,8 +195,8 @@ const Searching: React.FC<{ f: number }> = ({ f }) => {
 
 /** the hunt's scenes at a held moment, for the turn's five panels */
 const PANELS: { place: (f: number) => React.ReactNode; x: number; y: number; dir: [number, number]; rot: number }[] = [
-  { place: () => <Grid kind="insta" y={1200} />, x: 248, y: 870, dir: [-1, -0.7], rot: -4 },
-  { place: () => <Grid kind="tiktok" y={900} />, x: 832, y: 870, dir: [1, -0.7], rot: 4 },
+  { place: () => <Grid kind="insta" y={1200} />, x: 248, y: 870, dir: [-1, -0.35], rot: -4 },
+  { place: () => <Grid kind="tiktok" y={900} />, x: 832, y: 870, dir: [1, -0.35], rot: 4 },
   { place: () => <ScreenshotWall y={1400} />, x: 248, y: 1430, dir: [-1, 0.8], rot: 3 },
   { place: () => <SelfChat y={600} />, x: 832, y: 1430, dir: [1, 0.8], rot: -3 },
   { place: (f) => <SearchBar query={QUERY} caret={caretOn(f)} none={1} />, x: 540, y: 1150, dir: [0, 1], rot: 0 },
@@ -341,20 +387,24 @@ const Lines: React.FC<{ f: number }> = ({ f }) => (
         const [kicker, ...big] = lines;
         return <HookTitle key={c.at} kicker={kicker} lines={big} frame={f} to={c.to} />;
       }
-      return (
-        <div key={c.at} style={{ position: 'absolute', left: 0, right: 0, top: HOUSE_BAND.top, display: 'flex', justifyContent: 'center' }}>
-          <KineticLine
-            text={c.text}
-            frame={f}
-            from={c.at}
-            to={c.to}
-            starts={starts}
-            size={HOUSE_BAND.size}
-            weight={HOUSE_BAND.weight}
-            width={HOUSE_BAND.width}
-          />
+      // (round 3) the punchline line, a touch heavier than the lines above it
+      const weights = c.punch === undefined ? undefined : lines.map((_, k) => (k === c.punch ? HOUSE_BAND.weight + 110 : HOUSE_BAND.weight));
+      // (round 3) a screen-only roll-over on a later word ("Nothing." → "Still nothing.")
+      const thenAt = c.then ? c.at + Math.round((t?.words[c.then.cue] ?? 0) * FPS) : null;
+      const line = (text: string, from: number, to: number, at: number[]) => (
+        <div key={`${c.at}-${from}`} style={{ position: 'absolute', left: 0, right: 0, top: HOUSE_BAND.top, display: 'flex', justifyContent: 'center' }}>
+          <KineticLine text={text} frame={f} from={from} to={to} starts={at} size={HOUSE_BAND.size} weight={HOUSE_BAND.weight} weights={weights} width={HOUSE_BAND.width} />
         </div>
       );
+      if (c.then && thenAt !== null) {
+        return (
+          <React.Fragment key={c.at}>
+            {line(c.text, c.at, thenAt - HEAD_LEAD - 1, starts)}
+            {line(c.then.text, thenAt, c.to, c.then.text.split(' ').map(() => 0))}
+          </React.Fragment>
+        );
+      }
+      return line(c.text, c.at, c.to, starts);
     })}
   </AbsoluteFill>
 );

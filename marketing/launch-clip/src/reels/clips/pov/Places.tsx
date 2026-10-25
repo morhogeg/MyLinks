@@ -400,7 +400,7 @@ const LINKS: { day?: string; url: string; at: string }[] = [
   { url: 'maps.app.goo.gl/x7Fq…', at: '19:58' },
   { day: 'Yesterday', url: 'tiktok.com/t/ZT8hQx1/', at: '00:12' },
   { url: 'instagram.com/reel/DA03pk…', at: '00:13' },
-  { url: 'youtu.be/q3Lm0…', at: '07:40' },
+  { url: 'youtu.be/g3LmO…', at: '07:40' },
   { url: 'instagram.com/reel/C7xT…', at: '22:19' },
   { day: 'Today', url: 'tiktok.com/t/ZT8mW4/', at: '01:06' },
   { url: 'instagram.com/p/DB1n…', at: '01:07' },

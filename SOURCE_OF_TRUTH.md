@@ -2659,6 +2659,20 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-25 — POV round 3 (owner, three edits, "keep everything else
+  the same").** Same branch. (1) "Finding it again is." became the payoff
+  caption's third line, on its spoken word, weight 760 (kit `KineticLine`
+  `weights`). (2) The "youtube" chat link was motion blur, not a typo (the
+  source said `youtu.be`): the chat scroll now settles slowly with the link
+  sharp, reading `youtu.be/g3LmO…`. (3) A readable four-app montage (0.43s
+  each, thrown swipes with a true vertical blur) between the two "No
+  results", its time taken from the first hold; "Nothing." rolls to "Still
+  nothing." on the spoken "Still". Voice takes, score and mix byte-identical
+  (`HITS` for sound unchanged; picture on `MONTAGE`). Verified: tsc 0,
+  house-verify ✓, word timings and audio unchanged, 900 frames / 30.000s,
+  sync measured on the final file ("Still" 15.13–15.16s vs its line in at
+  15.17s; "Finding" 18.78s vs 18.80s). Only frames 225–674 re-rendered.
+  Not verified: speakers, in-app playback.
 - **2026-10-25 — POV round 2 (owner: "perfect… the captions area is too
   high… more space for showing", an Apple-grade pass, and "should we
   populate the Instagram/TikTok items with actual media?").** Same branch.

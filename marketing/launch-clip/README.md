@@ -1501,6 +1501,40 @@ no longer one of the crowd: it is the last save home, gliding in from the
 left, slowing to be read ("That Lisbon café"), then joining the point on its
 last pulse. Timing, voice and score are unchanged.
 
+**Round 3 (owner, three edits; voice, music, effects, colours, type and the
+end card untouched).**
+1. *The punchline on screen.* "Finding it again is." is now the caption's
+   third line, rising on its own word (cue: the spoken "Finding", 18.78s)
+   in the same type and motion as the two above it, a touch heavier (weight
+   760 vs 650, `punch`; the kit's `KineticLine` gained `weights`); emphasis
+   by weight, not colour, per the house rule. All three hold to the gather
+   at 0:20.7. The one caption allowed past the band's two lines; the top
+   panels of the turn drift up half as far so they stay clear of it.
+2. *The chat link.* It always read `youtu.be/…` in code, but it passed on
+   the fastest stretch of a scroll that sped up into the cut, and the motion
+   blur doubled the letters and swallowed the dot ("youtube"). The scroll
+   is now quick through the middle and slow at both ends (`EASE_IN_OUT`,
+   1,250px), so it settles with the link sharp; the link reads
+   `youtu.be/g3LmO…`.
+3. *The montage.* Between the two "No results" was one blurred Instagram
+   scroll; it is now every place again, readable: Instagram, TikTok, the
+   screenshots, the chat, each on screen 13 frames (0.43s), each arriving on
+   a thrown swipe up (5 frames, `EASE_FLING`) under a true vertical Gaussian
+   blur (an SVG filter, σ ≈ 0.12 × speed, ≤ 60px; a sampled smear showed
+   stacked copies at these speeds), then the search swipes back to "No
+   results" on the spoken "nothing.". The time came from the first "No
+   results" hold (0.73s → 0.40s); nothing from 0:16 moved. The sound under
+   it is round 1's (`HITS.scroll/freeze/none2` keep their values, so the
+   score is byte-identical); the picture runs on `MONTAGE`. The screen line
+   rolls over from "Nothing." to "Still nothing." on the spoken "Still"
+   (`then`, screen-only: no re-voicing).
+
+Sync, measured on the final file two ways (the takes alone, and the mix
+with consonants included; a 300–3400Hz band misses the S and F by ~0.1s):
+"Still" is heard at 15.13–15.16s, its line's ink appears at 15.10s and is
+in at 15.17s; "Finding" at 18.78s, its line appears at 18.73s and is in at
+18.80s. The house lead (the eye a few frames ahead of the ear), both times.
+
 **Voice.** Gemini TTS Sulafat, warm and a little wry, quick at the start and
 slower from "Saving was never the hard part." Seven lines, voiced by
 `narration-tts.yml` run 27, plus the Signature's shared take. On screen
