@@ -75,21 +75,6 @@ enum Lumen {
     static let easeSpring = CAMediaTimingFunction(controlPoints: 0.34, 1.56, 0.64, 1)
 }
 
-/// Share Extension entry point. Pulls the shared item (link, text, or image)
-/// out of the share sheet, reads the user's ingest endpoint + token from the
-/// App Group (written by the main app, see ShareConfigPlugin.swift), uploads it
-/// to the backend's /api/share endpoint, and shows a brief confirmation.
-///
-/// For images it re-creates — natively, in UIKit + CoreAnimation — the in-app
-/// "image scan" animation (see web/components/ImageScanProgress.tsx): a
-/// porcelain scan-line sweeping over a preview of the shared image, a rising
-/// percentage counter, a thin accent progress bar, and a rotating phase label.
-/// The animation is cosmetic; the *real* completion is driven by the network
-/// upload, so the percentage eases toward 90% while the request is in flight
-/// and only resolves to the "saved, still analyzing" frame once the upload
-/// actually succeeds.
-@objc(ShareViewController)
-
 /// Reads an Instagram or TikTok post ON THE PHONE before the share is sent.
 ///
 /// Instagram serves Machina's servers (Google Cloud) its login page and TikTok
@@ -117,6 +102,11 @@ final class PagePreviewReader: NSObject, WKNavigationDelegate {
 
     private static let extractJS = """
     (() => {
+      // Instagram's login or checkpoint page, in any language: never the post.
+      const p = location.pathname;
+      if (location.hostname.endsWith("instagram.com") && (p.startsWith("/accounts/") || p.startsWith("/challenge/"))) {
+        return JSON.stringify({wall: "1"});
+      }
       const m = n => (document.querySelector('meta[property="' + n + '"],meta[name="' + n + '"]') || {}).content || "";
       let out = {title: m("og:title"), description: m("og:description"), image: m("og:image"), url: m("og:url")};
       try {
@@ -168,7 +158,13 @@ final class PagePreviewReader: NSObject, WKNavigationDelegate {
         web.alpha = 0.01  // laid out like a real page, never seen
         host.insertSubview(web, at: 0)
         webView = web
-        web.load(URLRequest(url: url, timeoutInterval: timeout))
+        // English, as the server's own read asks for it: Instagram translates
+        // its login page and its "likes - user on date:" wording, and both the
+        // wall check here and the backend's parsers read the English text. A
+        // phone set to Hebrew would otherwise send a Hebrew login page as the post.
+        var request = URLRequest(url: url, timeoutInterval: timeout)
+        request.setValue("en-US,en;q=0.9", forHTTPHeaderField: "Accept-Language")
+        web.load(request)
         let deadline = Date().addingTimeInterval(timeout)
         timer = Timer.scheduledTimer(withTimeInterval: 0.6, repeats: true) { [weak self] _ in
             if Date() >= deadline { self?.finish(nil) } else { self?.poll() }
@@ -191,7 +187,7 @@ final class PagePreviewReader: NSObject, WKNavigationDelegate {
                 if let s = v as? String, !s.isEmpty { out[k] = s }
             }
             let desc = (out["description"] ?? "").lowercased()
-            if Self.wallPhrases.contains(where: { desc.contains($0) }) {
+            if out["wall"] != nil || Self.wallPhrases.contains(where: { desc.contains($0) }) {
                 self.finish(nil)  // the phone got the wall too: don't wait for it
             } else if !desc.isEmpty {
                 self.finish(out)
@@ -224,6 +220,25 @@ final class PagePreviewReader: NSObject, WKNavigationDelegate {
     }
 }
 
+/// Share Extension entry point. Pulls the shared item (link, text, or image)
+/// out of the share sheet, reads the user's ingest endpoint + token from the
+/// App Group (written by the main app, see ShareConfigPlugin.swift), uploads it
+/// to the backend's /api/share endpoint, and shows a brief confirmation.
+///
+/// For images it re-creates — natively, in UIKit + CoreAnimation — the in-app
+/// "image scan" animation (see web/components/ImageScanProgress.tsx): a
+/// porcelain scan-line sweeping over a preview of the shared image, a rising
+/// percentage counter, a thin accent progress bar, and a rotating phase label.
+/// The animation is cosmetic; the *real* completion is driven by the network
+/// upload, so the percentage eases toward 90% while the request is in flight
+/// and only resolves to the "saved, still analyzing" frame once the upload
+/// actually succeeds.
+///
+/// `@objc(ShareViewController)` is the name Info.plist's
+/// NSExtensionPrincipalClass points at, so it must stay directly on this
+/// class. On any other class the extension still compiles, then dies the
+/// moment it is tapped in the share sheet (build 1383).
+@objc(ShareViewController)
 class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionTaskDelegate {
 
     private static let appGroup = "group.com.morhogeg.machina"
