@@ -72,6 +72,12 @@ find."), and the film closes on the tagline, "Everything you save, finally
 useful.": problem → Machina → payoff (owner call 2026-09-28; the tagline is
 the fixed brand line and is said once, at the end, while the subtitle can
 change with search tests). It deliberately avoids two framings the
+rest → nothing worth keeping stays buried.** The film introduces Machina with
+the App Store subtitle, "Never lose another great find.", and closes on the
+tagline, "Everything you save, finally useful.": problem → Machina → payoff
+(owner decision 2026-09-28: the tagline is the fixed brand line and ends every
+film, once; the subtitle can change with search tests, so no film ends on
+it). It deliberately avoids two framings the
 owner ruled out: it is **not** a learning app, and it does **not** sell
 "search by meaning" as the headline. The word *library* appears nowhere.
 
@@ -81,7 +87,7 @@ owner ruled out: it is **not** a learning app, and it does **not** sell
 |---|---|---|---|
 | 0–1 | 0:00 | `ColdOpen` | **The app booting** — the real `BootScreen` motion, in the film's light grade |
 | 1–5 | 0:02.5 | `Scatter` | **Scattered saving, as a story**: five save gestures (bookmark / playlist / send-to-self / star / one-more-tab), each flying into its own silo → the piles grow unreadable → **the loss on bar 3** (the film's only minor chord): the wrong pile opened twice |
-| 5–7 | 0:12.5 | `WordmarkScene` | The five silos rush back and collapse into one point of ink; the mark closes around it, then pushes through into the product |
+| 5–7 | 0:12.5 | `WordmarkScene` | The five silos rush back and collapse into one point of ink; the mark closes around it ("Introducing Machina. Never lose another great find."), then pushes through into the product |
 | 7–12 | 0:17.5 | `Capture` | **One share sheet, four sources behind it** (the sheet names each one: an Instagram carousel, a YouTube video, a screenshot from Photos, an article) → the five-phase pipeline, held ~5.5s under a push-in → a finished card |
 | 12–15 | 0:30 | `Library` | The feed, then the search that finds the one you meant |
 | 15–20 | 0:37.5 | `AskScene` | **The hero, five bars.** Question → streamed answer → three citation chips, from three different platforms |
@@ -89,6 +95,7 @@ owner ruled out: it is **not** a learning app, and it does **not** sell
 | 23–26 | 0:57.5 | `CollectionsScene` | The organising that is yours |
 | 26–29 | 1:05 | `DigestScene` | The weekly write-up, then the resurfaced save as its own beat |
 | 29–32 | 1:12.5 | `Endcard` | The bare mark, the wordmark, the tagline (`Everything you save, finally useful.`), which the voice-over speaks word for word and alone |
+| 29–32 | 1:12.5 | `Endcard` | The bare mark, the wordmark, the tagline (`Everything you save, finally useful.`), which the voice-over speaks word for word and nothing else |
 
 `Capture` / `Ask` / `Connect` print as a letterspaced kicker above the line on
 their own beats, so a viewer can place each act inside the film's three acts
@@ -313,6 +320,16 @@ tagline earlier. To change the endcard line, change `Endcard.tsx`, the last
 re-voice, re-mix and re-render every edition. The space under the line is the
 slot for a real App Store badge or URL once the listing is live. Nothing else in
 the film claims availability.
+useful.` (exact wording, comma and full stop, set in sentence case), and the
+voice-over speaks exactly those words and nothing else (owner call 2026-09-17:
+screen and voice agree). Owner decision 2026-09-28: every film ENDS on the
+tagline and uses it once; the App Store subtitle `Never lose another great
+find` moved to the introduction beat ("Machina. Never lose another great
+find."), because the subtitle can change with search tests and would date
+every posted film. `npm run verify` checks the tagline is the reel's last line
+and appears once, and that the film uses it only on the endcard. The space
+under the line is the slot for a real App Store badge or URL once the listing
+is live. Nothing else in the film claims availability.
 
 # Reels
 
@@ -326,6 +343,13 @@ it." (the five phases) → the new card, opened → Find → Ask → Connect
 → the weekly recap, read → "Machina. Everything you save, finally useful."
 (the tagline, since 2026-09-28; it was the subtitle, which now follows the
 name, where "All your saves, finally useful." used to be). It has
+`MachinaReel` is an 80.5s vertical reel: the problem → "Introducing Machina."
+(round 16: no promise line under the mark; straight on to the shares) → "Save anything, from anywhere." (shares
+from YouTube, Instagram and Safari into the mark) → "A link, a screenshot, or
+a note." (the Add dialog's tabs) → "Machina reads it, summarizes it, and files
+it." (the five phases) → the new card, opened → Find → Ask → Connect
+→ the weekly recap, read ("And every week…": the "And" is voice only) → the
+lockup, "Machina." then "Everything you save, finally useful." It has
 its own score, the film's narrator and word-timed captions. **Every pixel of
 app UI in it is the real, shipped web app**, driven and recorded frame by
 frame; nothing is a mockup or a rebuilt screen. The one exception is not
@@ -514,6 +538,17 @@ Round 15 (owner, on round 14):
 | 1696–1808 | `Connect` | The real graph (60fps; lingers 1744–1772); tap Revisit |
 | 1808–2254 | `Recall` | "Do this" (to 1952), then "This week in Machina", opened (1968) and read slowly: write-up, themes, Standout, question; thrown out into the lockup |
 | 2240–2448 | `End` | The mark launches (strike 2284), "Machina" (the wordmark), the tagline "Everything you save, / finally useful." in Geist on two rows, held |
+| 288–424 | `Hook` | They collapse into the point (320), the brackets snap (336); "Introducing Machina." (the drawn wordmark under the mark) |
+| 424–600 | `ShareBeat` | "Save anything, from anywhere.": YouTube, Instagram and Safari saves shared into the mark (the `share` hold) |
+| 600–688 | `Hook` → `Save` | The point drops to become the **+** (the iris opens at 640), the + is tapped, Add to Machina |
+| 688–832 | `SaveModes` | "A link, a screenshot, or a note.": Link, Image, Note, back to Link, the link pasted, Save tapped |
+| 832–960 | `Save` | "Machina reads it, summarizes it, and files it." over the five real phases, an 8th apart; saved; the dialog drops; the card lands (944) |
+| 960–1152 | `CardDetail` | The new card opened: summary, **Key Points** (the `card` hold) |
+| 1152–1312 | `Find` | "easy dinner, empty fridge" → the one card it means (1216; lingers 1232–1272) → tap Ask |
+| 1312–1648 | `Ask` | The question → the answer and three sources (1456–1504; lingers 1512–1572) → the dive into the Graph chip |
+| 1648–1760 | `Connect` | The real graph (60fps; lingers 1696–1724); tap Revisit |
+| 1760–2206 | `Recall` | "Do this" (to 1904), then "This week in Machina", opened (1920) and read slowly: write-up, themes, Standout, question; thrown out into the lockup |
+| 2192–2416 | `End` | The mark launches (strike 2236), "Machina." said as the wordmark wipes in (round 16), then the tagline "Everything you save, finally useful." in Geist (spoken word for word), held |
 
 **The clock.** Scenes are written in SOURCE frames (the round-1 cut, 600
 frames). `MachinaReel` plays them at `K = 2` via `clockAt(frame)`; `HOLDS`

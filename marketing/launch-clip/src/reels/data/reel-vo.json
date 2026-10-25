@@ -45,18 +45,7 @@
   ]
  },
  {
-  "frame": 416,
-  "text": "Never lose another great find.",
-  "words": [
-   0.04,
-   0.367,
-   0.64,
-   1.076,
-   1.403
-  ]
- },
- {
-  "frame": 496,
+  "frame": 448,
   "text": "Save anything, from anywhere.",
   "words": [
    0.03,
@@ -66,7 +55,7 @@
   ]
  },
  {
-  "frame": 736,
+  "frame": 688,
   "text": "A link, a screenshot, or a note.",
   "words": [
    0.06,
@@ -79,7 +68,7 @@
   ]
  },
  {
-  "frame": 880,
+  "frame": 832,
   "text": "Makeena reads it, summarizes it, and files it.",
   "words": [
    0.06,
@@ -93,7 +82,7 @@
   ]
  },
  {
-  "frame": 1024,
+  "frame": 976,
   "text": "Each save becomes a card, with the key points pulled out.",
   "words": [
    0.03,
@@ -110,7 +99,7 @@
   ]
  },
  {
-  "frame": 1216,
+  "frame": 1168,
   "text": "Find it in your own words.",
   "words": [
    0.14,
@@ -122,7 +111,7 @@
   ]
  },
  {
-  "frame": 1364,
+  "frame": 1316,
   "text": "Ask anything. Every answer comes straight from your saves.",
   "words": [
    0.04,
@@ -137,7 +126,7 @@
   ]
  },
  {
-  "frame": 1700,
+  "frame": 1652,
   "text": "Related saves find each other, all on their own.",
   "words": [
    0.05,
@@ -152,7 +141,7 @@
   ]
  },
  {
-  "frame": 1824,
+  "frame": 1776,
   "text": "When a save calls for action, Makeena turns it into a to-do.",
   "words": [
    0.05,
@@ -170,21 +159,22 @@
   ]
  },
  {
-  "frame": 1976,
-  "text": "Every week, Makeena brings back what\u2019s worth remembering.",
+  "frame": 1928,
+  "text": "And Every week, Makeena brings back what\u2019s worth remembering.",
   "words": [
    0.03,
-   0.305,
-   0.82,
-   1.208,
-   1.547,
-   1.79,
-   2.129,
-   2.42
+   0.212,
+   0.486,
+   1.05,
+   1.438,
+   1.777,
+   2.02,
+   2.359,
+   2.65
   ]
  },
  {
-  "frame": 2088,
+  "frame": 2048,
   "text": "The themes of your week, and the one save worth rereading.",
   "words": [
    0.04,
@@ -201,15 +191,21 @@
   ]
  },
  {
-  "frame": 2304,
-  "text": "Makeena. Everything you save, finally useful.",
+  "frame": 2240,
+  "text": "Makeena.",
   "words": [
-   0.05,
-   0.93,
-   1.375,
-   1.537,
-   2.01,
-   2.425
+   0.04
+  ]
+ },
+ {
+  "frame": 2288,
+  "text": "Everything you save, finally useful.",
+  "words": [
+   0.03,
+   0.512,
+   0.687,
+   1.26,
+   1.675
   ]
  }
 ]
