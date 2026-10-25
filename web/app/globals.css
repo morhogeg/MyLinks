@@ -75,6 +75,9 @@
      triplet, not a colour, so the platform helpers can wrap it in rgb() and
      rgba() like the fixed brand colours. */
   --mark-ink-rgb: 229, 229, 229;
+  /* The X mark: its own blue-grey on dark, the ink above on light, where
+     that grey read at ~1.7:1 on the white card (owner, 2026-10-25). */
+  --mark-x-rgb: 191, 201, 214;
   /* Status colors (danger / warning / success / the favorite star). One token
      each, so light mode can darken them: Tailwind's red-400, amber-500,
      green-500 and yellow-500 read at 2-3:1 on the light ground. Light values
@@ -157,6 +160,7 @@
   --apple-button: #000000;
   --apple-button-ink: #FFFFFF;
   --mark-ink-rgb: 17, 24, 39;
+  --mark-x-rgb: var(--mark-ink-rgb);
   --danger: #DC2626;
   --warning: #B45309;
   --success: #15803D;
