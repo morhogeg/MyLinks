@@ -1965,9 +1965,9 @@ def _tiktok_item_from_html(html: str) -> dict:
     """The video's `itemStruct` from TikTok's embedded page data, or {}.
 
     A browser gets the post in `__UNIVERSAL_DATA_FOR_REHYDRATION__`; a server
-    fetch gets the same block WITHOUT the `webapp.video-detail` entry (verified
-    2026-10-25), so on the server this is usually {} and the phone's read is
-    what fills the card. Kept because the shape is the same either way."""
+    fetch gets the same block WITHOUT the video's entry (verified 2026-10-25),
+    so on the server this is usually {} and the phone's read is what fills the
+    card. Kept because the shape is the same either way."""
     import json
     m = re.search(r'<script[^>]+id="__UNIVERSAL_DATA_FOR_REHYDRATION__"[^>]*>(.{1,2000000}?)</script>',
                   html or "", re.S)
@@ -1975,7 +1975,10 @@ def _tiktok_item_from_html(html: str) -> dict:
         return {}
     try:
         scope = json.loads(m.group(1)).get("__DEFAULT_SCOPE__") or {}
-        item = (((scope.get("webapp.video-detail") or {}).get("itemInfo") or {}).get("itemStruct") or {})
+        # Desktop pages: "webapp.video-detail"; mobile ("reflow") pages:
+        # "webapp.reflow.video.detail" — same itemStruct inside.
+        detail = scope.get("webapp.video-detail") or scope.get("webapp.reflow.video.detail") or {}
+        item = ((detail.get("itemInfo") or {}).get("itemStruct") or {})
         return item if isinstance(item, dict) else {}
     except (ValueError, AttributeError):
         return {}

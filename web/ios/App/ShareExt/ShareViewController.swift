@@ -1,5 +1,6 @@
 import UIKit
 import ImageIO
+import WebKit
 
 /// The ONE progress curve, shared by convention with the web app. Progress is a
 /// deterministic function of elapsed wall-clock time since the capture started,
@@ -88,6 +89,141 @@ enum Lumen {
 /// and only resolves to the "saved, still analyzing" frame once the upload
 /// actually succeeds.
 @objc(ShareViewController)
+
+/// Reads an Instagram or TikTok post ON THE PHONE before the share is sent.
+///
+/// Instagram serves Machina's servers (Google Cloud) its login page and TikTok
+/// serves them an empty app shell, while a phone gets the post (verified
+/// 2026-10-25). So for those two hosts the extension loads the link in a
+/// hidden, signed-out web view (non-persistent data store: no cookies, no
+/// account), reads what the page shows — the og tags, or TikTok's embedded
+/// post data — and sends it as `pagePreview` beside the URL. The backend
+/// (`_clean_page_preview`, `scrape_url`) uses it only when its own read hits
+/// the wall. Bounded: whatever is there after `timeout` seconds, or nothing.
+final class PagePreviewReader: NSObject, WKNavigationDelegate {
+
+    static func isSupported(_ url: URL) -> Bool {
+        guard url.scheme?.lowercased() == "https", let host = url.host?.lowercased() else { return false }
+        return ["instagram.com", "tiktok.com"].contains { host == $0 || host.hasSuffix("." + $0) }
+    }
+
+    /// Instagram's login page (served to some phones too). Matches the
+    /// backend's `_IG_WALL_PHRASES`; a wall is "nothing", never the post.
+    private static let wallPhrases = [
+        "sign in to check out what your friends",
+        "create an account or log in to instagram",
+        "log in to see photos and videos from friends",
+    ]
+
+    private static let extractJS = """
+    (() => {
+      const m = n => (document.querySelector('meta[property="' + n + '"],meta[name="' + n + '"]') || {}).content || "";
+      let out = {title: m("og:title"), description: m("og:description"), image: m("og:image"), url: m("og:url")};
+      try {
+        const el = document.getElementById("__UNIVERSAL_DATA_FOR_REHYDRATION__");
+        const sc = el && JSON.parse(el.textContent).__DEFAULT_SCOPE__;
+        // Mobile pages carry the post as "webapp.reflow.video.detail",
+        // desktop ones as "webapp.video-detail".
+        const d = sc && (sc["webapp.reflow.video.detail"] || sc["webapp.video-detail"]);
+        const it = d && d.itemInfo && d.itemInfo.itemStruct;
+        if (it && typeof it.desc === "string") {
+          const a = it.author || {}, v = it.video || {};
+          out = {description: it.desc, author: a.uniqueId || "", authorName: a.nickname || "",
+                 image: v.cover || v.originCover || "", url: location.href, title: document.title};
+        }
+      } catch (e) {}
+      // A bare tiktok.com/@user/video/… link renders the caption into the
+      // page instead (no embedded post data): read it from there.
+      const shown = document.querySelector('[data-e2e="video-desc"]');
+      if (!out.description && shown && location.hostname.endsWith("tiktok.com")) {
+        const seg = location.pathname.split("/")[1] || "";
+        const h = /^@[A-Za-z0-9._]{1,24}$/.test(seg) ? seg.slice(1) : "";
+        out = {description: shown.innerText.replace(/^See more/, "").trim(), author: h, url: location.href};
+      }
+      return JSON.stringify(out);
+    })()
+    """
+
+    private let url: URL
+    private var webView: WKWebView?
+    private var timer: Timer?
+    private var completion: (([String: String]?) -> Void)?
+
+    init(url: URL) { self.url = url }
+
+    /// Main thread only. `completion` runs once, on the main thread.
+    func start(in host: UIView, timeout: TimeInterval, completion: @escaping ([String: String]?) -> Void) {
+        self.completion = completion
+        let config = WKWebViewConfiguration()
+        config.websiteDataStore = .nonPersistent()
+        config.mediaTypesRequiringUserActionForPlayback = .all
+        config.allowsInlineMediaPlayback = false
+        // The phone's own WebKit, labelled as Mobile Safari is: without the
+        // Safari token both sites treat a web view as an app wrapper.
+        let major = UIDevice.current.systemVersion.split(separator: ".").first ?? "18"
+        config.applicationNameForUserAgent = "Version/\(major).0 Mobile/15E148 Safari/604.1"
+        let web = WKWebView(frame: host.bounds, configuration: config)
+        web.navigationDelegate = self
+        web.isUserInteractionEnabled = false
+        web.alpha = 0.01  // laid out like a real page, never seen
+        host.insertSubview(web, at: 0)
+        webView = web
+        web.load(URLRequest(url: url, timeoutInterval: timeout))
+        let deadline = Date().addingTimeInterval(timeout)
+        timer = Timer.scheduledTimer(withTimeInterval: 0.6, repeats: true) { [weak self] _ in
+            if Date() >= deadline { self?.finish(nil) } else { self?.poll() }
+        }
+    }
+
+    /// Stop now without a result (the share is being sent without it).
+    func cancel() {
+        completion = nil
+        finish(nil)
+    }
+
+    private func poll() {
+        webView?.evaluateJavaScript(Self.extractJS) { [weak self] value, _ in
+            guard let self = self, self.completion != nil,
+                  let json = value as? String, let data = json.data(using: .utf8),
+                  let raw = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
+            var out: [String: String] = [:]
+            for (k, v) in raw {
+                if let s = v as? String, !s.isEmpty { out[k] = s }
+            }
+            let desc = (out["description"] ?? "").lowercased()
+            if Self.wallPhrases.contains(where: { desc.contains($0) }) {
+                self.finish(nil)  // the phone got the wall too: don't wait for it
+            } else if !desc.isEmpty {
+                self.finish(out)
+            }
+        }
+    }
+
+    private func finish(_ result: [String: String]?) {
+        timer?.invalidate()
+        timer = nil
+        webView?.stopLoading()
+        webView?.navigationDelegate = nil
+        webView?.removeFromSuperview()
+        webView = nil
+        let done = completion
+        completion = nil
+        done?(result)
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        poll()
+    }
+
+    /// Only web pages load: an `instagram://` / `snssdk…://` hop to the app
+    /// (or any other scheme) is refused.
+    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
+                 decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        let scheme = navigationAction.request.url?.scheme?.lowercased() ?? ""
+        decisionHandler(scheme == "https" || scheme == "http" ? .allow : .cancel)
+    }
+}
+
 class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionTaskDelegate {
 
     private static let appGroup = "group.com.morhogeg.machina"
@@ -169,6 +305,10 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
     private var isTextFlow = false
     private var finished = false
     private var resultShown = false
+    /// An Instagram/TikTok share waiting on its on-phone read (`sendLink`),
+    /// and the payload to send if the user closes before it is done.
+    private var previewReader: PagePreviewReader?
+    private var pendingLinkPayload: [String: Any]?
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -322,8 +462,17 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
     /// Dismiss the share extension immediately. The background upload session
     /// continues independently, so closing here does not cancel the save. A
     /// close while the item is still being read DOES cancel it: upload()
-    /// refuses to start once finish() has run, so nothing is sent.
+    /// refuses to start once finish() has run, so nothing is sent. A close
+    /// during an Instagram/TikTok on-phone read sends the link without it.
     @objc private func closeTapped() {
+        // Mid on-phone read: the link itself is in hand, so send it as is
+        // rather than drop the save.
+        if let payload = pendingLinkPayload {
+            pendingLinkPayload = nil
+            previewReader?.cancel()
+            previewReader = nil
+            upload(payload: payload)
+        }
         finish()
     }
 
@@ -1022,11 +1171,11 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
                                                "mimeType": outMime])
                     } else {
                         DispatchQueue.main.async { self?.presentLinkScan(urlString: url.absoluteString) }
-                        self?.upload(payload: ["url": url.absoluteString])
+                        self?.sendLink(url.absoluteString, payload: ["url": url.absoluteString])
                     }
                 } else if let s = item as? String {
                     DispatchQueue.main.async { self?.presentSharedString(s) }
-                    self?.upload(payload: ["url": s])
+                    self?.sendLink(Self.firstHttpUrl(in: s), payload: ["url": s])
                 } else {
                     self?.showResult("Couldn't read the link", success: false)
                 }
@@ -1037,7 +1186,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
             provider.loadItem(forTypeIdentifier: id, options: nil) { [weak self] item, _ in
                 if let s = Self.sharedText(from: item) {
                     DispatchQueue.main.async { self?.presentSharedString(s) }
-                    self?.upload(payload: ["text": s])
+                    self?.sendLink(Self.firstHttpUrl(in: s), payload: ["text": s])
                 } else {
                     self?.showResult("Couldn't read the text", success: false)
                 }
@@ -1054,6 +1203,29 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         if let a = item as? NSAttributedString { return a.string }
         if let d = item as? Data { return String(data: d, encoding: .utf8) }
         return nil
+    }
+
+    /// Upload a shared link. Instagram and TikTok links are first read on the
+    /// phone (`PagePreviewReader`, ≤7 s) and the post rides along as
+    /// `pagePreview`; every other link, or a failed read, uploads as before.
+    private func sendLink(_ link: String?, payload: [String: Any]) {
+        guard let link = link, let url = URL(string: link), PagePreviewReader.isSupported(url) else {
+            upload(payload: payload)
+            return
+        }
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self, !self.finished else { return }
+            let reader = PagePreviewReader(url: url)
+            self.previewReader = reader
+            self.pendingLinkPayload = payload
+            reader.start(in: self.view, timeout: 7) { [weak self] preview in
+                guard let self = self, var body = self.pendingLinkPayload else { return }
+                self.pendingLinkPayload = nil
+                self.previewReader = nil
+                if let preview = preview { body["pagePreview"] = preview }
+                self.upload(payload: body)
+            }
+        }
     }
 
     /// Show the native scan animation, with the shared image behind the sweep.
