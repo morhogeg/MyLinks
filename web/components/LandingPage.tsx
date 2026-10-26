@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type CSSProperties } from 'react';
 import Link from 'next/link';
 import { Share2, Globe, ChevronRight, Quote } from 'lucide-react';
 import { CitationGlyph, Wordmark } from '@/components/ui/Wordmark';
@@ -13,6 +13,9 @@ import ShelfScene from '@/components/landing/ShelfScene';
 import { useInView } from '@/components/landing/hooks';
 import { LiveMark } from '@/components/landing/parts';
 import { CINEMATIC_LANDING } from '@/components/landing/motion';
+import { platformIcon, platformColor, PLATFORM_LABELS, type PlatformKey } from '@/lib/platform';
+import { isNativeApp } from '@/lib/api';
+import { openExternal } from '@/lib/share';
 import '@/components/landing/landing.css';
 
 /**
@@ -166,7 +169,8 @@ function Header({ onGetStarted }: { onGetStarted?: () => void }) {
                 <CitationGlyph className="h-5 w-auto" />
                 <Wordmark className="h-[11px] w-auto" />
             </span>
-            <span className="flex items-center gap-4">
+            <span className="flex items-center gap-3 sm:gap-4">
+                <Socials compact className="max-[359px]:hidden" />
                 {/* The app's own theme control. The page reads correctly in both
                     themes (every colour is a token), so let a visitor see both —
                     layout.tsx mounts ThemeProvider outside the auth gate, which
@@ -505,6 +509,54 @@ function Close({ onGetStarted }: { onGetStarted?: () => void }) {
 
 /* -------------------------------------------------------------------- footer */
 
+/** Machina's own accounts, in the owner's order. The marks are the app's
+    source marks (`platformIcon`), so a mark changed there changes here. */
+const SOCIALS: { key: PlatformKey; href: string }[] = [
+    { key: 'x', href: 'https://x.com/machinaapp' },
+    { key: 'instagram', href: 'https://www.instagram.com/machinaapp' },
+    { key: 'tiktok', href: 'https://www.tiktok.com/@machinaapp' },
+    { key: 'youtube', href: 'https://www.youtube.com/@MachinaApp' },
+];
+
+/** `compact` is the header's size: it shares a phone-width row with the
+    lockup, the theme toggle and Sign in, so the marks and their hit areas
+    are a step smaller than the footer's 44pt targets. Below 360px (iPhone SE
+    1st gen) that row can't fit them at all, so the header drops them there;
+    the footer still has them. */
+function Socials({ className = '', compact = false }: { className?: string; compact?: boolean }) {
+    const box = compact ? 'h-8 w-6 sm:w-8' : 'h-11 w-11';
+    const mark = compact ? 'h-4 w-4' : 'h-5 w-5';
+    return (
+        <ul className={`flex items-center ${compact ? '' : 'gap-1'} ${className}`}>
+            {SOCIALS.map(({ key, href }) => (
+                <li key={key}>
+                    <a
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={`Machina on ${PLATFORM_LABELS[key]}`}
+                        onClick={(e) => {
+                            // Native shell: open in Safari (or the platform's
+                            // app) instead of navigating the WKWebView away.
+                            if (isNativeApp()) {
+                                e.preventDefault();
+                                openExternal(href);
+                            }
+                        }}
+                        // Muted at rest like the links beside it; the mark
+                        // takes its brand color (the app's source-filter
+                        // color, theme-aware for X and TikTok) on hover.
+                        style={{ '--brand': platformColor(key) } as CSSProperties}
+                        className={`flex ${box} items-center justify-center rounded-full text-text-secondary transition-colors hover:text-(--brand)`}
+                    >
+                        {platformIcon(key, mark)}
+                    </a>
+                </li>
+            ))}
+        </ul>
+    );
+}
+
 function Footer() {
     return (
         <footer className="border-t border-border-subtle">
@@ -524,6 +576,7 @@ function Footer() {
                         support@mymachina.app
                     </a>
                 </nav>
+                <Socials className="mt-5 -ml-2.5" />
                 {/* No personal name (round 5) and no self-description (round 6)
                     — by the footer the page has explained itself five times.
                     The App Store copyright FIELD keeps the legal name
