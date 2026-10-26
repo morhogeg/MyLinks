@@ -1187,8 +1187,8 @@ The multi-user auth work described below **was** fully written but not live:
     from "Get started" to "Get Machina on the App Store", and adds the
     install URL to the site's JSON-LD (added 2026-10-26, task 28).
 
-28. **[~] Website SEO + AI-assistant discoverability (built 2026-10-26).**
-    What's live once shipped: crawlers asking for `/` get `/welcome`'s HTML
+28. **[~] Website SEO + AI-assistant discoverability (SHIPPED 2026-10-26,
+    merge `7f4eefac`; only the owner steps below remain).** What's live: crawlers asking for `/` get `/welcome`'s HTML
     (`web/next.config.ts`, Vercel only, user-agent rewrite; people never
     match); canonical/OG/Twitter metadata + a generated preview card
     (`app/opengraph-image.tsx`, per-post cards too); JSON-LD
@@ -2763,8 +2763,8 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 
 - **2026-10-26 — WEBSITE SEO + AEO: BLOG, FAQ, CRAWLER-READABLE HOME
-  (§4 task 28; built in `claude/machina-seo-strategy-14fd4c`, not yet
-  shipped).** Before this, `/` served crawlers a 33-character boot shell, and
+  (§4 task 28; merge `7f4eefac`, LIVE on Vercel, no TestFlight build:
+  web-only).** Before this, `/` served crawlers a 33-character boot shell, and
   `robots.txt`, `sitemap.xml` and `llms.txt` all 404'd. No OG tags or JSON-LD
   either. Owner asked for "everything you can" on the website without touching
   the app or the design, and relaxed D-3 for the website (recorded in
@@ -2784,9 +2784,14 @@ exact-match, capped.
   ⚠️ **The App Store featuring nomination's description may repeat the 1/7/30/90
   claim. Check it in App Store Connect.** Verified: `tsc`, eslint, export
   build (40 static pages), the Vercel-mode build, and the pages in the preview
-  (light/dark, 375px, no overflow). Not verified: live Vercel behaviour of the
-  rewrite and the host header (needs deploy); Google's rendering of `/`.
-  Owner steps are under task 28.
+  (light/dark, 375px, no overflow). **Verified live after deploy:** Chrome UA
+  at `/` → the 22 KB app shell (title "Machina"); GPTBot, Googlebot and
+  facebookexternalhit at `/` → the 128 KB landing HTML; `/blog`, a post,
+  `/faq`, `robots.txt`, `sitemap.xml`, `llms-full.txt`, RSS and both OG images
+  return 200; `x-robots-tag: noindex` on `my-links-sable.vercel.app` only.
+  Not verified: Google's JS render of `/` for a bot (the client hydrates
+  under the real URL, so it may fall back to the normal signed-out landing:
+  same content either way). Owner steps are under task 28.
 - **2026-10-26 — App Store featuring nomination SUBMITTED; DAY 1 = TUE 17
   NOV 2026 (owner, 11:36 local).** App Store Connect → Featuring →
   Nominations: "Machina launch", App Launch, publish date Nov 17, iPhone,
