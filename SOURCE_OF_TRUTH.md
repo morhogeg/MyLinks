@@ -2749,8 +2749,10 @@ exact-match, capped.
   path. Stored takeaways on existing recipe cards are NOT deleted (Ask
   context and search text still read them; harmless). Verified: tsc 0,
   `test:takeaway` 6/6 (new recipe case), functions pytest 1984 passed (2 new
-  in `test_actionable_takeaway.py`). Not verified: on a device (rides 1388),
-  a live recipe save after the functions deploy.
+  in `test_actionable_takeaway.py`). **Shipped:** commit `300c20b`, merge
+  `f9a780d`; Vercel green; functions deploy run #144 green (all functions,
+  `ai_service.py` is shared); **build 1388** (run #388) uploaded to
+  TestFlight green. Not verified: on a device, a live recipe save.
 - **2026-10-26 — Build 1387 triggered to REPLACE 1382 in 1.0's review
   (owner call).** Owner: no point waiting on a build whose IG/TikTok
   capture is weak. `trigger/testflight` pushed at `b1fc39d` → run #387 →
