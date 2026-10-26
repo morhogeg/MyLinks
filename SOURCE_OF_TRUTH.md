@@ -884,12 +884,14 @@ The multi-user auth work described below **was** fully written but not live:
   "Creamy Lemon Chicken" (@madebythewa). **DECIDED 2026-10-26 (owner): swap
   1.0's build.** 1382 predates the phone read (its IG/TikTok shares make
   honest partial cards, not real ones), so the owner pulls 1382 from review
-  ("Developer Reject"), attaches **build 1387** (run #387, sha `b1fc39d`:
-  phone read + TikTok/X marks + onboarding copy + landing social links) to
-  the same 1.0 version, and resubmits. Version stays 1.0 (never released).
-  - **[ ] OWNER: install 1387 from TestFlight, smoke-test (IG + TikTok
-    share, landing links signed out), then swap and resubmit** — steps in
-    the 2026-10-26 §9 entry.
+  ("Developer Reject"), attaches the newest build to the same 1.0 version,
+  and resubmits. Version stays 1.0 (never released). **1387** (sha
+  `b1fc39d`) passed the owner's smoke test, then the owner asked for no
+  recipe to-dos first, so the build to submit is **1388** (next run; same
+  as 1387 plus the recipe-takeaway gate).
+  - **[ ] OWNER: install 1388, check a recipe card shows no "Do this" and
+    Revisit lists none, then swap 1382 → 1388 and resubmit** — steps in the
+    2026-10-26 §9 entries.
 
 1. **[x] Native auth build green (iOS)** *(code done 2026-07-03 — root cause was
    the Xcode 16 toolchain, not a dependency conflict; see §3. Workflow moved to
@@ -2732,6 +2734,23 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-26 — Recipe cards never show a "Do this" (owner ask; web +
+  functions + build 1388).** Recipe takeaways were always one of the
+  card's own steps ("Dredge the chicken…") — the prompt literally said a
+  recipe "always" gets one. Now: (1) **client gate** —
+  `getActionableTakeaway()` (`web/lib/takeaway.ts`) returns '' when
+  `category` is Recipe/Recipes (case-insensitive), so Revisit, its Done
+  list, card detail and export all drop it, for old cards too and for any
+  card later moved into Recipe; (2) **backend** — `TAKEAWAY_RULE_BULLETS`
+  says a recipe never gets one (the recipe GOOD example removed), and
+  `GeminiService._drop_recipe_takeaway`, called from
+  `_enforce_tag_language` (every analysis returns through it), strips one
+  the model writes anyway, before any save path incl. the client-side note
+  path. Stored takeaways on existing recipe cards are NOT deleted (Ask
+  context and search text still read them; harmless). Verified: tsc 0,
+  `test:takeaway` 6/6 (new recipe case), functions pytest 1984 passed (2 new
+  in `test_actionable_takeaway.py`). Not verified: on a device (rides 1388),
+  a live recipe save after the functions deploy.
 - **2026-10-26 — Build 1387 triggered to REPLACE 1382 in 1.0's review
   (owner call).** Owner: no point waiting on a build whose IG/TikTok
   capture is weak. `trigger/testflight` pushed at `b1fc39d` → run #387 →
