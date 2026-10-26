@@ -889,9 +889,13 @@ The multi-user auth work described below **was** fully written but not live:
   `b1fc39d`) passed the owner's smoke test, then the owner asked for no
   recipe to-dos first, so the build to submit is **1388** (next run; same
   as 1387 plus the recipe-takeaway gate).
-  - **[ ] OWNER: install 1388, check a recipe card shows no "Do this" and
-    Revisit lists none, then swap 1382 → 1388 and resubmit** — steps in the
-    2026-10-26 §9 entries.
+  - **[x] DONE 2026-10-26 10:21: 1.0 RESUBMITTED WITH BUILD 1388** (owner
+    verified the recipe fix on 1388 first). Submission = 4 items: iOS App
+    1.0 (1388), subscription group Machina Pro, Annual, Monthly — all
+    "Waiting for Review". **Next: wait for Apple** (up to 48 h, email on
+    completion). 1.0 was set to manual release for the 1382 submission
+    (owner call); not re-checked after the resubmit — confirm "Version
+    Release" on the 1.0 page still says manual, or approval publishes it.
 
 1. **[x] Native auth build green (iOS)** *(code done 2026-07-03 — root cause was
    the Xcode 16 toolchain, not a dependency conflict; see §3. Workflow moved to
@@ -2734,6 +2738,19 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-26 — 1.0 RESUBMITTED TO APP REVIEW WITH BUILD 1388 (owner,
+  10:21 local).** Owner checked on 1388 that recipe cards no longer show a
+  "Do this", pulled 1382 from review, attached 1388 to 1.0 and submitted 4
+  items: iOS App 1.0 (1388), group Machina Pro, Annual, Monthly, all
+  "Waiting for Review". **Gotcha for next time:** pulling the version left
+  the subscription GROUP alone in a new draft submission, which App Store
+  Connect refuses ("New subscription groups must be submitted with an
+  auto-renewable subscription from within that group" + "add an app
+  version"); the version page showed no In-App Purchases section because
+  the group already sat in that draft. Fix: "Add for Review" on the 1.0
+  page, then "Add for Review" on the Annual and Monthly pages
+  individually, then submit the draft. Build 1387 never went to review;
+  1383–1387 just expire in TestFlight.
 - **2026-10-26 — Recipe cards never show a "Do this" (owner ask; web +
   functions + build 1388).** Recipe takeaways were always one of the
   card's own steps ("Dredge the chicken…") — the prompt literally said a
