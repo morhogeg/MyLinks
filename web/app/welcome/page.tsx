@@ -1,10 +1,15 @@
 import type { Metadata } from "next";
 import LandingPage from "@/components/LandingPage";
+import { HOME_DESCRIPTION, HOME_TITLE } from "@/lib/site";
+import { JsonLd, organization, softwareApplication, website } from "@/lib/seo";
 
 export const metadata: Metadata = {
-  title: "Machina: Everything you save, finally useful.",
-  description:
-    "Machina is one place that holds everything you save: links, screenshots and videos from every app. It reads each save, summarizes it, files it, and lets you ask your own library a question and get an answer with sources.",
+  title: HOME_TITLE,
+  description: HOME_DESCRIPTION,
+  // `/` is the home page of record; this route is its static twin, and
+  // crawlers asking for `/` are served this HTML (next.config.ts), so both
+  // URLs consolidate onto the root.
+  alternates: { canonical: "/" },
 };
 
 /**
@@ -21,9 +26,19 @@ export const metadata: Metadata = {
  * home page — it is what Google's branding review and App Store Connect's
  * Support/Marketing rows point at — and this is its floor.
  *
+ * It is also what search and AI crawlers read for `/`: on Vercel, a request
+ * for `/` from a crawler user agent is rewritten here (`next.config.ts`), so
+ * the home page they index is this prose plus the JSON-LD below, not the
+ * 33-character boot shell. Same content a signed-out person sees.
+ *
  * `onGetStarted` is deliberately omitted: there is no auth context here, so the
  * CTA renders as a link to `/`.
  */
 export default function WelcomePage() {
-  return <LandingPage />;
+  return (
+    <>
+      <JsonLd graph={[organization, website, softwareApplication]} />
+      <LandingPage />
+    </>
+  );
 }

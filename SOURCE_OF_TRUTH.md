@@ -1181,7 +1181,31 @@ The multi-user auth work described below **was** fully written but not live:
     Store hand-off on iPhone/iPad. Set it only once the app is live: before
     release the App Store page says the app isn't available. Later, post
     launch: Associated Domains entitlement + an in-app screen for a shared
-    answer, so the link itself opens the app.
+    answer, so the link itself opens the app. **Also set the same id in
+    `web/lib/site.ts` (`APP_STORE_ID`, one line) and push:** it turns on the
+    Smart App Banner on mymachina.app, switches the blog/FAQ closing button
+    from "Get started" to "Get Machina on the App Store", and adds the
+    install URL to the site's JSON-LD (added 2026-10-26, task 28).
+
+28. **[~] Website SEO + AI-assistant discoverability (built 2026-10-26).**
+    What's live once shipped: crawlers asking for `/` get `/welcome`'s HTML
+    (`web/next.config.ts`, Vercel only, user-agent rewrite; people never
+    match); canonical/OG/Twitter metadata + a generated preview card
+    (`app/opengraph-image.tsx`, per-post cards too); JSON-LD
+    (`web/lib/seo.tsx`); `robots.txt` naming the AI crawlers, `sitemap.xml`,
+    `llms.txt` + `llms-full.txt`, blog RSS; `/blog` with 11 researched
+    articles (`web/lib/blog/posts/`, one file each) and `/faq`
+    (`web/lib/faq.ts`); `X-Robots-Tag: noindex` on `my-links-sable.vercel.app`.
+    Website copy may say "second brain"/"AI" (BRANDING D-3 scope change).
+    **Owner steps (≈15 min, after deploy):** (a) Search Console → the
+    `mymachina.app` property → Sitemaps → submit `sitemap.xml`, then URL
+    Inspection → Request indexing for `/`, `/blog`, `/faq`; (b) Bing
+    Webmaster Tools → "Import from Google Search Console" (ChatGPT search and
+    Copilot use Bing's index) and submit the sitemap there too; (c) on
+    release day, task 27's `web/lib/site.ts` line. **Next content to write**
+    (not started): "Machina vs mymind" / "mymind alternative" and a
+    Notion-web-clipper alternative page; a monthly post. Re-check
+    `best-second-brain-apps` prices every quarter (dated October 2026).
 
 6. **[x] AI-consent disclosure (Guideline 5.1.1/5.1.2 as updated Nov 2025).**
    Apps sending personal data to third-party AI must name the provider and get
@@ -2738,6 +2762,31 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-26 — WEBSITE SEO + AEO: BLOG, FAQ, CRAWLER-READABLE HOME
+  (§4 task 28; built in `claude/machina-seo-strategy-14fd4c`, not yet
+  shipped).** Before this, `/` served crawlers a 33-character boot shell, and
+  `robots.txt`, `sitemap.xml` and `llms.txt` all 404'd. No OG tags or JSON-LD
+  either. Owner asked for "everything you can" on the website without touching
+  the app or the design, and relaxed D-3 for the website (recorded in
+  `docs/BRANDING.md`). Built: a user-agent rewrite so bots get `/welcome` at
+  `/` (verified with a `VERCEL=1` build: Chrome UA → the 21 KB shell, GPTBot
+  UA → the landing HTML + JSON-LD); metadata + generated OG cards; robots
+  (AI crawlers named), sitemap, llms.txt/llms-full.txt, RSS; `/blog` (11
+  posts, written by 3 research agents with every stat sourced and linked)
+  and `/faq`, both in the landing's own header/footer (moved verbatim to
+  `components/landing/chrome.tsx`), plus Blog/FAQ footer links (web only,
+  hidden in the native shell). **Fact-check catch:** the posts and this
+  doc's featuring entry said reminders resurface saves "after 1, 7, 30 and
+  90 days". The code says otherwise (`reminder_service.py`
+  `calculate_next_reminder` + `should_complete_reminder`): a reminder is
+  opt-in per save ("Smart review"), and fires the next day, then 7 days
+  later, then 30 days later, and stops at 3. All site copy now says that.
+  ⚠️ **The App Store featuring nomination's description may repeat the 1/7/30/90
+  claim. Check it in App Store Connect.** Verified: `tsc`, eslint, export
+  build (40 static pages), the Vercel-mode build, and the pages in the preview
+  (light/dark, 375px, no overflow). Not verified: live Vercel behaviour of the
+  rewrite and the host header (needs deploy); Google's rendering of `/`.
+  Owner steps are under task 28.
 - **2026-10-26 — App Store featuring nomination SUBMITTED; DAY 1 = TUE 17
   NOV 2026 (owner, 11:36 local).** App Store Connect → Featuring →
   Nominations: "Machina launch", App Launch, publish date Nov 17, iPhone,

@@ -202,6 +202,15 @@ retention, 50 organic shares.** *Retention gates any paid spend* — do not buy
 installs before week-2 retention holds. This is the one number that should
 override enthusiasm.
 
+**Scope change to D-3 (owner, 2026-10-26): the marketing website is exempt.**
+The owner kept "second brain" off the *app* and the *App Store storefront*
+because that space is crowded; it was never meant to stop the website ranking
+for it. On mymachina.app, the blog (`/blog`), the FAQ (`/faq`), page titles,
+meta descriptions, JSON-LD and `/llms.txt` may say "second brain" and "AI"
+freely. Still in force everywhere: D-1 (never "Machina AI"), and the landing
+page's own on-page copy is unchanged (it also renders as the iPhone app's
+signed-out screen, so D-3 still applies to it). Constants: `web/lib/site.ts`.
+
 **Scope note on D-3:** Apple Search Ads keywords are invisible to users in the
 same way the App Store keywords field is, so bidding on `second brain` there is
 permitted. D-3 restricts *user-visible surfaces*, not the search index.
