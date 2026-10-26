@@ -20,6 +20,20 @@
 export interface TakeawaySource {
     actionableTakeaway?: unknown;
     metadata?: { actionableTakeaway?: unknown } | null;
+    category?: unknown;
+}
+
+/** Categories that never carry a "Do this" (owner call, 2026-10-26). A
+ *  recipe's "task" was always one of its own steps ("Dredge the chicken…") —
+ *  a to-do row for something the card's Steps section already says. The
+ *  backend stopped generating them too (`ai_service` TAKEAWAY_RULE_BULLETS,
+ *  `main._build_link_data`); this gate covers cards saved before that and any
+ *  card later moved into the category. Categories are stored in English Title
+ *  Case (`link_service.canonical_category`); matched loosely anyway. */
+const NO_TAKEAWAY_CATEGORIES = new Set(['recipe', 'recipes']);
+
+function hidesTakeaway(category: unknown): boolean {
+    return typeof category === 'string' && NO_TAKEAWAY_CATEGORIES.has(category.trim().toLowerCase());
 }
 
 /**
@@ -27,10 +41,13 @@ export interface TakeawaySource {
  *
  * Always a string (never null/undefined) so every caller's emptiness test is
  * the same one, and a whitespace-only value counts as absent: a "Do this"
- * heading over a blank line is worse than no heading at all.
+ * heading over a blank line is worse than no heading at all. A Recipe card
+ * reads as having none, whatever is stored (see NO_TAKEAWAY_CATEGORIES), so
+ * Revisit, its Done list, card detail and export all agree.
  */
 export function getActionableTakeaway(link: TakeawaySource | null | undefined): string {
     if (!link) return '';
+    if (hidesTakeaway(link.category)) return '';
     const top = link.actionableTakeaway;
     if (typeof top === 'string' && top.trim()) return top.trim();
     const nested = link.metadata?.actionableTakeaway;

@@ -10,6 +10,19 @@ test('reads the takeaway from either shape and trims it', () => {
     assert.equal(getActionableTakeaway(null), '');
 });
 
+test('a Recipe card never has a takeaway, whatever is stored', () => {
+    assert.equal(getActionableTakeaway({ category: 'Recipe', metadata: { actionableTakeaway: 'Dredge the chicken' } }), '');
+    assert.equal(getActionableTakeaway({ category: ' recipes ', actionableTakeaway: 'Chill the dough' }), '');
+    assert.equal(getActionableTakeaway({ category: 'Food', actionableTakeaway: 'Book the class' }), 'Book the class');
+    const cards = [
+        { id: 'recipe', createdAt: 2, category: 'Recipe', actionableTakeaway: 'Dredge the chicken' },
+        { id: 'recipe-done', createdAt: 3, category: 'Recipe', actionableTakeaway: 'Rest the dough', takeawayDoneAt: 9 },
+        { id: 'howto', createdAt: 1, category: 'Productivity', actionableTakeaway: 'Turn on grayscale' },
+    ];
+    assert.deepEqual(openTakeaways(cards).map((c) => c.id), ['howto']);
+    assert.deepEqual(closedTakeaways(cards), []);
+});
+
 test('done is a positive timestamp, nothing else', () => {
     assert.equal(isTakeawayDone({ takeawayDoneAt: 1_700_000_000_000 }), true);
     assert.equal(isTakeawayDone({ takeawayDoneAt: null }), false);

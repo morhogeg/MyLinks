@@ -160,3 +160,25 @@ def test_card_takeaway_tolerates_a_malformed_card():
     assert main._card_takeaway({"metadata": "not a dict"}) == ""
     assert main._card_takeaway({"metadata": {"actionableTakeaway": 42}}) == ""
     assert main._card_takeaway({"actionableTakeaway": ["a list"]}) == ""
+
+
+# ── NEVER on a Recipe card (owner call, 2026-10-26) ───────────────────────
+
+def test_recipe_analysis_loses_its_takeaway():
+    # Every analysis returns through _enforce_tag_language, so this is the one
+    # place a recipe's "Do this" is dropped before any save path sees it.
+    from ai_service import GeminiService
+    out = GeminiService._enforce_tag_language(
+        _analysis(category="Recipe", actionableTakeaway="Dredge the chicken in flour first."))
+    assert "actionableTakeaway" not in out
+    assert main._build_link_data(
+        url="https://example.com/r", title="t", summary="s", detailed_summary="d",
+        source_type="web", source_name="x", original_title="t",
+        estimated_read_time=1, analysis=out,
+    )["metadata"]["actionableTakeaway"] is None
+
+
+def test_non_recipe_analysis_keeps_its_takeaway():
+    from ai_service import GeminiService
+    out = GeminiService._enforce_tag_language(_analysis(category="Food"))
+    assert out["actionableTakeaway"] == "Block the first 90 minutes of your day."

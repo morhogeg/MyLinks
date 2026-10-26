@@ -533,10 +533,9 @@ TAKEAWAY_RULE_BULLETS = """   - **LANGUAGE**: Write the takeaway in the SAME lan
      GOOD: "Switch your phone to black and white so the screen is easier to put down."
      GOOD: "Wait 90 minutes after waking for coffee, and skip caffeine after 2 PM."
      GOOD: "Book a Tsukiji sushi-making class before you fly, while spots are still open."
-     GOOD (a recipe): "Chill the cookie dough for 24 hours before baking for a deeper flavor."
      BAD (generic, no detail from the content): "Limit your screen time to improve your focus."
      BAD (too long, several steps): "Track your caffeine intake, stop drinking coffee in the afternoon, and switch your evening drink to herbal tea for better sleep."
-   - **INCLUDE ONLY WHEN GENUINE**: Provide a takeaway ONLY if the content genuinely supports one concrete, specific action. A recipe or a how-to with real steps always does: its task is the ONE technique or step that makes it work, not the whole procedure. If the content is not actionable (e.g. a news event, an anecdote, a personal note or update), OMIT this field entirely: leave it out of the JSON rather than manufacturing advice.
+   - **INCLUDE ONLY WHEN GENUINE**: Provide a takeaway ONLY if the content genuinely supports one concrete, specific action. A how-to with real steps always does: its task is the ONE technique or step that makes it work, not the whole procedure. A RECIPE NEVER gets one (category "Recipe"): its steps already live in the card's Steps section, so a step repeated as a to-do adds nothing; omit the field. If the content is not actionable (e.g. a news event, an anecdote, a personal note or update), OMIT this field entirely: leave it out of the JSON rather than manufacturing advice.
    - **DO NOT INVENT ADVICE**: Never pad this with generic filler ("stay informed", "consider the implications"). An omitted takeaway is always better than a fabricated one."""
 
 # Professional system prompt
@@ -1434,7 +1433,12 @@ class GeminiService:
         "Recipe" card, case-insensitive) — the prompt already says a tag like
         that adds nothing over the category, and the same lesson applies:
         instruction-following can't be trusted, so it's enforced after parsing.
+
+        Every analysis path returns through here, so it is also where a
+        Recipe card's takeaway is dropped (_drop_recipe_takeaway) — before any
+        caller, the note path included, can store it.
         """
+        data = GeminiService._drop_recipe_takeaway(data)
         tags = data.get("tags") if isinstance(data, dict) else None
         if not isinstance(tags, list) or not tags:
             return data
@@ -1457,6 +1461,23 @@ class GeminiService:
             if len(kept) != len(tags):
                 logger.info("Dropped tag duplicating the category")
                 data["tags"] = kept
+        return data
+
+    @staticmethod
+    def _drop_recipe_takeaway(data: dict) -> dict:
+        """A Recipe card never carries a "Do this" (owner call, 2026-10-26).
+
+        Its task was always one of its own steps ("Dredge the chicken…"), a
+        Revisit to-do for something the card's Steps section already says.
+        The prompt now says to omit it; this enforces that after parsing, for
+        the same reason as the tag rules above. The client hides one on any
+        Recipe card too (web/lib/takeaway.ts), which covers older cards.
+        """
+        if not isinstance(data, dict) or not data.get("actionableTakeaway"):
+            return data
+        if str(data.get("category") or "").strip().casefold() in ("recipe", "recipes"):
+            data.pop("actionableTakeaway", None)
+            logger.info("Dropped takeaway on a Recipe card")
         return data
 
     @staticmethod
