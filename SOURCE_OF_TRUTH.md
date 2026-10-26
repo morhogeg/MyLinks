@@ -2730,6 +2730,27 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-26 — Landing page: the how-to film under the hero (web only).**
+  New `Watch` section in `LandingPage.tsx`, between `Hero` and
+  `GatherScene`: the film's YouTube thumbnail (`-nKonQBYbsY`, "Machina:
+  Everything you save, finally useful", 1:13, 16:9, Machina App channel)
+  with a play button; pressing play swaps in a `youtube-nocookie.com`
+  player already playing (`autoplay=1&rel=0&playsinline=1`). Nothing of
+  Google's loads before the tap. The poster is a real link to the video, so
+  it still works without JS. `vercel.json` CSP `frame-src` gains
+  `https://www.youtube-nocookie.com` (thumbnail is covered by `img-src
+  https:`). **Hidden on native** (`isNativeApp()` early return; safe
+  because native mounts the landing client-only). **Gotcha learned:** a
+  nested `.light` class does NOT re-theme Tailwind token utilities
+  (`bg-accent` reads `--color-accent`, resolved once at `:root`); the play
+  button reads `--accent` raw (`bg-(--accent)`) inside a `.light` poster so
+  it stays dark on the light thumbnail in dark mode. Verified: tsc 0,
+  eslint 0; dev server at 375px + desktop, light + dark; play swaps to
+  the nocookie iframe and stays on the page. Not verified: the native hide
+  (no device run), and the live CSP until after the push. **Owner note:**
+  YouTube showed its auto-generated captions on top of the film's burned-in
+  captions; unpublish the auto-captions in YouTube Studio → Subtitles if
+  that shows for visitors too.
 - **2026-10-26 — Landing page: Machina's social accounts in header + footer
   (LIVE on web: commit `aefd9aa`, merge `5df4d70`; native on next TestFlight
   build).** Live HTML of `mymachina.app/welcome` carries all four hrefs twice

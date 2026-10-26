@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useRef, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import Link from 'next/link';
-import { Share2, Globe, ChevronRight, Quote } from 'lucide-react';
+import { Share2, Globe, ChevronRight, Quote, Play } from 'lucide-react';
 import { CitationGlyph, Wordmark } from '@/components/ui/Wordmark';
 import ThemeToggle from '@/components/ThemeToggle';
 import GatherScene from '@/components/landing/GatherScene';
@@ -84,6 +84,7 @@ export default function LandingPage({
             <Header onGetStarted={onGetStarted} />
             <main>
                 <Hero onGetStarted={onGetStarted} />
+                <Watch />
                 <GatherScene />
                 <CaptureScene />
                 <AskScene />
@@ -397,6 +398,84 @@ function Hero({ onGetStarted }: { onGetStarted?: () => void }) {
                 </div>
             </div>
 
+        </section>
+    );
+}
+
+/* --------------------------------------------------------------------- watch */
+
+/** The how-to film on the Machina App channel. 16:9, embeddable (oEmbed 200). */
+const WATCH_VIDEO_ID = '-nKonQBYbsY';
+const WATCH_TITLE = 'Machina: Everything you save, finally useful';
+
+/**
+ * The short how-to film, right under the hero (owner call, 2026-10-26).
+ *
+ * TAP-TO-PLAY, not an embed on load: until someone presses play this is the
+ * film's own YouTube thumbnail and nothing of Google's loads — no player
+ * script, no cookies, no weight on the page. Pressing play swaps in a
+ * `youtube-nocookie.com` player (vercel.json `frame-src` allows exactly that
+ * host) already playing. The poster is a real link to the video, so without
+ * JavaScript it still opens the film on YouTube.
+ *
+ * WEB ONLY: the iPhone's signed-out landing mounts this same page, but someone
+ * who already installed the app doesn't need the tour, and it keeps a YouTube
+ * player off App Review's first screen. Native renders the landing client-only
+ * (`SignedOutWeb`, `ssr: false`), so this early return can't mismatch a
+ * prerender.
+ */
+function Watch() {
+    const [ref, seen] = useInView<HTMLElement>();
+    const [playing, setPlaying] = useState(false);
+    if (isNativeApp()) return null;
+    return (
+        <section
+            ref={ref}
+            aria-label="Watch how Machina works"
+            className={`mx-auto max-w-4xl px-6 pb-14 sm:pb-20 ${seen ? 'mx-in' : ''}`}
+        >
+            <div className="mx-rise relative aspect-video overflow-hidden rounded-3xl border border-border-subtle bg-card shadow-sm">
+                {playing ? (
+                    <iframe
+                        src={`https://www.youtube-nocookie.com/embed/${WATCH_VIDEO_ID}?autoplay=1&rel=0&playsinline=1`}
+                        title={WATCH_TITLE}
+                        allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+                        allowFullScreen
+                        referrerPolicy="strict-origin-when-cross-origin"
+                        className="absolute inset-0 h-full w-full"
+                    />
+                ) : (
+                    <a
+                        href={`https://www.youtube.com/watch?v=${WATCH_VIDEO_ID}`}
+                        onClick={(e) => {
+                            e.preventDefault();
+                            setPlaying(true);
+                        }}
+                        aria-label={`Play video: ${WATCH_TITLE}`}
+                        // `light` pins the light theme's tokens to the poster:
+                        // the thumbnail is a light frame in both themes, so
+                        // the play button must stay the dark accent — the
+                        // dark theme's near-white accent vanished on it. The
+                        // button reads `--accent` raw: Tailwind's `bg-accent`
+                        // goes through `--color-accent`, resolved once at the
+                        // root, so a nested `.light` wouldn't reach it.
+                        className="light group absolute inset-0 block"
+                    >
+                        <img
+                            src={`https://i.ytimg.com/vi/${WATCH_VIDEO_ID}/maxresdefault.jpg`}
+                            alt=""
+                            loading="lazy"
+                            decoding="async"
+                            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.015]"
+                        />
+                        <span className="absolute inset-0 grid place-items-center">
+                            <span className="grid h-16 w-16 place-items-center rounded-full bg-(--accent) text-(--accent-ink) shadow-lg shadow-black/20 transition-transform duration-300 group-hover:scale-105 sm:h-20 sm:w-20">
+                                <Play className="ml-1 h-7 w-7 fill-current sm:h-8 sm:w-8" aria-hidden />
+                            </span>
+                        </span>
+                    </a>
+                )}
+            </div>
         </section>
     );
 }
