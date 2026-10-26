@@ -2730,6 +2730,23 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-26 — Landing page: Machina's social accounts in header + footer
+  (branch only, not shipped).** `LandingPage.tsx` gains a `Socials` row
+  linking X, Instagram, TikTok (`machinaapp`) and YouTube (`@MachinaApp`),
+  drawn with the app's own source marks (`platformIcon`, `lib/platform.tsx`)
+  in `text-secondary`, each taking its `platformColor` on hover (theme-aware
+  for X/TikTok). Header uses a compact size (32px tall, 24px wide below
+  `sm`) and hides below 360px, where the row can't fit; footer uses 44px
+  targets. On native the links open in Safari via `openExternal` (the
+  `AIConsentNotice` pattern) so the WKWebView doesn't navigate away. **Ships
+  to mymachina.app on the main push; the iPhone's signed-out landing (same
+  component, bundled export) gets it only on the next TestFlight build.**
+  Verified: tsc 0; rendered in the dev server at 375px (no overflow, header
+  ends at the 24px gutter) and desktop, light + dark, hover color. Not
+  verified: on a device. **Pending:** the instructional YouTube video —
+  needs the video link; plan is a tap-to-play poster with
+  `youtube-nocookie.com` added to `frame-src` in `vercel.json`, and the
+  owner still has to decide whether the native landing shows it.
 - **2026-10-25 — INSTAGRAM + TIKTOK VERIFIED ON DEVICE (1384); TIKTOK GETS ITS
   MARK.** Owner on build 1384: "Everything works perfectly". An Instagram reel
   became a real card (Hebrew recipe, @einavhakounfood, Instagram mark) and a
