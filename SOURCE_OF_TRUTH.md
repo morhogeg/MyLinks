@@ -2738,6 +2738,23 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-26 — App Store featuring nomination SUBMITTED; DAY 1 = TUE 17
+  NOV 2026 (owner, 11:36 local).** App Store Connect → Featuring →
+  Nominations: "Machina launch", App Launch, publish date Nov 17, iPhone,
+  ID `9c76f94a-66f5-4681-9515-39061b504ac7`. The checklist's suggested 10 Nov
+  was dropped: by today it gave Apple 15 days' notice, not the 3 weeks asked;
+  17 Nov gives 22 (24 Nov is Thanksgiving week). Description (980/1000) and
+  Helpful Details (490/500, founder voice from Settings → The story behind
+  Machina) were rewritten with the owner; claims checked against code:
+  YouTube `videoHighlights` timestamps, spaced reminders (1/7/30/90 days),
+  `suggestNewCollections`, notes feed search + Ask (NOT AI-summarized; note
+  text stays verbatim), sharing = card/collection/answer links (shared pages
+  do NOT show connections). Supplemental: 5 view-only Drive links in folder
+  "Machina - App Store featuring" (launch film + screenshots 2, 6, 7, 8);
+  1-feed and 5-collection left out (real faces). Checklist `mkt-featuring`
+  marked done with the full record. **Day 1 is now fixed for Product Hunt,
+  press and post scheduling.** Date stays editable in ASC if launch moves.
+  Leftover: two private duplicate `Machina launch film.mp4` in My Drive root.
 - **2026-10-26 — 1.0 RESUBMITTED TO APP REVIEW WITH BUILD 1388 (owner,
   10:21 local).** Owner checked on 1388 that recipe cards no longer show a
   "Do this", pulled 1382 from review, attached 1388 to 1.0 and submitted 4
