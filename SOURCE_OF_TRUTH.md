@@ -881,13 +881,15 @@ The multi-user auth work described below **was** fully written but not live:
   2026-10-25). Build 1383 carried the reader but its extension died on tap;
   1384 fixed that. **Owner on 1384: "Everything works perfectly"**: an IG reel
   landed as a real Hebrew recipe card (@einavhakounfood) and a TikTok as
-  "Creamy Lemon Chicken" (@madebythewa). **Still open, owner's call: which
-  build reaches the App Store.** 1.0 is in review with build 1382, which
-  predates the phone read: its IG/TikTok shares make honest partial cards (the
-  backend half is live for every build), not real ones. Either take 1382 out
-  of review and resubmit 1.0 with the newest build, or release 1.0 and follow
-  with 1.0.1. Not verified here which of those App Store Connect allows in
-  1.0's current review state.
+  "Creamy Lemon Chicken" (@madebythewa). **DECIDED 2026-10-26 (owner): swap
+  1.0's build.** 1382 predates the phone read (its IG/TikTok shares make
+  honest partial cards, not real ones), so the owner pulls 1382 from review
+  ("Developer Reject"), attaches **build 1387** (run #387, sha `b1fc39d`:
+  phone read + TikTok/X marks + onboarding copy + landing social links) to
+  the same 1.0 version, and resubmits. Version stays 1.0 (never released).
+  - **[ ] OWNER: install 1387 from TestFlight, smoke-test (IG + TikTok
+    share, landing links signed out), then swap and resubmit** — steps in
+    the 2026-10-26 §9 entry.
 
 1. **[x] Native auth build green (iOS)** *(code done 2026-07-03 — root cause was
    the Xcode 16 toolchain, not a dependency conflict; see §3. Workflow moved to
@@ -2730,6 +2732,21 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-26 — Build 1387 triggered to REPLACE 1382 in 1.0's review
+  (owner call).** Owner: no point waiting on a build whose IG/TikTok
+  capture is weak. `trigger/testflight` pushed at `b1fc39d` → run #387 →
+  **build 1387**. Owner steps, in order: (1) TestFlight → install 1387,
+  check an Instagram and a TikTok share become real cards and the signed-out
+  landing shows the social icons (no video in the app, by design);
+  (2) App Store Connect → Apps → Machina → iOS App 1.0 → "Remove from
+  Review"/"Developer Reject" (the first subscriptions ride in the same
+  submission; check whether they leave review with it); (3) in the 1.0 page's
+  Build section remove 1382, "Add Build" → 1387 (answer export
+  compliance if asked); (4) re-add Machina Pro Annual + Monthly under "In-App
+  Purchases and Subscriptions" if they dropped off; (5) "Add for Review" →
+  "Submit for Review". Review restarts from the back of the queue. Not
+  verified: the exact button labels in today's App Store Connect (written
+  from general knowledge), and 1387 on a device.
 - **2026-10-26 — Landing page: the how-to film under the hero (web only).**
   New `Watch` section in `LandingPage.tsx`, between `Hero` and
   `GatherScene`: the film's YouTube thumbnail (`-nKonQBYbsY`, "Machina:
