@@ -2746,8 +2746,11 @@ exact-match, capped.
   button reads `--accent` raw (`bg-(--accent)`) inside a `.light` poster so
   it stays dark on the light thumbnail in dark mode. Verified: tsc 0,
   eslint 0; dev server at 375px + desktop, light + dark; play swaps to
-  the nocookie iframe and stays on the page. Not verified: the native hide
-  (no device run), and the live CSP until after the push. **Owner note:**
+  the nocookie iframe and stays on the page. **LIVE** (commit `0146f05`,
+  merge `aa9ea93`, ~45 s): live `frame-src` carries the host, and pressing
+  play on `mymachina.app/welcome` loaded the player with zero CSP
+  violations. Not verified: the native hide (no device run; the iPhone gets
+  this code only on the next TestFlight build anyway). **Owner note:**
   YouTube showed its auto-generated captions on top of the film's burned-in
   captions; unpublish the auto-captions in YouTube Studio → Subtitles if
   that shows for visitors too.
