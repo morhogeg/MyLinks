@@ -6,16 +6,38 @@ import type { Metadata, Viewport } from "next";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import "./globals.css";
+import { APP_STORE_ID, HOME_DESCRIPTION, HOME_TITLE, SITE_NAME, SITE_URL } from "@/lib/site";
 
 const geistSans = GeistSans;
 const geistMono = GeistMono;
 
 export const metadata: Metadata = {
+  // Resolves every relative URL below (canonical, Open Graph images) against
+  // the production domain, whichever host served the page.
+  metadataBase: new URL(SITE_URL),
+  // The bare "Machina" stays the signed-in web app's tab title. `/` is the only
+  // app route, so these defaults are effectively the root's; every public page
+  // sets its own title, description and canonical.
   title: "Machina",
-  // The product tagline (docs/BRANDING.md D-6). Not the App Store subtitle —
-  // that stays `Capture. Ask. Connect.` (36 chars doesn't fit the 30-char field,
-  // and `save` is already a Name token).
-  description: "Everything you save, finally useful.",
+  description: HOME_DESCRIPTION,
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    siteName: SITE_NAME,
+    url: "/",
+    title: HOME_TITLE,
+    description: HOME_DESCRIPTION,
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    site: "@machinaapp",
+    title: HOME_TITLE,
+    description: HOME_DESCRIPTION,
+  },
+  // Safari's native "Open in App Store" banner. Off until the id is known
+  // (lib/site.ts); it is browser chrome, not page design.
+  ...(APP_STORE_ID ? { itunes: { appId: APP_STORE_ID } } : {}),
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,

@@ -5,6 +5,7 @@ import Link from "next/link";
 export const metadata: Metadata = {
   title: "Privacy Policy · Machina",
   description: "How Machina collects, uses, and protects your data.",
+  alternates: { canonical: "/privacy" },
 };
 
 /**

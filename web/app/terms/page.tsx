@@ -4,6 +4,7 @@ import Link from "next/link";
 export const metadata: Metadata = {
   title: "Terms of Service · Machina",
   description: "The terms that govern your use of Machina.",
+  alternates: { canonical: "/terms" },
 };
 
 /**

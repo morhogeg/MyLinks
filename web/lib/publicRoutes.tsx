@@ -17,8 +17,11 @@ import { AuthProvider } from '@/components/AuthProvider';
  * copy is in the shipped markup and the URL makes NO auth call at all, which is
  * what a crawler, a JS-less fetch, or a reviewer checking the claim actually
  * gets. See `components/LandingPage.tsx`.
+ *
+ * `/blog` (and every `/blog/<slug>`) and `/faq` are the public website's
+ * content pages: static, auth-free, written for search and AI assistants.
  */
-const PUBLIC_ROUTES = ['/privacy', '/terms', '/welcome'];
+const PUBLIC_ROUTES = ['/privacy', '/terms', '/welcome', '/blog', '/faq'];
 
 export function AuthGate({ children }: { children: ReactNode }) {
     const pathname = usePathname() ?? '';
