@@ -2731,7 +2731,10 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 
 - **2026-10-26 — Landing page: Machina's social accounts in header + footer
-  (branch only, not shipped).** `LandingPage.tsx` gains a `Socials` row
+  (LIVE on web: commit `aefd9aa`, merge `5df4d70`; native on next TestFlight
+  build).** Live HTML of `mymachina.app/welcome` carries all four hrefs twice
+  (header + footer), ~45 s after the push. The YouTube icon goes to the
+  channel (owner call: videos get posted there), not a single video. `LandingPage.tsx` gains a `Socials` row
   linking X, Instagram, TikTok (`machinaapp`) and YouTube (`@MachinaApp`),
   drawn with the app's own source marks (`platformIcon`, `lib/platform.tsx`)
   in `text-secondary`, each taking its `platformColor` on hover (theme-aware
@@ -2743,10 +2746,11 @@ exact-match, capped.
   component, bundled export) gets it only on the next TestFlight build.**
   Verified: tsc 0; rendered in the dev server at 375px (no overflow, header
   ends at the 24px gutter) and desktop, light + dark, hover color. Not
-  verified: on a device. **Pending:** the instructional YouTube video —
-  needs the video link; plan is a tap-to-play poster with
-  `youtube-nocookie.com` added to `frame-src` in `vercel.json`, and the
-  owner still has to decide whether the native landing shows it.
+  verified: on a device. **Next (owner wants to discuss first):** embed a
+  short how-to video on the page itself — plan is a tap-to-play poster
+  (YouTube thumbnail) loading a `youtube-nocookie.com` player, which needs
+  that host added to `frame-src` in `vercel.json`; open questions are which
+  video, where on the page, and whether the native landing shows it.
 - **2026-10-25 — INSTAGRAM + TIKTOK VERIFIED ON DEVICE (1384); TIKTOK GETS ITS
   MARK.** Owner on build 1384: "Everything works perfectly". An Instagram reel
   became a real card (Hebrew recipe, @einavhakounfood, Instagram mark) and a
