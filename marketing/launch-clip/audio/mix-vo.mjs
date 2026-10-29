@@ -42,6 +42,8 @@ const SCRIPTS = {
   // POV: YOU SAVED IT (clips/pov-timeline.mjs, audio/pov-score.mjs): the reel's
   // balance, and the kit's Signature take laid in at its own frame
   pov: { vo: path.join(root, 'out', 'vo', 'pov'), score: 'clips/pov/score.wav', out: 'clips/pov/score-vo.wav', duck: 0.55, timeline: '../clips/pov-timeline.mjs', signature: true },
+  // the App Store preview: no narrator lines (an empty manifest), only the Signature's take
+  preview: { vo: path.join(root, 'out', 'vo', 'preview'), score: 'clips/preview/score.wav', out: 'clips/preview/score-vo.wav', duck: 0.55, timeline: '../clips/preview-timeline.mjs', signature: true },
 };
 const name = process.argv[2] ?? 'film';
 const script = SCRIPTS[name];
@@ -157,7 +159,7 @@ let g = peak > 0.98 ? 0.98 / peak : 1;
 // Shorts and YouTube expect a finished mix (the round-12 mix measured −15.8).
 // A global gain, then a look-ahead limiter on the few transients that would
 // pass the ceiling. The film's mix is untouched (it has no MASTER).
-const MASTER = { reel: { lufs: -14, truePeak: -1 }, find: { lufs: -14, truePeak: -1 }, savethis: { lufs: -14, truePeak: -1 }, needle: { lufs: -14, truePeak: -1 }, 'needle-video': { lufs: -14, truePeak: -1 }, revisit: { lufs: -14, truePeak: -1 }, pov: { lufs: -14, truePeak: -1 } }[name];
+const MASTER = { reel: { lufs: -14, truePeak: -1 }, find: { lufs: -14, truePeak: -1 }, savethis: { lufs: -14, truePeak: -1 }, needle: { lufs: -14, truePeak: -1 }, 'needle-video': { lufs: -14, truePeak: -1 }, revisit: { lufs: -14, truePeak: -1 }, pov: { lufs: -14, truePeak: -1 }, preview: { lufs: -14, truePeak: -1 } }[name];
 if (MASTER) {
   let gain = 10 ** ((MASTER.lufs - lufs(L, R, SR)) / 20);
   let ceiling = 10 ** ((MASTER.truePeak - 0.3) / 20);

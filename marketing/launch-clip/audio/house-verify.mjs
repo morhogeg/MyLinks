@@ -33,6 +33,8 @@ const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 export const HOUSE = {
   // POV: YOU SAVED IT (2026-10-25)
   pov: { timeline: 'clips/pov-timeline.mjs', dir: 'src/reels/clips/pov', mix: 'public/clips/pov/score-vo.wav' },
+  // THE APP STORE PREVIEW (2026-10-28)
+  preview: { timeline: 'clips/preview-timeline.mjs', dir: 'src/reels/clips/preview', mix: 'public/clips/preview/score-vo.wav' },
 };
 
 const TAGLINE = SIGNATURE.line;

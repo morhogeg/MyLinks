@@ -16,6 +16,8 @@ import { Revisit } from './reels/clips/revisit/Revisit';
 import { Signature } from './reels/kit/Signature';
 import * as POV from '../clips/pov-timeline.mjs';
 import { Pov } from './reels/clips/pov/Pov';
+import * as PREVIEW from '../clips/preview-timeline.mjs';
+import { AppPreview } from './reels/clips/preview/Preview';
 import { SIGNATURE } from './reels/kit/signature.mjs';
 
 /**
@@ -277,6 +279,26 @@ export const RemotionRoot: React.FC = () => (
       width={POV.WIDTH}
       height={POV.HEIGHT}
       defaultProps={{ withAudio: true, withCaptions: true, ending: 'store' as const }}
+    />
+    {/* THE APP STORE PREVIEW (src/reels/clips/preview, clips/preview-timeline.mjs):
+        real screen recordings, 1080 x 2340 here, encoded to 886 x 1920 */}
+    <Composition
+      id="MachinaAppPreview"
+      component={AppPreview}
+      durationInFrames={PREVIEW.TOTAL_FRAMES}
+      fps={PREVIEW.FPS}
+      width={PREVIEW.WIDTH}
+      height={PREVIEW.HEIGHT}
+      defaultProps={{ withAudio: true, withCaptions: true }}
+    />
+    <Composition
+      id="MachinaAppPreviewSilent"
+      component={AppPreview}
+      durationInFrames={PREVIEW.TOTAL_FRAMES}
+      fps={PREVIEW.FPS}
+      width={PREVIEW.WIDTH}
+      height={PREVIEW.HEIGHT}
+      defaultProps={{ withAudio: false, withCaptions: true }}
     />
   </>
 );

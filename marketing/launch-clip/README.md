@@ -1551,6 +1551,76 @@ H.264 High yuv420p BT.709, AAC 48kHz 320k, 23.8MB in round 2 (13.1MB in
 round 1: the filled tiles carry more detail); no brightness jump at the
 three range seams; the last frame still pixel-identical to the Signature. Nobody has listened to it on speakers.
 
+## THE APP STORE PREVIEW (2026-10-28/29)
+
+The App Preview video for the 1.0 product page: 25.3s, 886 × 1920, H.264
+High L4.0, 30fps, AAC stereo 256k 48kHz (`out/preview/Machina-App-Preview-886x1920.mp4`;
+`Machina-App-Preview-review-copy.mp4` is a small copy for phones, never the
+upload). Apple's spec and rules are in `clips/preview-timeline.mjs`'s header.
+
+**The story: one save, start to useful**, under a camera:
+
+- **"Save anything, from any app."** A Mark Manson video, "If You Want to Fix
+  Brain Rot, Watch This Immediately" (YouTube `Ey1g-imraNs`), pasted into Add
+  to Machina; Save.
+- **"Every save, analyzed and summarized."** The card built LIVE: "Fetching
+  the video..." over its thumbnail, "Reading the page", "Writing the
+  summary", "Searching connections", the card landing ("The Truth About
+  Attention Spans and Digital Distraction", 18 min).
+- **"Jump to the moments that matter."** Opened on its four timestamped key
+  moments (ringed).
+- **"Turn what you save into what you do."** A whip down to its Do this
+  ("Perform an attention audit...", ringed).
+- **"Ask about anything you saved." / "Answers cite your saves."** "Is my
+  attention span really 8 seconds?" typed; a two-sentence answer (a myth)
+  citing the new card, question to source on one screen (ringed).
+- **"Every save, connected."** The card's See in graph: it builds around the
+  card, six links lit.
+- The kit's Signature, no footer (owner, round 3).
+
+**Rounds.** 1: full-bleed static screens of a saved card. 2 ("not engaging
+enough"): the live save, the camera, rings, a groove. 3 (owner): a short Ask
+answer with its source on one screen (no scroll), hook and captions
+rewritten (the hook no longer narrows the app to video; "Turn what you save
+into what you do." is App Store screenshot 8's approved line), no footer,
+and smoothness: the simulator's web view scrolls at ~15fps (50-70ms frame
+gaps in the takes), so there is NO scroll footage; the app's other
+animations were captured at a steady 60fps and are motion-blurred to 30
+(two-frame mean); joins crossfade; the camera runs a monotone cubic through
+its keys (no stops, no snaps, no overshoot).
+
+**Everything on screen is the real app**: the iOS Simulator (iPhone 17 Pro
+Max, Debug build of `main` at `0db534f2`), signed into the review account, on
+the live backend. The camera only frames it; zoom is capped so no word is
+cropped (a full-width screen's text spans 16-424pt: z ≤ 1.26). Retimes, all
+of real footage: the build and answer waits are cut, "Searching your
+library..." is skipped (brand ban), the typing's 60fps character steps are
+each shown two frames.
+
+**Choosing the video:** check the thumbnail first
+(`https://i.ytimg.com/vi/<id>/mqdefault.jpg`). Manson's "Why Trying to Be
+Confident Makes You Less Confident" was saved first and dropped: its
+thumbnail prints profanity, which Apple bans in previews. That card is
+ARCHIVED on the review account (not deleted).
+
+    python3 capture/preview-cut.py <takes dir> public/clips/preview
+    node audio/preview-score.mjs && node audio/mix-vo.mjs preview
+    node audio/house-verify.mjs preview && node scripts/preview-stills.mjs
+    # render MachinaAppPreviewSilent in ranges (house recipe), concat, then:
+    ffmpeg -i master.mp4 -i public/clips/preview/score-vo.wav -map 0:v -map 1:a \
+      -vf "scale=886:1920:flags=lanczos,format=yuv420p,setsar=1" -r 30 \
+      -c:v libx264 -profile:v high -level:v 4.0 -preset slow -b:v 11M -maxrate 12M \
+      -bufsize 22M -x264-params keyint=30:min-keyint=30 -color_primaries bt709 \
+      -color_trc bt709 -colorspace bt709 -c:a aac -b:a 256k -ar 48000 -ac 2 \
+      -shortest -movflags +faststart Machina-App-Preview-886x1920.mp4
+
+The takes (`capture/preview-cut.py` header): `xcrun simctl io <device>
+recordVideo --codec=h264`, made 60fps CFR (`S60.mp4` the save, the card and
+its graph; `R60.mp4` Ask). Not in git.
+
+**Poster frame:** set it to 0s in App Store Connect (the hook over the Add
+sheet). Apple's default, 5s, lands mid-transition.
+
 ## Motion language
 
 The rules every Machina video follows, and the kit component that implements
