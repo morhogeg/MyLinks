@@ -1,6 +1,6 @@
 import React from 'react';
 import { AbsoluteFill, Audio, OffthreadVideo, Sequence, staticFile, useCurrentFrame } from 'remotion';
-import { CAMERA, CAPTIONS, CLIPS, DISSOLVE, HEIGHT, PINGS, SCREEN, SIGNATURE_AT, SLAB, TAPS, WHIP, WIDTH } from '../../../../clips/preview-timeline.mjs';
+import { CAMERA, CAPTIONS, CLIPS, DISSOLVE, FPS, HEIGHT, PINGS, SCREEN, SIGNATURE_AT, SLAB, TAPS, WIDTH } from '../../../../clips/preview-timeline.mjs';
 import { Ping, Tap } from '../../kit/AppShot';
 import { BandScrim, HOUSE_BAND } from '../../kit/Captions';
 import { EASE_IN_OUT, prog } from '../../kit/curves';
@@ -9,21 +9,24 @@ import { Paper } from '../../kit/Paper';
 import { Signature } from '../../kit/Signature';
 import { SIGNATURE } from '../../kit/signature.mjs';
 import { TOKENS } from '../../kit/tokens';
-import { KineticLine } from '../../kit/Type';
+import { HEAD_LEAD, KineticLine } from '../../kit/Type';
+import VO from './preview-vo.json';
 
 /**
- * THE APP STORE PREVIEW, round 3. 25s, 1080 × 2340 here, 886 × 1920
+ * THE APP STORE PREVIEW, round 4. 28.5s, 1080 × 2340 here, 886 × 1920
  * delivered (clips/preview-timeline.mjs).
  *
  * The real app's screen recordings, as a slab on the house paper, under a
- * camera that glides to whatever the caption names. Over the pixels, only
- * what Apple's rules allow: captions in the house band, a tap mark where the
- * take tapped, a ring off the thing being named, dissolves, one whip. Then
- * the kit's Signature.
+ * camera that makes one slow move a beat. Over the pixels, only what
+ * Apple's rules allow: the narrated line in the house band, a tap mark
+ * where the take tapped, a ring off the thing the line names, dissolves
+ * between scenes. Then the kit's Signature.
  */
 
 type Key = readonly [number, number, number, number];
 type ClipName = keyof typeof CLIPS;
+type Clip = { at: number; frames: number; file: string; dissolve?: boolean };
+const NAMES = Object.keys(CLIPS) as ClipName[];
 
 /** the layout the slab is drawn at (the clip's own pixels: 1080 wide); the
  *  camera's scale is a transform on it, never a resize (no pixel snapping) */
@@ -35,17 +38,13 @@ const FOCUS = { x: WIDTH / 2, y: SLAB.top + (SCREEN.h / 2) * SLAB.k };
 /**
  * The camera path: a monotone cubic through the keys, per axis (Fritsch and
  * Carlson). It passes through every key with a continuous velocity, so a
- * move never stops dead at a key or starts with a jolt (round 2's eased
- * key-to-key moves did both: the "jitter" the owner saw), and it never
- * overshoots, so a held value stays held.
+ * move never stops dead at a key or starts with a jolt, and it never
+ * overshoots, so a held value stays held. Each track starts and ends at rest.
  */
 const monotone = (xs: number[], ys: number[]) => {
   const n = xs.length;
   const d = xs.slice(1).map((x, i) => (ys[i + 1] - ys[i]) / (x - xs[i]));
-  const m = xs.map((_, i) => (i === 0 ? d[0] : i === n - 1 ? d[n - 2] : d[i - 1] * d[i] <= 0 ? 0 : (d[i - 1] + d[i]) / 2));
-  // ease in from rest and out to rest at the ends of the track
-  m[0] = 0;
-  m[n - 1] = 0;
+  const m = xs.map((_, i) => (i === 0 || i === n - 1 ? 0 : d[i - 1] * d[i] <= 0 ? 0 : (d[i - 1] + d[i]) / 2));
   for (let i = 0; i < n - 1; i++) {
     if (d[i] === 0) {
       m[i] = 0;
@@ -75,35 +74,20 @@ const monotone = (xs: number[], ys: number[]) => {
 };
 
 const PATHS = Object.fromEntries(
-  (Object.keys(CAMERA) as ClipName[]).map((name) => {
+  NAMES.map((name) => {
     const keys = CAMERA[name] as unknown as Key[];
     const xs = keys.map((k) => k[0]);
     return [name, [1, 2, 3].map((axis) => monotone(xs, keys.map((k) => k[axis])))];
   }),
 ) as Record<ClipName, ((f: number) => number)[]>;
 
-/** the whip's vertical blur, layout px, peaking on the join */
-const whipBlur = (f: number) => {
-  const d = Math.abs(f - WHIP.at);
-  return d > WHIP.half ? 0 : 22 * Math.sin((Math.PI / 2) * (1 - d / WHIP.half)) ** 2;
-};
-
 const Slab: React.FC<{ name: ClipName; f: number; opacity: number }> = ({ name, f, opacity }) => {
-  const c = CLIPS[name];
+  const c = CLIPS[name] as Clip;
   const [cx, cy, z] = PATHS[name].map((p) => p(f));
   const k = SLAB.k * z;
-  const blur = name === 'save' ? whipBlur(f) : 0;
-  const id = `whip-${name}`;
   const mine = <T extends { at: number }>(list: readonly T[]) => list.filter((m) => m.at >= c.at && m.at < c.at + c.frames);
   return (
     <AbsoluteFill style={{ opacity }}>
-      {blur > 0.2 && (
-        <svg width="0" height="0" style={{ position: 'absolute' }}>
-          <filter id={id} x="0" y="-5%" width="100%" height="110%">
-            <feGaussianBlur stdDeviation={`0 ${blur.toFixed(2)}`} />
-          </filter>
-        </svg>
-      )}
       <div
         style={{
           position: 'absolute',
@@ -117,7 +101,6 @@ const Slab: React.FC<{ name: ClipName; f: number; opacity: number }> = ({ name, 
           overflow: 'hidden',
           background: TOKENS.card,
           boxShadow: TOKENS.shadow,
-          filter: blur > 0.2 ? `url(#${id})` : undefined,
         }}
       >
         <Sequence from={c.at} durationInFrames={c.frames} name={name} layout="none">
@@ -126,7 +109,7 @@ const Slab: React.FC<{ name: ClipName; f: number; opacity: number }> = ({ name, 
         {/* marks, in screen points, riding the same camera */}
         <div style={{ position: 'absolute', left: 0, top: 0, width: SCREEN.w, height: SCREEN.h, transform: `scale(${LAYOUT})`, transformOrigin: '0 0' }}>
           {mine(PINGS).map((p) => (
-            <Ping key={p.at} rect={p.rect as [number, number, number, number]} radius={p.radius} t={(f - p.at) / 20} reach={10} width={2} alpha={0.55} />
+            <Ping key={p.at} rect={p.rect as [number, number, number, number]} radius={p.radius} t={(f - p.at) / 22} reach={10} width={2} alpha={0.55} />
           ))}
           {mine(TAPS).map((t) => (
             <Tap key={t.at} x={t.x} y={t.y} t={(f - t.at) / 12} tone={t.tone === 'light' ? 'light' : 'dark'} />
@@ -137,13 +120,21 @@ const Slab: React.FC<{ name: ClipName; f: number; opacity: number }> = ({ name, 
   );
 };
 
+/** each narrated line on screen, a line of type arriving on its cue word */
 const Lines: React.FC<{ f: number }> = ({ f }) => (
   <>
     {CAPTIONS.map((c) => {
-      if (c.place === 'hook') return <HookTitle key={c.at} lines={c.text.split('\n')} frame={f} to={c.to} />;
+      const lines = c.text.split('\n');
+      if (c.place === 'hook') return <HookTitle key={c.at} lines={lines} frame={f} to={c.to} />;
+      const t = VO.find((v) => v.frame === c.at);
+      const starts = lines.flatMap((line, k) => {
+        const cue = c.cues[k];
+        const s = cue === undefined ? -(HEAD_LEAD + 12) : Math.round((t?.words[cue] ?? 0) * FPS);
+        return line.split(' ').map(() => s);
+      });
       return (
         <div key={c.at} style={{ position: 'absolute', left: 0, right: 0, top: HOUSE_BAND.top, display: 'flex', justifyContent: 'center' }}>
-          <KineticLine text={c.text} frame={f} from={c.at} to={c.to} size={HOUSE_BAND.size} weight={HOUSE_BAND.weight} width={HOUSE_BAND.width} />
+          <KineticLine text={c.text} frame={f} from={c.at} to={c.to} starts={starts} size={HOUSE_BAND.size} weight={HOUSE_BAND.weight} width={HOUSE_BAND.width} />
         </div>
       );
     })}
@@ -187,14 +178,15 @@ const SignatureCentred: React.FC = () => {
 
 export const AppPreview: React.FC<{ withAudio?: boolean; withCaptions?: boolean }> = ({ withAudio = true, withCaptions = true }) => {
   const f = useCurrentFrame();
-  const fadeIn = (name: ClipName) => prog(f, CLIPS[name].at, CLIPS[name].at + DISSOLVE, EASE_IN_OUT);
-  const on = (name: ClipName) => f >= CLIPS[name].at && f < Math.min(CLIPS[name].at + CLIPS[name].frames, SIGNATURE_AT + SIGNATURE.paperIn + 2);
+  const end = SIGNATURE_AT + SIGNATURE.paperIn + 2;
   return (
     <AbsoluteFill style={{ background: TOKENS.paper }}>
       <Paper drift={f / 900} />
-      {on('save') && <Slab name="save" f={f} opacity={1} />}
-      {on('ask') && <Slab name="ask" f={f} opacity={fadeIn('ask')} />}
-      {on('graph') && <Slab name="graph" f={f} opacity={fadeIn('graph')} />}
+      {NAMES.map((name) => {
+        const c = CLIPS[name] as Clip;
+        if (f < c.at || f >= Math.min(c.at + c.frames, end)) return null;
+        return <Slab key={name} name={name} f={f} opacity={c.dissolve ? prog(f, c.at, c.at + DISSOLVE, EASE_IN_OUT) : 1} />;
+      })}
       {/* the paper band the type sits on: always there, so the slab slides under it */}
       <BandScrim tone={TOKENS.paper} band={HOUSE_BAND} />
       {withCaptions && <Lines f={f} />}

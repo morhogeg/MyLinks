@@ -1,52 +1,70 @@
 {
   "save": {
-    "frames": 305,
-    "planned": 305,
+    "frames": 326,
+    "planned": 325,
     "starts": [
       0,
-      14,
-      55,
-      93,
-      100,
-      106,
-      159,
-      233
-    ],
-    "lengths": [
-      15,
-      47,
-      43,
-      12,
-      11,
+      24,
       54,
-      82,
-      72
-    ]
-  },
-  "ask": {
-    "frames": 177,
-    "planned": 176,
-    "starts": [
-      0,
-      29,
-      61,
-      73
+      78,
+      105,
+      167,
+      182,
+      225
     ],
     "lengths": [
+      24,
       30,
-      38,
-      13,
-      103
+      24,
+      27,
+      62,
+      15,
+      43,
+      100
     ]
   },
-  "graph": {
-    "frames": 159,
-    "planned": 159,
+  "revisit": {
+    "frames": 100,
+    "planned": 100,
     "starts": [
       0
     ],
     "lengths": [
-      159
+      100
+    ]
+  },
+  "askType": {
+    "frames": 75,
+    "planned": 75,
+    "starts": [
+      0,
+      30
+    ],
+    "lengths": [
+      30,
+      45
+    ]
+  },
+  "askAnswer": {
+    "frames": 115,
+    "planned": 115,
+    "starts": [
+      0,
+      18
+    ],
+    "lengths": [
+      18,
+      97
+    ]
+  },
+  "graph": {
+    "frames": 132,
+    "planned": 132,
+    "starts": [
+      0
+    ],
+    "lengths": [
+      132
     ]
   }
 }

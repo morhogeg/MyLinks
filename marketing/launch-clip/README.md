@@ -1553,57 +1553,64 @@ three range seams; the last frame still pixel-identical to the Signature. Nobody
 
 ## THE APP STORE PREVIEW (2026-10-28/29)
 
-The App Preview video for the 1.0 product page: 25.3s, 886 × 1920, H.264
-High L4.0, 30fps, AAC stereo 256k 48kHz (`out/preview/Machina-App-Preview-886x1920.mp4`;
+The App Preview video for the 1.0 product page: 28.5s, 886 × 1920, H.264
+High L4.0, 30fps, AAC stereo 256k 48kHz, narrated
+(`out/preview/Machina-App-Preview-886x1920.mp4`;
 `Machina-App-Preview-review-copy.mp4` is a small copy for phones, never the
 upload). Apple's spec and rules are in `clips/preview-timeline.mjs`'s header.
 
-**The story: one save, start to useful**, under a camera:
+**Seven beats, one idea and one narrated line each** (3 to 4 seconds on
+the 120 BPM grid; the caption is the line, word for word):
 
-- **"Save anything, from any app."** A Mark Manson video, "If You Want to Fix
-  Brain Rot, Watch This Immediately" (YouTube `Ey1g-imraNs`), pasted into Add
-  to Machina; Save.
-- **"Every save, analyzed and summarized."** The card built LIVE: "Fetching
-  the video..." over its thumbnail, "Reading the page", "Writing the
-  summary", "Searching connections", the card landing ("The Truth About
-  Attention Spans and Digital Distraction", 18 min).
-- **"Jump to the moments that matter."** Opened on its four timestamped key
-  moments (ringed).
-- **"Turn what you save into what you do."** A whip down to its Do this
-  ("Perform an attention audit...", ringed).
-- **"Ask about anything you saved." / "Answers cite your saves."** "Is my
-  attention span really 8 seconds?" typed; a two-sentence answer (a myth)
-  citing the new card, question to source on one screen (ringed).
-- **"Every save, connected."** The card's See in graph: it builds around the
-  card, six links lit.
-- The kit's Signature, no footer (owner, round 3).
+1. "Save anything, from any app." The clean feed, +, a Mark Manson video
+   ("33 Things Everyone Should Know How To Do", YouTube `FqiRxOirFyY`)
+   pasted into Add to Machina, Save.
+2. "Every save, analyzed and summarized." The card built LIVE: "Watching
+   the video...", the sheet handing over to the feed, "Writing the
+   summary...", "Searching connections...", the card landing, "Saved to
+   Machina".
+3. "Jump straight to the moments that matter." Opened on its five
+   timestamped key moments (ringed).
+4. "Turn what you save into what you do." Revisit's Do this list: tasks
+   from saves, each tagged with its save (rows ringed in turn).
+5. "Ask about anything you've saved." "Is my attention span really 8
+   seconds?" typed.
+6. "Every answer comes straight from your saves." The two-sentence answer
+   and the save it came from, on one screen (ringed). The launch film's line.
+7. "Every save, connected." The new card's See in graph, settled, its links
+   lit, the connected saves listed under it.
 
-**Rounds.** 1: full-bleed static screens of a saved card. 2 ("not engaging
-enough"): the live save, the camera, rings, a groove. 3 (owner): a short Ask
-answer with its source on one screen (no scroll), hook and captions
-rewritten (the hook no longer narrows the app to video; "Turn what you save
-into what you do." is App Store screenshot 8's approved line), no footer,
-and smoothness: the simulator's web view scrolls at ~15fps (50-70ms frame
-gaps in the takes), so there is NO scroll footage; the app's other
-animations were captured at a steady 60fps and are motion-blurred to 30
-(two-frame mean); joins crossfade; the camera runs a monotone cubic through
-its keys (no stops, no snaps, no overshoot).
+Then the kit's Signature, no footer.
+
+**Rounds.** 1: full-bleed static screens. 2 ("not engaging enough"): one
+live save, a camera, rings, a groove. 3: a short Ask answer, new captions,
+no footer, no scroll footage. 4 ("too busy", "pacing off", "graph jittery",
+"narration"): re-shot on a clean feed (the due-reminder banner and the
+weekly strip dismissed on the review account); seven even beats with a
+narrated line each (Gemini TTS, Sulafat, voiced by the narration workflow:
+`synth-vo.py preview`); the graph only once settled (its build, nodes flying
+in and labels jumping, was the jitter); every other 60fps frame, crisp (a
+two-frame mean doubled the text of fast UI moves); hard cuts only where the
+screen is still, dissolves between scenes; one slow camera move a beat.
 
 **Everything on screen is the real app**: the iOS Simulator (iPhone 17 Pro
 Max, Debug build of `main` at `0db534f2`), signed into the review account, on
 the live backend. The camera only frames it; zoom is capped so no word is
-cropped (a full-width screen's text spans 16-424pt: z ≤ 1.26). Retimes, all
+cropped (a full-width screen's text spans 16-424pt: z ≤ 1.2). Retimes, all
 of real footage: the build and answer waits are cut, "Searching your
-library..." is skipped (brand ban), the typing's 60fps character steps are
-each shown two frames.
+library..." is cut (brand ban), the typing's 60fps character steps are each
+shown two frames.
 
 **Choosing the video:** check the thumbnail first
-(`https://i.ytimg.com/vi/<id>/mqdefault.jpg`). Manson's "Why Trying to Be
-Confident Makes You Less Confident" was saved first and dropped: its
-thumbnail prints profanity, which Apple bans in previews. That card is
-ARCHIVED on the review account (not deleted).
+(`https://i.ytimg.com/vi/<id>/mqdefault.jpg`); Apple bans profanity in
+previews. Manson's "Why Trying to Be Confident Makes You Less Confident" was
+saved first and dropped for its thumbnail; that card is ARCHIVED on the
+review account. A list video ("33 Things") gets no Do this (the backend
+writes one only when the content supports one concrete action), so beat 4
+is Revisit's list, not the card's own step.
 
-    python3 capture/preview-cut.py <takes dir> public/clips/preview
+    python3 capture/preview-cut.py out/preview-takes public/clips/preview
+    GEMINI_VOICE=Sulafat <venv>/bin/python audio/synth-vo.py preview   # from the committed takes
     node audio/preview-score.mjs && node audio/mix-vo.mjs preview
     node audio/house-verify.mjs preview && node scripts/preview-stills.mjs
     # render MachinaAppPreviewSilent in ranges (house recipe), concat, then:
@@ -1615,11 +1622,12 @@ ARCHIVED on the review account (not deleted).
       -shortest -movflags +faststart Machina-App-Preview-886x1920.mp4
 
 The takes (`capture/preview-cut.py` header): `xcrun simctl io <device>
-recordVideo --codec=h264`, made 60fps CFR (`S60.mp4` the save, the card and
-its graph; `R60.mp4` Ask). Not in git.
+recordVideo --codec=h264`, made 60fps CFR, in `out/preview-takes/` (T60 the
+save through the key moments, U60 Revisit and the graph, R60 Ask). Not in
+git.
 
-**Poster frame:** set it to 0s in App Store Connect (the hook over the Add
-sheet). Apple's default, 5s, lands mid-transition.
+**Poster frame:** set it to 0s in App Store Connect (the hook over the
+feed). Apple's default, 5s, lands mid-beat.
 
 ## Motion language
 

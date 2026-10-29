@@ -22,7 +22,7 @@ fs.mkdirSync(out, { recursive: true });
 const browserExecutable = process.env.BROWSER || null;
 
 const REVIEW = [
-  0, 22, 44, 70, 100, 125, 160, 190, 226, 232, 240, 262, 295, 325, 352, 372, 400, 430, 462, 480, 540, 590,
+  0, 20, 40, 66, 96, 120, 160, 200, 222, 250, 290, 320, 345, 380, 410, 440, 470, 485, 520, 560, 590, 640, 700,
   SIGNATURE_AT + 40, TOTAL_FRAMES - 1,
 ];
 const frames = process.argv.slice(2).map(Number).filter((n) => !Number.isNaN(n));
