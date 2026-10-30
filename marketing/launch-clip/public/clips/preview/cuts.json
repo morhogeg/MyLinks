@@ -1,70 +1,74 @@
 {
   "save": {
-    "frames": 326,
-    "planned": 325,
+    "frames": 262,
+    "planned": 262,
     "starts": [
       0,
       24,
-      54,
-      78,
-      105,
-      167,
-      182,
-      225
+      46,
+      74,
+      115,
+      133,
+      151,
+      169,
+      217
     ],
     "lengths": [
       24,
-      30,
-      24,
-      27,
-      62,
-      15,
-      43,
-      100
-    ]
-  },
-  "revisit": {
-    "frames": 100,
-    "planned": 100,
-    "starts": [
-      0
-    ],
-    "lengths": [
-      100
-    ]
-  },
-  "askType": {
-    "frames": 75,
-    "planned": 75,
-    "starts": [
-      0,
-      30
-    ],
-    "lengths": [
-      30,
+      22,
+      28,
+      41,
+      18,
+      18,
+      18,
+      48,
       45
     ]
   },
-  "askAnswer": {
-    "frames": 115,
-    "planned": 115,
-    "starts": [
-      0,
-      18
-    ],
-    "lengths": [
-      18,
-      97
-    ]
-  },
-  "graph": {
-    "frames": 132,
-    "planned": 132,
+  "revisit": {
+    "frames": 102,
+    "planned": 102,
     "starts": [
       0
     ],
     "lengths": [
-      132
+      102
+    ]
+  },
+  "askType": {
+    "frames": 83,
+    "planned": 83,
+    "starts": [
+      0,
+      27
+    ],
+    "lengths": [
+      27,
+      56
+    ]
+  },
+  "askAnswer": {
+    "frames": 159,
+    "planned": 158,
+    "starts": [
+      0,
+      18,
+      33
+    ],
+    "lengths": [
+      18,
+      15,
+      125
+    ]
+  },
+  "graph": {
+    "frames": 116,
+    "planned": 116,
+    "starts": [
+      0
+    ],
+    "lengths": [
+      116
     ]
   }
 }

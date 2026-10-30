@@ -1,6 +1,6 @@
 [
  {
-  "frame": 8,
+  "frame": 6,
   "text": "Save anything, from any app.",
   "words": [
    0.06,
@@ -11,7 +11,7 @@
   ]
  },
  {
-  "frame": 112,
+  "frame": 92,
   "text": "Every save, analyzed and summarized.",
   "words": [
    0.03,
@@ -22,20 +22,7 @@
   ]
  },
  {
-  "frame": 232,
-  "text": "Jump straight to the moments that matter.",
-  "words": [
-   0.03,
-   0.228,
-   0.583,
-   0.702,
-   0.86,
-   1.176,
-   1.374
-  ]
- },
- {
-  "frame": 322,
+  "frame": 260,
   "text": "Turn what you save into what you do.",
   "words": [
    0.02,
@@ -49,7 +36,7 @@
   ]
  },
  {
-  "frame": 412,
+  "frame": 352,
   "text": "Ask about anything you\u2019ve saved.",
   "words": [
    0.03,
@@ -60,20 +47,20 @@
   ]
  },
  {
-  "frame": 488,
-  "text": "Every answer comes straight from your saves.",
+  "frame": 468,
+  "text": "Every answer comes from your own sources.",
   "words": [
-   0.07,
-   0.369,
-   0.717,
-   1.116,
-   1.564,
-   1.813,
-   2.062
+   0.06,
+   0.411,
+   0.821,
+   1.263,
+   1.556,
+   1.979,
+   2.353
   ]
  },
  {
-  "frame": 593,
+  "frame": 584,
   "text": "Every save, connected.",
   "words": [
    0.03,

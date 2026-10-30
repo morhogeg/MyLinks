@@ -1,21 +1,32 @@
 """Cut the App Preview's clips from the simulator takes.
 
-  python3 capture/preview-cut.py TAKES_DIR public/clips/preview
+  python3 capture/preview-cut.py out/preview-takes public/clips/preview
       ->  save.mp4 revisit.mp4 askType.mp4 askAnswer.mp4 graph.mp4 + cuts.json
 
 TAKES_DIR holds the simulator takes as 60fps CFR masters, recorded with
 `xcrun simctl io <device> recordVideo --codec=h264` on the iPhone 17 Pro Max
 simulator (1320 x 2868), signed into the review account, and made CFR with
-`ffmpeg -i T.mp4 -vf fps=60 -crf 8 T60.mp4` (the recorder writes a frame only
+`ffmpeg -i W.mp4 -vf fps=60 -crf 8 W60.mp4` (the recorder writes a frame only
 on change; fps=60 repeats the still ones). Not in git (out/preview-takes/):
-  T60  the clean feed (reminder and weekly strip dismissed), + -> the link ->
-       Save -> the card built live -> landed -> opened on its key moments
-  U60  Revisit (its Do this list), then the card's See in graph, settled
-  R60  Ask: "Is my attention span really 8 seconds?" -> the answer
+  W60  round 5: the feed opening on Kurzgesagt and TED (the Manson test
+       cards archived), + -> a Wait But Why article's link -> Save -> the
+       analysis stepper (Fetching the link, Reading the page, Writing the
+       summary, Searching connections, Organizing & tagging) -> the card on
+       the feed -> Revisit, its new Do this on top
+  X60  round 5: Ask: "Briefly, how is procrastination linked to phone
+       addiction?" -> an answer citing three saves from three channels ->
+       its Graph chip -> the three cited cards, linked
+  (T60, U60, R60: round 4's takes)
 
 Smoothness (owner, rounds 3 and 4):
   - no scroll footage (the simulator's web view scrolls at ~15fps);
-  - the graph only once settled (its build is what read as jitter);
+  - the graph only once settled (its build is what read as jitter), and
+    as ONE held frame (round 5: the "settled" graph still twitches, ~50/255
+    jumps every few frames; held, it is perfectly still and the camera
+    carries the motion);
+  - only the stepper's forward steps (in W it reached "Searching
+    connections" at 63.0s, fell back to "Writing the summary" at 70.4s, and
+    advanced again at 73.2s: the cut skips the fall-back);
   - every other 60fps frame, crisp (round 4: a two-frame mean doubled the
     text of fast UI moves, the sheet's morph, instead of blurring it);
   - joins are hard cuts where the screen is still on both sides (a fade
@@ -32,38 +43,47 @@ import sys
 from pathlib import Path
 
 TAKES_DIR = Path(sys.argv[1])
-TAKES = {k: TAKES_DIR / f"{k}60.mp4" for k in ("T", "U", "R")}
+TAKES = {k: TAKES_DIR / f"{k}60.mp4" for k in ("W", "X")}
 
-# R60: the question, one more character in each of these 60fps frames
-TYPED_AT = 8910  # 148.50s
-TYPING = [(TYPED_AT + i, 2) for i in (4, 6, 7, 8, 10, 12, 15, 16, 17, 19, 20, 24, 25)] + [(TYPED_AT + 26, 19)]
+# X60: the question; each of these 60fps frames shows more of it
+# ("Brie", "Briefl", "Briefly,", ... "addiction?")
+TYPED = (9669, 9672, 9674, 9675, 9677, 9680, 9682, 9685, 9689, 9692, 9694, 9698,
+         9701, 9704, 9705, 9707, 9708, 9709, 9710, 9714, 9715, 9716)
+TYPING = [(f, 2) for f in TYPED[:-1]] + [(TYPED[-1], 14)]
+
+# X60: the settled graph, held (255.55s, a frame between two of its twitches)
+GRAPH_FRAME = 15333
 
 CLIPS = {
-    # the save, the card built live, opened (+10 frames under the dissolve)
+    # the save: the feed, +, the link, Save, the stepper's five beats, the
+    # card on the feed (+10 frames under the dissolve)
     "save": [
-        ("seg", "T", 10.65, 11.45),    # the clean feed
-        ("seg", "T", 11.45, 12.45),    # + : Add to Machina slides up
-        ("seg", "T", 30.30, 31.10),    # the link in the field
-        ("seg", "T", 68.45, 69.35),    # Save: the sheet turns to "Fetching the video..."
-        ("seg", "T", 77.90, 79.97),    # "Watching the video..." 43-46%; the sheet hands over to the feed
-        ("seg", "T", 83.40, 83.90),    # "Writing the summary..." 71%
-        ("seg", "T", 105.62, 107.05),  # "Searching connections..." 80%; the card lands; "Saved to Machina"
-        ("seg", "T", 124.95, 128.28),  # the tap that opens it: its key moments
+        ("seg", "W", 12.62, 13.42),    # the feed: Kurzgesagt, TED
+        ("seg", "W", 13.42, 14.15),    # + : Add to Machina slides up
+        ("seg", "W", 31.58, 32.50),    # the link pasted; Save turns on
+        ("seg", "W", 47.05, 48.40),    # Save: the stepper, "Fetching the link", the site's icon
+        ("seg", "W", 50.80, 51.40),    # "Reading the page"
+        ("seg", "W", 55.80, 56.40),    # "Writing the summary"
+        ("seg", "W", 62.80, 63.40),    # "Searching connections"
+        ("seg", "W", 74.55, 76.15),    # every step done, "Saved to Machina", the sheet closes
+        ("seg", "W", 76.15, 77.65),    # the new card on top of the feed
     ],
-    # Revisit: the Do this list (+10 under the dissolve)
-    "revisit": [("seg", "U", 0.50, 3.83)],
+    # Revisit: the Do this list, the new save's task on top (+10)
+    "revisit": [("seg", "W", 128.00, 131.40)],
     # Ask: the empty screen, the question typed
     "askType": [
-        ("seg", "R", 147.25, 148.25),
-        ("frames", "R", TYPING),
+        ("seg", "X", 160.20, 161.10),
+        ("frames", "X", TYPING),
     ],
-    # "Reviewing relevant cards...", then the answer and its source (+10)
+    # "Reviewing relevant cards...", "Writing your answer...", the answer and
+    # its three sources, settled (+10)
     "askAnswer": [
-        ("seg", "R", 160.20, 160.80),
-        ("seg", "R", 161.80, 165.03),
+        ("seg", "X", 186.45, 187.05),
+        ("seg", "X", 189.00, 189.50),
+        ("seg", "X", 197.95, 202.12),
     ],
-    # the card's graph, settled (+12 under the Signature's paper)
-    "graph": [("seg", "U", 50.70, 55.10)],
+    # the three cited cards, linked: one held frame (+14 under the Signature's paper)
+    "graph": [("frames", "X", [(GRAPH_FRAME, 116)])],
 }
 
 FPS = 30

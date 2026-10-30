@@ -1,16 +1,17 @@
 /**
- * THE APP STORE PREVIEW: the score, round 4 (owner: narration on every
- * beat). The house instruments (audio/synth.mjs) on the preview's clock
+ * THE APP STORE PREVIEW: the score, round 5 (owner: narration on every
+ * beat; the analysis stepper shown). The house instruments (audio/synth.mjs) on the preview's clock
  * (clips/preview-timeline.mjs: 120 BPM, 15 frames a beat), written UNDER a
  * narrator: a warm bed that moves with the picture and never competes with
  * the voice (mix-vo ducks it under every line).
  *
  * The energy curve, beat by beat:
  *  - Save: a light ticking pulse, a tick on + and on Save;
- *  - Summary: the pulse in 8ths and hats creeping in, a riser that lands
- *    WITH the card (a soft impact and a bell);
- *  - Moments and Do: a gentle groove (a soft kick on the beat, hats, the
- *    pulse), a bell on each ring;
+ *  - Analyzed: the pulse in 8ths and hats creeping in, a soft tick on each
+ *    step the stepper checks off, a riser into "all done" (a soft impact),
+ *    a bell as the card lands on the feed;
+ *  - Do: a gentle groove (a soft kick on the beat, hats, the pulse), a bell
+ *    on each ring;
  *  - Ask: the drums drop out for the typing (a key tick per character) and
  *    the wait, back on the answer with a bell;
  *  - Connected: the full groove at its warmest, a riser into the
@@ -74,10 +75,12 @@ for (let f = 0; f < SIGNATURE_AT; f += EIGHTH) {
   pulse(t(f), chordAt(f).upper[k % 4] + 12, 0.03 + 0.025 * build + 0.015 * drive(f), ((k % 4) - 1.5) * 0.3);
   if (f < H.landed) tick(t(f), (onBeat ? 0.045 : 0.028) + 0.025 * build, onBeat ? 1 : 1.35);
 }
-// hats creep in while the card is built; a riser lands with it
-for (let f = BEATS.summary; f < H.landed; f += EIGHTH) hat(t(f), 0.01 + 0.022 * ((f - BEATS.summary) / (H.landed - BEATS.summary)), f % BEAT_FRAMES ? 0.2 : -0.2);
-riser(t(H.sheetClose), t(H.landed - H.sheetClose), 0.06);
-impact(t(H.landed), 0.14);
+// hats creep in while the card is built, a tick on each step it checks off,
+// a riser into "all done", a bell as the card lands on the feed
+for (let f = BEATS.summary; f < H.done; f += EIGHTH) hat(t(f), 0.01 + 0.022 * ((f - BEATS.summary) / (H.done - BEATS.summary)), f % BEAT_FRAMES ? 0.2 : -0.2);
+H.steps.forEach((f, i) => keys(t(f), [72, 74, 76, 79][i], 0.035, (i % 2 ? 0.2 : -0.2), 0.9));
+riser(t(H.done - 54), t(54), 0.06);
+impact(t(H.done), 0.13);
 bell(t(H.landed + 2), 76, 0.065, 0.1, 2.6);
 
 // ── the groove
@@ -95,8 +98,9 @@ for (const tap of TAPS) {
   tick(t(tap.at + 4), 0.055, 1.2);
   keys(t(tap.at + 4), 76, 0.03, 0, 0.7);
 }
-// ── rings: a bell each, rising through the Do this list
-PINGS.forEach((p, i) => bell(t(p.at), [79, 76, 79, 83, 84, 79][i], 0.045, i % 2 ? 0.2 : -0.2, 1.8));
+// ── rings: a bell each, rising through the three sources and the three nodes
+const RING_NOTES = [79, 76, 79, 83, 86, 79, 83, 86];
+PINGS.forEach((p, i) => bell(t(p.at), RING_NOTES[i % RING_NOTES.length], 0.045, i % 2 ? 0.2 : -0.2, 1.8));
 // ── the scene changes: a breath of air on each dissolve
 [BEATS.todo, BEATS.ask, BEATS.graph].forEach((f, i) => whoosh(t(f - 6), 0.5, 0.035, i % 2 ? 0.3 : -0.3));
 
