@@ -1603,7 +1603,11 @@ of real footage: the build and answer waits are cut, only the stepper's
 forward steps are used (in the take it fell back from "Searching
 connections" to "Writing the summary" once), "Searching your library..." is
 cut (brand ban), the typing's 60fps steps are shown two frames each, the
-settled graph is one held frame.
+settled graph is one held frame. **One pixel edit** (round 6, owner: "this
+logo next to Wait But Why is ugly"): the site's favicon in the stepper is
+painted out with the sheet's own white (`PATCHES` in the timeline; kit
+`TOKENS.captureWhite`, the 253 a simulator capture encodes, so no seam), and
+"waitbutwhy.com" lines up with the step labels.
 
 **Choosing a save:** check the thumbnail first
 (`https://i.ytimg.com/vi/<id>/mqdefault.jpg`); Apple bans profanity in

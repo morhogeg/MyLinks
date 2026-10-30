@@ -19,6 +19,9 @@ export const TOKENS = {
   paper: SET_BG,
   /** a card or screen on the paper (the app's surface) */
   card: '#FFFFFF',
+  /** the app's white as a simulator capture encodes it (253, not 255): for
+   *  painting a detail out of a captured screen without leaving a seam */
+  captureWhite: '#FDFDFD',
   ink: INK,
   inkSoft: INK_SOFT,
   /** secondary text and glyphs on a card */

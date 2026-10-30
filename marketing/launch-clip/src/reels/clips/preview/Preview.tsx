@@ -1,6 +1,6 @@
 import React from 'react';
 import { AbsoluteFill, Audio, OffthreadVideo, Sequence, staticFile, useCurrentFrame } from 'remotion';
-import { CAMERA, CAPTIONS, CLIPS, DISSOLVE, FPS, HEIGHT, PINGS, SCREEN, SIGNATURE_AT, SLAB, TAPS, WIDTH } from '../../../../clips/preview-timeline.mjs';
+import { CAMERA, CAPTIONS, CLIPS, DISSOLVE, FPS, HEIGHT, PATCHES, PINGS, SCREEN, SIGNATURE_AT, SLAB, TAPS, WIDTH } from '../../../../clips/preview-timeline.mjs';
 import { Ping, Tap } from '../../kit/AppShot';
 import { BandScrim, HOUSE_BAND } from '../../kit/Captions';
 import { EASE_IN_OUT, prog } from '../../kit/curves';
@@ -108,6 +108,11 @@ const Slab: React.FC<{ name: ClipName; f: number; opacity: number }> = ({ name, 
         </Sequence>
         {/* marks, in screen points, riding the same camera */}
         <div style={{ position: 'absolute', left: 0, top: 0, width: SCREEN.w, height: SCREEN.h, transform: `scale(${LAYOUT})`, transformOrigin: '0 0' }}>
+          {/* the one painted-out detail (PATCHES), in the sheet's own white */}
+          {PATCHES.filter((p) => p.from >= c.at && p.from < c.at + c.frames && f >= p.from && f <= p.to).map((p) => {
+            const [x, y, w, h] = p.rect as [number, number, number, number];
+            return <div key={p.from} style={{ position: 'absolute', left: x, top: y, width: w, height: h, background: TOKENS.captureWhite }} />;
+          })}
           {mine(PINGS).map((p) => (
             <Ping key={p.at} rect={p.rect as [number, number, number, number]} radius={p.radius} t={(f - p.at) / 22} reach={10} width={2} alpha={0.55} />
           ))}

@@ -142,6 +142,17 @@ export const CAMERA = {
   ],
 };
 
+/**
+ * The ONE pixel edit (round 6, owner: "this logo next to Wait But Why in this
+ * screen is ugly, remove it"): the site's favicon in the stepper's host row
+ * is painted out with the sheet's own white (kit TOKENS.captureWhite, the
+ * 253 the capture encodes), so "waitbutwhy.com" sits in line with the step
+ * labels below it. From the stepper's first frame (the icon has not loaded
+ * yet) to the last frame before the sheet closes (it vanishes in one frame,
+ * at 200). Screen points.
+ */
+export const PATCHES = [{ from: 86, to: 199, rect: [38, 438, 31, 31] }];
+
 /** taps, drawn where the take really tapped (screen points); `at` is a few
  *  frames before the press, which lands at t 0.35 of the mark's 12 frames */
 export const TAPS = [
