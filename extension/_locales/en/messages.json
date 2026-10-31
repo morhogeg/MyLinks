@@ -74,6 +74,7 @@
   "privateFailedDetail": { "message": "Machina couldn't be reached, and saves from private windows aren't kept for later.", "description": "Result detail." },
   "notConnectedTitle": { "message": "Connect Machina", "description": "Popup title when there is no token." },
   "notConnectedDetail": { "message": "Connect this browser to your Machina account to start saving.", "description": "Popup detail." },
+  "connectDisclosure": { "message": "Machina reads a page only when you save it, and sends only that save: the page's address and title, any text you selected, or a screenshot you ask for.", "description": "Shown before connecting: what the extension sends (store disclosure)." },
   "unsavableTitle": { "message": "Can't save this page", "description": "Popup title on a page that can't be saved." },
   "unsavableBrowser": { "message": "This is one of the browser's own pages. Machina saves websites.", "description": "Reason." },
   "unsavableFile": { "message": "This is a file on your computer. Machina saves pages from the web.", "description": "Reason." },

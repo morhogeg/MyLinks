@@ -45,7 +45,9 @@ test('not connected: the popup offers one-click connect and saves nothing', asyn
     const page = await article();
     const popup = await ext.openPopup(page);
     await expect(title(popup)).toHaveText('Connect Machina');
+    await expect(popup.locator('#hint')).toHaveText(/reads a page only when you save it/);
     await expect(popup.getByRole('button', { name: 'Use a token instead' })).toBeVisible();
+    await expect(popup.getByRole('button', { name: 'Read the privacy policy' })).toBeVisible();
     await a11y(popup);
     const [opened] = await Promise.all([
         ext.context.waitForEvent('page', (p) => p.url().includes('connect=extension')),

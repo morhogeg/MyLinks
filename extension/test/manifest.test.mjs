@@ -114,3 +114,18 @@ test('copy rules: no em dashes, never "Machina AI", placeholders declared', () =
         assert.doesNotMatch(s, /—/, `${p}: no em dash`);
     }
 });
+
+test('store listing copy matches the package and the listing rules', () => {
+    const listing = readFileSync(join(ROOT, 'store/LISTING.md'), 'utf8');
+    assert.ok(listing.includes(`\`${msg('extName')}\``), 'LISTING.md names the packaged item name');
+    assert.ok(listing.includes(`\`${msg('extDescription')}\``), 'LISTING.md quotes the packaged summary');
+    const description = listing.split('### Description (paste as is)')[1].split('```')[1];
+    assert.ok(description.length > 500);
+    assert.doesNotMatch(description, /—/, 'no em dashes in the description');
+    assert.doesNotMatch(description, /Machina AI/);
+    for (const term of ['second brain', 'web clipper', 'screenshot', 'AI summary', 'search by meaning']) {
+        const count = (description.match(new RegExp(term, 'gi')) || []).length;
+        assert.ok(count <= 5, `"${term}" ${count} times (keyword-spam limit is 5)`);
+    }
+    assert.doesNotMatch(description, /\b(Pocket|Evernote|Notion|OneNote|Obsidian|Raindrop|Readwise|Instapaper)\b/, 'no competitor names');
+});

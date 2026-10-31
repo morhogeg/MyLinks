@@ -62,7 +62,7 @@ export default function PrivacyPage() {
       <h1 className="mt-6 text-3xl font-semibold tracking-tight text-text">
         Privacy Policy
       </h1>
-      <p className="mt-2 text-sm text-text-muted">Last updated: October 22, 2026</p>
+      <p className="mt-2 text-sm text-text-muted">Last updated: October 31, 2026</p>
 
       <p className="mt-6 leading-relaxed text-text-secondary">
         Machina (&ldquo;we&rdquo;) is a personal knowledge base: you save
@@ -142,11 +142,19 @@ export default function PrivacyPage() {
           </li>
           <li>
             <span className="text-text">Browser extension.</span>{" "}
-            When you save with the Machina browser extension, it sends the page&rsquo;s address, and
-            any text you selected, to Machina, and nothing else. It keeps a connection token in that
-            browser&rsquo;s extension storage so your saves reach your account; the token is only ever
-            sent to our server. It does not read or record the pages you visit and don&rsquo;t save. On
-            mymachina.app it runs a small script so you can connect it in one click.
+            The Machina browser extension reads a page only when you save it (with its button, its
+            keyboard shortcut, or its right-click menu), and sends Machina only what that save needs:
+            the page&rsquo;s address and title; any text you selected on it; for an Instagram or
+            TikTok post, the post&rsquo;s preview (caption, cover image, and author) as the page
+            shows it; and, when you ask for one, a screenshot of what you can see in the tab. It does
+            not read, record, or send anything about pages you don&rsquo;t save. It keeps a connection
+            token, and the email address of the account it saves to, in that browser&rsquo;s extension
+            storage: the token is only ever sent to our server, and the email address is never sent
+            anywhere. Saves it couldn&rsquo;t send yet (while you&rsquo;re offline, say) wait in the
+            same storage until they go out or you discard them; saves from private windows are never
+            stored. On mymachina.app it runs a small script so you can connect it in one click. The
+            use of information received from the extension adheres to the Chrome Web Store User Data
+            Policy, including the Limited Use requirements.
           </li>
           <li>
             <span className="text-text">Questions you ask.</span>{" "}
@@ -209,8 +217,9 @@ export default function PrivacyPage() {
         <ul className="mt-4 list-disc space-y-2 pl-6 leading-relaxed text-text-secondary">
           <li>
             <span className="text-text">Saving a link.</span>{" "}
-            The text of the page we fetched, up to 30,000 characters, and your list of existing tags
-            so the new card can reuse them. Usually only the site&rsquo;s name goes with it. When the
+            The text of the page we fetched, up to 30,000 characters, any text you shared or selected
+            with it (for an Instagram or TikTok post, the caption your phone or browser showed), and
+            your list of existing tags so the new card can reuse them. Usually only the site&rsquo;s name goes with it. When the
             page can&rsquo;t be read in full (a login wall, a post that only shows a preview), its
             address goes too, so the card can still be named, but never the part after a
             &ldquo;?&rdquo; or &ldquo;#&rdquo;, where links carry sign-in and tracking codes.

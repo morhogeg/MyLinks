@@ -110,6 +110,9 @@ export function ExtensionView({
     const masUrl = macAppStoreUrl();
     // Something this browser can install from.
     const listed = safari ? !!masUrl : !!storeUrl;
+    // Name only the browsers it can actually be installed in today: the
+    // Chrome listing covers Chrome, Edge and Brave; Safari needs the Mac app.
+    const availableIn = masUrl ? 'Chrome, Edge, Brave, and Safari' : 'Chrome, Edge, and Brave';
 
     // ── The account's token ─────────────────────────────────────────────────
     const [token, setToken] = useState<string | null>(null);
@@ -252,7 +255,7 @@ export function ExtensionView({
             <>
                 <StatusLine
                     icon={<ChevronRight className="w-[14px] h-[14px]" />}
-                    title={storeUrl ? 'Works in Chrome, Edge, Brave, and Safari' : 'Coming soon to Chrome, Edge, Brave, and Safari'}
+                    title={storeUrl ? `Works in ${availableIn}` : 'Coming soon to Chrome, Edge, Brave, and Safari'}
                 >
                     {storeUrl
                         ? 'Open Machina in one of those browsers on a computer to add it.'
@@ -342,7 +345,7 @@ export function ExtensionView({
             <LargeTitle>Browser extension</LargeTitle>
             <p className="px-1 text-[15px] text-text-secondary leading-snug">
                 {live
-                    ? 'Save any page from your desktop browser in one click. Works in Chrome, Edge, Brave, and Safari.'
+                    ? `Save any page from your desktop browser in one click. Works in ${availableIn}.`
                     : 'A one-click save button for your desktop browser is on its way. Until then, add any page by pasting its link with the + button.'}
             </p>
 
@@ -354,8 +357,9 @@ export function ExtensionView({
             {live && (<>
                 <SectionHeader>How to save</SectionHeader>
                 <ul className="rounded-[14px] border border-border-subtle bg-card px-[14px] py-3 space-y-2 text-[14.5px] text-text-secondary leading-snug">
-                    <li>Click the Machina icon in the toolbar, or press <Mono>Ctrl+Shift+S</Mono> (<Mono>Command+Shift+S</Mono> on a Mac).</li>
-                    <li>Right-click a link to save the link, or select text and right-click to save it with the page.</li>
+                    <li>Click the Machina icon in the toolbar, or press <Mono>Ctrl+Shift+S</Mono> (<Mono>Command+Shift+S</Mono> on a Mac). Text you selected is saved with the page.</li>
+                    <li>Press <Mono>Alt+Shift+S</Mono> (<Mono>Option+Shift+S</Mono> on a Mac) to save a screenshot of what you see.</li>
+                    <li>Or right-click a link, an image, or selected text, and choose Save to Machina.</li>
                     <li>Each save lands in your library, and Machina reads it in the background.</li>
                 </ul>
                 <Footnote>Pin Machina to the toolbar so the icon is always one click away.</Footnote>

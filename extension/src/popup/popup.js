@@ -7,7 +7,7 @@
 
 import { localize, t } from '../lib/i18n.js';
 import { describe } from '../lib/describe.js';
-import { APP_URL, CONNECT_URL } from '../lib/config.js';
+import { APP_URL, CONNECT_URL, PRIVACY_URL } from '../lib/config.js';
 import { displayUrl, savability } from '../lib/urls.js';
 
 const $ = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
@@ -82,6 +82,7 @@ function actionsFor(result) {
             return [
                 button(t('connectButton'), 'primary', () => openTab(CONNECT_URL), 'link'),
                 button(t('useToken'), 'link', () => openTab(chrome.runtime.getURL('src/options/options.html?token=1'))),
+                button(t('privacyLink'), 'link', () => openTab(PRIVACY_URL)),
             ];
         case 'reconnect':
             return [button(t('reconnect'), 'primary', () => openTab(CONNECT_URL), 'link')];
@@ -122,9 +123,11 @@ function show(result) {
     $('quote').hidden = !quoteShown;
     $('quote-text').textContent = quoteShown ? result.quote.slice(0, 600) : '';
 
-    const hintShown = Boolean(result.site) && result.kind === 'page' && KEPT.has(result.outcome);
+    // Before connecting (the user's consent), say exactly what gets sent.
+    const disclose = result.outcome === 'not-connected';
+    const hintShown = disclose || (Boolean(result.site) && result.kind === 'page' && KEPT.has(result.outcome));
     $('hint').hidden = !hintShown;
-    $('hint').textContent = hintShown ? t('partialHint', result.site) : '';
+    $('hint').textContent = disclose ? t('connectDisclosure') : hintShown ? t('partialHint', result.site) : '';
 
     const actions = actionsFor(result);
     $('actions').replaceChildren(...actions);
