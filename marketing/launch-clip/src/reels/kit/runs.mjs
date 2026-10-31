@@ -33,6 +33,8 @@ export const runAt = (runs, f) => {
     const top = r.wrap && j >= r.wrap.at ? { i: r.wrap.keep, above: r.wrap.above } : null;
     return { ...base, i: r.frames[j], next: blend ? r.frames[j + 1] : null, mix: blend ? (k % hold) / hold : 0, top };
   }
+  // a take not measured yet has no frames (not frame 0: Math.min reads null as 0)
+  if (r.from == null) return { ...base, i: null };
   return { ...base, i: Math.min(r.to, r.from + r.step * k) };
 };
 
