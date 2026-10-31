@@ -320,9 +320,12 @@ const PACE = 'Everyday conversational speed, about 175 words a minute; short nat
 /**
  * The narration, and on screen the same words. The first is the frame-0
  * cover (the kit HookTitle, its second row arriving on its word); the rest
- * sit in the house band, two rows, each row arriving as the voice reaches
- * it (`cues`: the word in `say` each row starts on), split where the voice
- * pauses. `say` is spoken (its takes are voiced: changing `say`, `style` or
+ * sit in the house band, two rows, split where the voice pauses: a row
+ * after a pause arrives as the voice reaches it (`cues`: the word in `say`
+ * each row starts on); a line said in one breath arrives whole (measured on
+ * the takes: the hook breaks 0.36s before "Later", the answer 0.31s before
+ * "Sources", the share and ask lines briefly at their commas; the to-do and
+ * graph lines not at all). `say` is spoken (its takes are voiced: changing `say`, `style` or
  * `pace` re-voices it).
  */
 export const CAPTIONS = [
@@ -352,7 +355,9 @@ export const CAPTIONS = [
   {
     at: HITS.revisit,
     to: 262,
-    cues: [0, 4],
+    // said in one breath (measured: no pause anywhere in the take), so both
+    // rows arrive together; a row only waits for its word after a pause
+    cues: [0, 0],
     text: 'It even tells you\nwhat to do with it.',
     say: 'It even tells you what to do with it.',
     // (take 2: the first ran 8 syllables a second, rushed)
@@ -387,7 +392,8 @@ export const CAPTIONS = [
   {
     at: HITS.graph,
     to: 556,
-    cues: [0, 3],
+    // one breath too (no pause before "which"): both rows together
+    cues: [0, 0],
     text: 'And it notices\nwhich saves belong together.',
     say: 'And it notices which saves belong together.',
     style: 'Natural and conversational, with a little warmth and wonder, like pointing out something clever a friend did; light and unforced, no word stressed.',
