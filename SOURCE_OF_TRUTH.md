@@ -1430,7 +1430,7 @@ The multi-user auth work described below **was** fully written but not live:
     future use (`functions/tools/convert_quota_failed_to_waiting.py`).
 
 26b. **[ ] Browser extension on the Chrome Web Store — REBUILT FROM SCRATCH
-    2026-10-31 (owner ask), code ready, not published.** Name `Machina: Web
+    2026-10-31 (owner ask), merged `d8211eb` (PR #21), not published.** Name `Machina: Web
     Clipper & Screenshot Saver`; summary uses "second brain" (owner extended the
     D-3 exemption to the Web Store, `docs/BRANDING.md`). One-click save (popup
     saves on open; selection rides along as a quote via `shared` +
@@ -2778,8 +2778,9 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 
 - **2026-10-31 (night) — CHROME EXTENSION REBUILT FROM SCRATCH (owner ask:
-  "delete it and start from scratch"; §4 26b). NOT PUBLISHED; branch
-  `claude/chrome-extension-rebuild-a001a6`.** Old `extension/` and its
+  "delete it and start from scratch"; §4 26b). SHIPPED as merge `d8211eb`
+  (PR #21): the web changes are live on Vercel; the extension itself is NOT
+  PUBLISHED to the Web Store (owner steps below).** Old `extension/` and its
   Playwright harness deleted (`63ce51a`), new MV3 extension written without
   reusing its code (`520bba2`): popup saves on open (selection as a quote:
   `shared` + `noteKind:'quote'`, kept as the card's note, never a reminder),
@@ -2821,11 +2822,16 @@ exact-match, capped.
   light and dark); web `tsc` 0, eslint clean on touched files; package check;
   store images rendered from the real UI. **Not verified:** the production
   endpoint and CORS through the Vercel → Hosting rewrite (mymachina.app is
-  denied by this sandbox's network policy); web e2e test 10 (moved to the new
-  harness, but the Firestore emulator download is blocked here; CI runs it);
-  the real toolbar, native right-click menu and shortcuts (driven through the
+  denied by this sandbox's network policy); the real toolbar, native right-click menu and shortcuts (driven through the
   same handlers); Edge, Brave, Safari; a real Web Store review. **Owner
-  steps:** `extension/store/LISTING.md` §4.
+  steps:** `extension/store/LISTING.md` §4. **CI on PR #21 (e2e-journeys run
+  41246056971, green):** unit 60/60, package check, extension suite 17/17, and
+  the journeys 71 passed / 4 skipped (iPhone copies of desktop-only tests),
+  including all five desktop `10-browser-extension` tests: the real web app
+  connected the new extension against the emulators (the one check the
+  sandbox couldn't run). No functions, rules, hosting or TestFlight deploy:
+  the two web changes are web-only (the iOS app hides the extension screen and
+  gets the privacy text on its next build).
 - **2026-10-31 — APP STORE PREVIEW VIDEO: FINAL CUT, OWNER APPROVED ("It's
   perfect"); kept off `main` with the rest of the video work (owner).** The
   App Preview for the product page: 28.9s, 886 × 1920, H.264 High 4.0, 30fps,
