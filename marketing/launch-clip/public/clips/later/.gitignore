@@ -1,0 +1,5 @@
+# the frames of take S (capture/take-frames.mjs later; regenerable, large)
+frames/
+# the score alone (node audio/later-score.mjs rewrites it byte-identically)
+score.wav
+*.mp4

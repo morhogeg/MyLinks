@@ -1,0 +1,84 @@
+[
+ {
+  "frame": 4,
+  "text": "Saved it for later? Later never comes.",
+  "words": [
+   0.06,
+   0.45,
+   0.645,
+   0.905,
+   1.72,
+   1.96,
+   2.2
+  ]
+ },
+ {
+  "frame": 105,
+  "text": "Share it to Makeena, and it reads it for you.",
+  "words": [
+   0.03,
+   0.309,
+   0.449,
+   0.588,
+   1.007,
+   1.193,
+   1.333,
+   1.612,
+   1.751,
+   1.937
+  ]
+ },
+ {
+  "frame": 195,
+  "text": "It even tells you what to do with it.",
+  "words": [
+   0.07,
+   0.208,
+   0.438,
+   0.715,
+   0.899,
+   1.129,
+   1.267,
+   1.406,
+   1.636
+  ]
+ },
+ {
+  "frame": 270,
+  "text": "Ask about anything you\u2019ve saved.",
+  "words": [
+   0.02,
+   0.21,
+   0.496,
+   0.924,
+   1.257
+  ]
+ },
+ {
+  "frame": 360,
+  "text": "It answers from your own saves. Sources included.",
+  "words": [
+   0.03,
+   0.188,
+   0.608,
+   0.87,
+   1.133,
+   1.343,
+   2.02,
+   2.447
+  ]
+ },
+ {
+  "frame": 465,
+  "text": "And it notices which saves belong together.",
+  "words": [
+   0.03,
+   0.242,
+   0.401,
+   0.824,
+   1.142,
+   1.46,
+   1.83
+  ]
+ }
+]

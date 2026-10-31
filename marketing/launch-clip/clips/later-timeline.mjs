@@ -55,8 +55,8 @@ export const BPM = (60 * FPS) / BEAT_FRAMES; // 120
 export const BEAT = BEAT_FRAMES / FPS; // 0.5s
 export const beat = (n) => Math.round(n * BEAT_FRAMES);
 
-/** 50 beats: 20s of the app, then the shared ending */
-export const TOTAL_FRAMES = beat(50);
+/** 48 beats (24.0s): 19s of the app, then the shared ending */
+export const TOTAL_FRAMES = beat(48);
 export const TOTAL_SEC = TOTAL_FRAMES / FPS;
 export const SIGNATURE_AT = TOTAL_FRAMES - SIGNATURE.frames;
 
@@ -128,25 +128,27 @@ const TYPED_FRAMES = [9669, 9672, 9674, 9675, 9677, 9680, 9682, 9685, 9689, 9692
 // ── picture events (output frames): every move, change and sound hangs off these
 
 export const HITS = {
-  tap: beat(5), // the pad lands on Machina in the share sheet; the groove drops
-  /** Machina's card works: Reading the page, Writing the summary, Searching connections */
-  steps: [beat(6.6), beat(8.2), beat(9.8)],
-  saved: beat(11.4), // "Saved ✓"
+  // (re-timed to the measured takes, 2026-10-31: the hook is said over
+  // 0.13–2.83s, its punchline from 1.85s; every other line starts on a beat)
+  tap: beat(6), // after the punchline: the pad lands on Machina, the groove drops
+  /** Machina's card works: Reading the page (as "reads" is said), Writing the summary, Searching connections */
+  steps: [120, 140, 160],
+  saved: beat(12), // "Saved ✓", held half a second
   revisit: beat(13), // the card cross-blurs into Revisit's Do this
-  todo: beat(15), // the article's task lifts, its ring
-  askTap: beat(19) - 1, // the pad lands on the Ask tab
-  ask: beat(19), // Revisit softens into Ask
-  typeFrom: beat(20),
-  send: beat(23.5), // the pad lands on send; the chat takes over
-  writing: beat(24.5),
-  answer: beat(26), // the answer resolves into focus
+  todo: beat(15), // the article's task lifts, its ring ("what to do")
+  askTap: beat(18) - 1, // the pad lands on the Ask tab
+  ask: beat(18), // Revisit softens into Ask
+  typeFrom: 280,
+  send: beat(22), // the pad lands on send; the chat takes over
+  writing: 345,
+  answer: beat(24), // the answer resolves into focus
   /** "Sources included.": each source rings, an 8th apart */
-  sources: [beat(30), beat(30.5), beat(31)],
-  graphTap: beat(33) - 1, // the pad lands on the Graph chip
-  graph: beat(33), // the answer softens into the graph
-  /** the three cited saves, lit, ring as the line names them */
-  nodes: [beat(35), beat(35.5), beat(36)],
-  out: beat(39), // the phone settles back under the Signature's paper
+  sources: [422, 429, 436],
+  graphTap: beat(31) - 1, // the pad lands on the Graph chip
+  graph: beat(31), // the answer softens into the graph
+  /** the three cited saves, lit, ring on "which saves belong together" */
+  nodes: [490, 498, 505],
+  out: 555, // the phone settles back under the Signature's paper
 };
 /** the frame the typed question is complete */
 HITS.typed = HITS.typeFrom + 2 * (TYPED_FRAMES.length - 1);
@@ -247,16 +249,17 @@ export const SHOTS = [
       tg(HITS.revisit, 220, 436, 2.2, 0.13),
       tg(HITS.todo + 20, 220, 440, 2.22),
       // easing down the list toward the tab bar as the line ends
-      tg(HITS.askTap - 6, 220, 690, 2.2),
-      // Ask: the composer and the typing
-      tg(HITS.ask, 220, 780, 2.2),
-      tg(HITS.send - 1, 220, 786, 2.22),
-      // SEND: up to the question, then where the answer lands
-      tg(HITS.send, 220, 300, 2.2, 0.13),
+      tg(HITS.askTap - 4, 220, 690, 2.2),
+      // Ask: the composer and the typing, the empty state above it
+      tg(HITS.ask, 220, 720, 2.2),
+      tg(HITS.send - 1, 220, 724, 2.22),
+      // SEND: up with the question to where the answer lands, on a softer
+      // spring (the longest move: verify measured a jolt at 0.13)
+      tg(HITS.send, 220, 380, 2.2, 0.11),
       tg(HITS.answer, 220, 420, 2.2),
-      tg(HITS.sources[0] - 8, 220, 424, 2.22),
-      // the sources and the Graph chip, as "Sources included." is said
-      tg(HITS.sources[0] - 7, 220, 610, 2.2, 0.15),
+      tg(HITS.sources[0] - 27, 220, 424, 2.22),
+      // the sources and the Graph chip, gliding in as "Sources included." comes
+      tg(HITS.sources[0] - 26, 220, 610, 2.2, 0.15),
       tg(HITS.graph - 1, 220, 612, 2.22),
       // the graph, as it blooms in
       tg(HITS.graph, 220, 628, 2.2),
@@ -325,7 +328,7 @@ const PACE = 'Everyday conversational speed, about 175 words a minute; short nat
 export const CAPTIONS = [
   {
     at: 4,
-    to: HITS.tap - 2,
+    to: 98,
     place: 'hook',
     cues: [0, 4],
     text: 'Saved it for later?\nLater never comes.',
@@ -337,8 +340,8 @@ export const CAPTIONS = [
     maxPause: 0.3,
   },
   {
-    at: HITS.tap + 5,
-    to: HITS.revisit - 4,
+    at: beat(7),
+    to: 186,
     cues: [0, 4],
     text: 'Share it to Machina,\nand it reads it for you.',
     say: 'Share it to Machina, and it reads it for you.',
@@ -347,8 +350,8 @@ export const CAPTIONS = [
     maxPause: 0.2,
   },
   {
-    at: HITS.revisit + 3,
-    to: HITS.askTap - 2,
+    at: HITS.revisit,
+    to: 262,
     cues: [0, 4],
     text: 'It even tells you\nwhat to do with it.',
     say: 'It even tells you what to do with it.',
@@ -356,10 +359,14 @@ export const CAPTIONS = [
     style: 'Natural and conversational, like pointing out a nice detail to a friend: warm and easy, a little pleased on "even"; relaxed and clear, never rushed or clipped.',
     pace: 'Relaxed conversational speed, about 160 words a minute; the whole line in one easy breath, every word given its room.',
     maxPause: 0.2,
+    // take 2 still ran 7 syllables a second (Gemini reads this line quick
+    // however it is asked): eased to ~5.6 in assembly, the approved
+    // preview's top pace (Rubber Band, formants preserved)
+    tempo: 0.82,
   },
   {
-    at: HITS.ask + 5,
-    to: HITS.send - 6,
+    at: HITS.ask,
+    to: 327,
     cues: [0, 3],
     text: 'Ask about anything\nyou’ve saved.',
     say: 'Ask about anything you’ve saved.',
@@ -368,8 +375,8 @@ export const CAPTIONS = [
     maxPause: 0.2,
   },
   {
-    at: HITS.answer + 5,
-    to: HITS.graphTap - 2,
+    at: HITS.answer,
+    to: 460,
     cues: [0, 6],
     text: 'It answers from your own saves.\nSources included.',
     say: 'It answers from your own saves. Sources included.',
@@ -378,8 +385,8 @@ export const CAPTIONS = [
     maxPause: 0.3,
   },
   {
-    at: HITS.graph + 5,
-    to: SIGNATURE_AT - 4,
+    at: HITS.graph,
+    to: 556,
     cues: [0, 3],
     text: 'And it notices\nwhich saves belong together.',
     say: 'And it notices which saves belong together.',

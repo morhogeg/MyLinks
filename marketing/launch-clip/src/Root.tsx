@@ -19,6 +19,8 @@ import { Pov } from './reels/clips/pov/Pov';
 import * as PREVIEW from '../clips/preview-timeline.mjs';
 import { AppPreview, AppPreviewShutter, SHUTTER_COUNTS, SHUTTER_TOTAL } from './reels/clips/preview/Preview';
 import { SIGNATURE } from './reels/kit/signature.mjs';
+import * as LATER from '../clips/later-timeline.mjs';
+import { LATER_SHUTTER, Later, LaterShutter } from './reels/clips/later/Later';
 
 /**
  * Compositions:
@@ -310,6 +312,46 @@ export const RemotionRoot: React.FC = () => (
       width={PREVIEW.WIDTH}
       height={PREVIEW.HEIGHT}
       defaultProps={{ counts: SHUTTER_COUNTS }}
+    />
+    {/* LATER NEVER COMES, the Instagram Reel on the preview (src/reels/clips/later,
+        clips/later-timeline.mjs): 1080 x 1920, the footer of the day as `ending` */}
+    <Composition
+      id="MachinaLater"
+      component={Later}
+      durationInFrames={LATER.TOTAL_FRAMES}
+      fps={LATER.FPS}
+      width={LATER.WIDTH}
+      height={LATER.HEIGHT}
+      defaultProps={{ withAudio: true, withCaptions: true, ending: 'soon' as const }}
+    />
+    <Composition
+      id="MachinaLaterStore"
+      component={Later}
+      durationInFrames={LATER.TOTAL_FRAMES}
+      fps={LATER.FPS}
+      width={LATER.WIDTH}
+      height={LATER.HEIGHT}
+      defaultProps={{ withAudio: true, withCaptions: true, ending: 'store' as const }}
+    />
+    <Composition
+      id="MachinaLaterSilent"
+      component={Later}
+      durationInFrames={LATER.TOTAL_FRAMES}
+      fps={LATER.FPS}
+      width={LATER.WIDTH}
+      height={LATER.HEIGHT}
+      defaultProps={{ withAudio: false, withCaptions: true, ending: 'soon' as const }}
+    />
+    {/* every exposure of every frame (the shutter): scripts/shutter-render.mjs
+        renders it and averages each frame's exposures into the master */}
+    <Composition
+      id="MachinaLaterShutter"
+      component={LaterShutter}
+      durationInFrames={LATER_SHUTTER.total}
+      fps={LATER.FPS}
+      width={LATER.WIDTH}
+      height={LATER.HEIGHT}
+      defaultProps={{ ending: 'soon' as const, counts: LATER_SHUTTER.counts }}
     />
   </>
 );

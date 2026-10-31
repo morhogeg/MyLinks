@@ -12,13 +12,30 @@ import { INK } from './Type';
  *
  * Its own type (heavier and tighter than a caption) is the one place a hook
  * differs from the narration; everything else is the house band's.
+ *
+ * `starts` (LATER NEVER COMES, 2026-10-31: a setup and its punchline): the
+ * frame each line arrives on. A line with a start after 0 is not on the
+ * cover; it rises out of its own mask HEAD_LEAD frames before its word is
+ * said, in a KineticLine's gesture (HEAD_IN frames, ease-out quint). Without
+ * `starts`, every line is on screen from frame 0, as before.
  */
 export const HOOK_TYPE = { top: 262, kicker: 42, kickerGap: 14, size: 96 };
 
-export const HookTitle: React.FC<{ kicker?: string; lines: string[]; frame: number; to: number }> = ({ kicker, lines, frame, to }) => {
+/** a line arriving: frames to rise in, and how far ahead of its word (Type.tsx's headline gesture) */
+const RISE = { frames: 9, lead: 3 };
+const OUT_QUINT = (t: number) => 1 - Math.pow(1 - t, 5);
+
+export const HookTitle: React.FC<{ kicker?: string; lines: string[]; frame: number; to: number; starts?: number[] }> = ({ kicker, lines, frame, to, starts }) => {
   if (frame >= to + 1) return null;
   const out = prog(frame, to - 7, to, (t) => t * t * t);
   const roll = { transform: `translateY(${Math.round(-out * 108)}%)` };
+  /** a line's own roll: rising in on its start (if after the cover), leaving with the rest */
+  const rollOf = (k: number) => {
+    const s = starts?.[k] ?? 0;
+    if (s <= 0) return roll;
+    const tin = OUT_QUINT(Math.min(1, Math.max(0, (frame - s + RISE.lead) / RISE.frames)));
+    return { transform: `translateY(${Math.round((1 - tin) * 108 - out * 108)}%)` };
+  };
   const clip = { overflow: 'hidden', padding: '0.04em 0.12em 0.12em', margin: '-0.04em 0 -0.12em' } as const;
   return (
     <div style={{ position: 'absolute', left: 0, right: 0, top: HOOK_TYPE.top, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -45,7 +62,7 @@ export const HookTitle: React.FC<{ kicker?: string; lines: string[]; frame: numb
         <div key={k} style={clip}>
           <div
             style={{
-              ...roll,
+              ...rollOf(k),
               fontFamily: sans,
               fontSize: HOOK_TYPE.size,
               fontWeight: 720,
