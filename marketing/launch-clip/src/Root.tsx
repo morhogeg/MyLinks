@@ -17,7 +17,7 @@ import { Signature } from './reels/kit/Signature';
 import * as POV from '../clips/pov-timeline.mjs';
 import { Pov } from './reels/clips/pov/Pov';
 import * as PREVIEW from '../clips/preview-timeline.mjs';
-import { AppPreview } from './reels/clips/preview/Preview';
+import { AppPreview, AppPreviewShutter, SHUTTER_COUNTS, SHUTTER_TOTAL } from './reels/clips/preview/Preview';
 import { SIGNATURE } from './reels/kit/signature.mjs';
 
 /**
@@ -299,6 +299,17 @@ export const RemotionRoot: React.FC = () => (
       width={PREVIEW.WIDTH}
       height={PREVIEW.HEIGHT}
       defaultProps={{ withAudio: false, withCaptions: true }}
+    />
+    {/* every exposure of every frame (the shutter): scripts/preview-render.mjs
+        renders it and averages each frame's exposures into the master */}
+    <Composition
+      id="MachinaAppPreviewShutter"
+      component={AppPreviewShutter}
+      durationInFrames={SHUTTER_TOTAL}
+      fps={PREVIEW.FPS}
+      width={PREVIEW.WIDTH}
+      height={PREVIEW.HEIGHT}
+      defaultProps={{ counts: SHUTTER_COUNTS }}
     />
   </>
 );

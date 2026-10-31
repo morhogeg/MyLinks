@@ -22,6 +22,9 @@ export const TOKENS = {
   /** the app's white as a simulator capture encodes it (253, not 255): for
    *  painting a detail out of a captured screen without leaving a seam */
   captureWhite: '#FDFDFD',
+  /** the app's page (#F9FAFB) as a simulator capture encodes it (249, 249,
+   *  251): what a page fades in from (the app's own tab change) */
+  capturePage: '#F9F9FB',
   ink: INK,
   inkSoft: INK_SOFT,
   /** secondary text and glyphs on a card */
@@ -34,6 +37,9 @@ export const TOKENS = {
   /** the kit's card shadow (SaveChip), and a quieter one for small tiles */
   shadow: '0 1px 2px rgba(16,24,40,0.06), 0 14px 34px -12px rgba(24,32,48,0.28), 0 30px 60px -30px rgba(24,32,48,0.2)',
   shadowSoft: '0 1px 2px rgba(16,24,40,0.05), 0 8px 20px -10px rgba(24,32,48,0.22)',
+  /** AppShot's studio shadow at a 3px-a-point layout: an element lifted
+   *  well off its screen (a dialog floating over the pushed-back app) */
+  shadowLift: '0 4px 9px rgba(16,24,40,0.08), 0 66px 180px -42px rgba(24,32,48,0.34), 0 180px 360px -120px rgba(24,32,48,0.22)',
   /** the app's platform hues (ui/app.tsx PLATFORM_INK) */
   platform: PLATFORM_INK,
   /**

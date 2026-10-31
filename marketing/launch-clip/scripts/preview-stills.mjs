@@ -21,9 +21,11 @@ const out = path.join(root, 'out', 'preview-stills');
 fs.mkdirSync(out, { recursive: true });
 const browserExecutable = process.env.BROWSER || null;
 
+// every beat, and both sides of every move (lift, drop, match, tab, send,
+// dive, gather); single exposures: the shutter is scripts/preview-render.mjs
 const REVIEW = [
-  0, 30, 48, 66, 92, 110, 128, 146, 164, 185, 205, 225, 250, 275, 330, 352, 385, 420, 435, 470, 520, 570, 590, 640,
-  SIGNATURE_AT + 40, TOTAL_FRAMES - 1,
+  0, 21, 24, 60, 81, 150, 180, 199, 203, 215, 244, 248, 284, 336, 338, 362, 420, 427, 440, 460, 463, 500, 558, 575,
+  576, 600, 640, 672, 682, SIGNATURE_AT + 40, TOTAL_FRAMES - 1,
 ];
 const frames = process.argv.slice(2).map(Number).filter((n) => !Number.isNaN(n));
 const list = frames.length ? frames : REVIEW;

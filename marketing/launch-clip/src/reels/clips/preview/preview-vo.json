@@ -3,15 +3,30 @@
   "frame": 6,
   "text": "Save anything, from any app.",
   "words": [
-   0.06,
-   0.407,
-   1.47,
-   1.892,
-   2.118
+   0.03,
+   0.3,
+   0.98,
+   1.226,
+   1.424
   ]
  },
  {
-  "frame": 92,
+  "frame": 66,
+  "text": "Share it straight to Makeena. No copying, no pasting.",
+  "words": [
+   0.04,
+   0.363,
+   0.525,
+   1.01,
+   1.172,
+   1.797,
+   1.958,
+   2.443,
+   2.605
+  ]
+ },
+ {
+  "frame": 170,
   "text": "Every save, analyzed and summarized.",
   "words": [
    0.03,
@@ -22,7 +37,7 @@
   ]
  },
  {
-  "frame": 260,
+  "frame": 298,
   "text": "Turn what you save into what you do.",
   "words": [
    0.02,
@@ -36,7 +51,7 @@
   ]
  },
  {
-  "frame": 352,
+  "frame": 390,
   "text": "Ask about anything you\u2019ve saved.",
   "words": [
    0.03,
@@ -47,7 +62,7 @@
   ]
  },
  {
-  "frame": 468,
+  "frame": 506,
   "text": "Every answer comes from your own sources.",
   "words": [
    0.06,
@@ -60,12 +75,16 @@
   ]
  },
  {
-  "frame": 584,
-  "text": "Every save, connected.",
+  "frame": 622,
+  "text": "And Makeena notices which saves belong together.",
   "words": [
    0.03,
-   0.47,
-   1.26
+   0.258,
+   0.713,
+   1.169,
+   1.51,
+   1.852,
+   2.251
   ]
  }
 ]

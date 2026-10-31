@@ -1,6 +1,7 @@
 # Regenerable: `node audio/preview-score.mjs` rewrites score.wav; the
-# narrated mix beside it, score-vo.wav, is committed. The clips are cut from
-# the simulator takes by capture/preview-cut.py (the takes are not in git:
-# out/preview-takes/), and are large.
+# narrated mix beside it, score-vo.wav, is committed. frames/ holds the
+# simulator takes' frames the picture uses, written by
+# capture/preview-frames.mjs (the takes are not in git: out/preview-takes/).
 score.wav
 *.mp4
+frames/

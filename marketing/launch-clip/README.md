@@ -1553,33 +1553,47 @@ three range seams; the last frame still pixel-identical to the Signature. Nobody
 
 ## THE APP STORE PREVIEW (2026-10-28/30)
 
-The App Preview video for the 1.0 product page: 27.6s, 886 × 1920, H.264
+The App Preview video for the 1.0 product page: 28.9s, 886 × 1920, H.264
 High L4.0, 30fps, AAC stereo 256k 48kHz, narrated
 (`out/preview/Machina-App-Preview-886x1920.mp4`;
 `Machina-App-Preview-review-copy.mp4` is a small copy for phones, never the
 upload). Apple's spec and rules are in `clips/preview-timeline.mjs`'s header.
 
-**Six beats, one idea and one narrated line each** (the caption is the
-line):
+**Seven narrated lines over six beats** (the caption is the line), on ONE
+phone under ONE camera that follows its framings like an iOS spring; every
+change of screen dissolves on that phone (round 8):
 
 1. "Save anything, from any app." The feed opening on Kurzgesagt's
-   "Loneliness" and TED's "How Great Leaders Inspire Action", +, Wait But
-   Why's "How to Beat Procrastination" pasted into Add to Machina, Save.
-2. "Every save, analyzed and summarized." The analysis stepper, the five
-   beats every save goes through (Fetching the link, Reading the page,
-   Writing the summary, Searching connections, Organizing & tagging), each
-   checked off; "Saved to Machina"; the new card on top of the feed, its
-   summary (ringed).
-3. "Turn what you save into what you do." Revisit's Do this list, the new
-   save's task on top: "Break your largest goal into a single, manageable
-   brick and schedule it now." (ringed).
-4. "Ask about anything you've saved." "Briefly, how is procrastination
-   linked to phone addiction?" typed.
-5. "Every answer comes from your own sources." The answer citing three saves
-   from three channels (Big Think, Mark Manson, TEDx), question to sources
-   on one screen, each source ringed in turn.
-6. "Every save, connected." The answer's Graph chip: the three cited cards,
-   lit and linked (each node ringed).
+   "Loneliness" and TED's "How Great Leaders Inspire Action". A save
+   arrives (round 10: no + tap and no pasted link): **lift**, the feed
+   recedes out of focus and the analysis sheet rises off it, already reading
+   Wait But Why's "How to Beat Procrastination".
+   "Share it straight to Machina. No copying, no pasting." (round 10, owner
+   and agreed: how saves arrive, said rather than shown; not "no switching
+   apps", which the sheet rising over Machina's own feed would contradict)
+   over the stepper's first beats.
+2. "Every save, analyzed and summarized." (the caption builds with the
+   narration: "Every save," then "analyzed and summarized.") The stepper's
+   last beats (Fetching the link, Reading the page, Writing the summary,
+   Searching connections, one a second over both lines), all done.
+   **Drop**: the dialog settles back into the feed, which racks into focus
+   with the new card on top; the card lifts (ringed).
+3. "Turn what you save into what you do." The new card cross-blurs into
+   Revisit's Do this list as the camera eases down to it, the new save's
+   task on top (lifted, ringed).
+4. "Ask about anything you've saved." **Tab**: the Ask tab tapped, Revisit
+   cross-blurs into Ask. "Briefly, how is procrastination linked to phone
+   addiction?" typed, each character fading in. **Send**: the chat
+   cross-blurs in as the camera rises to where the answer lands.
+5. "Every answer comes from your own sources." The answer resolving into
+   focus, citing three saves from three channels (Big Think, Mark Manson,
+   TEDx), question to sources on one screen, each source ringed.
+6. "And Machina notices which saves belong together." (round 10, owner: was
+   "Every save, connected."; "And" is spoken only, tying the answer's
+   sources to the graph; the caption reads "Machina notices / which saves
+   belong together.") The Graph chip tapped, the answer cross-blurs into the
+   graph as it blooms in (the three cited cards lit, each ringed); the phone
+   settles back and softens as the Signature's paper rises.
 
 Then the kit's Signature, no footer.
 
@@ -1593,21 +1607,71 @@ progress bar instead); the opening feed diversified (the four Mark Manson
 test cards archived on the review account, the four test tasks removed from
 Do this); the key-moments beat dropped (the saved article has none, and the
 only key-moments footage was a Mark Manson card); the settled graph held as
-one frame (it still twitched, ~50/255 jumps every few frames).
+one frame (it still twitched, ~50/255 jumps every few frames). 6 (owner):
+the stepper's favicon painted out. 7 (owner: "the transitions are jittery
+and low quality, dated and boring"): measured first. The screen flipped to
+the Add dialog's black backdrop in one frame (64% of the pixels at once) and
+back in one frame (69%), and every scene change was a 10-frame dissolve
+between two differently framed phones (two slabs, two shadows, two texts
+ghosting: the house's own "never dissolve between takes"). Rebuilt as one
+phone and the moves above, from frame sequences (any frame of the 60fps
+takes at any output frame, at the capture's full 3px a point) instead of cut
+clips, with a real shutter. 8 (owner: "all transitions within Ask are super
+abrupt; the clip is very jumpy; smooth everything out, effortless and
+natural, yet modern and advanced"; and "the first line's narration is too
+slow and too enunciated"): measured first. Round 7's camera started and
+stopped 13 times, peaked at 745px a frame and jolted on the send, the dive
+and the gather; ~15 changes of screen landed in one frame. Now the camera is
+a critically damped spring after a ramped target path (peak 24px a frame,
+5 moves, no kick: `follow` in `Preview.tsx`), every change of screen is a
+crossfade (the app's small changes) or a cross-blur (a new screen: the two
+only overlap out of focus), the typed question fades in character by
+character, and the dive and the gather are gone. The hook re-voiced as an
+everyday conversational read (~180 wpm, the comma a brief beat): 1.78s, was
+2.6s. 9 (owner: "some frames are too zoomed in, you are cutting off text";
+"what is that bottom bar with the arrows and checkmark? get rid of it"; "a
+complete round of polishing"): the whole phone's width is in frame at every
+hold (z ≤ 2.4, centred: verified on every frame, no word of a screen's
+16–424pt text is ever cut), which retired the "manageable" match (holding
+the word on one pixel needed z 2.95); iOS's keyboard accessory bar is
+painted out of the Ask frames. 10 (owner: "what if we just skip the frame
+of pasting a link?", then a line on how saves arrive): the + tap and the
+paste are gone, the new line is voiced in the hook's natural register
+(3.09s), the stepper spreads over both lines; 28.9s.
+
+**Motion blur is a real 180° shutter.** Where the camera moves, a frame is
+rendered at several instants across half a frame (one exposure every ~1.5px
+of travel, up to 48: `SHUTTER_COUNTS` in `Preview.tsx`) and the exposures are
+averaged in floating point (`scripts/preview-render.mjs`). A dive smears
+outward from the point it dives into; a hold has one exposure and is never
+blurred. Summing exposures inside the browser was tried first and dropped:
+Chrome rounds to 8 bits at every exposure (text tones drifted by up to 4
+levels at 8 exposures, and worse with more).
 
 **Everything on screen is the real app**: the iOS Simulator (iPhone 17 Pro
 Max, Debug build of `main` at `0db534f2`), signed into the review account, on
-the live backend. The camera only frames it; zoom is capped so no word is
-cropped (a full-width screen's text spans 16-424pt: z ≤ 1.26). Retimes, all
-of real footage: the build and answer waits are cut, only the stepper's
-forward steps are used (in the take it fell back from "Searching
-connections" to "Writing the summary" once), "Searching your library..." is
-cut (brand ban), the typing's 60fps steps are shown two frames each, the
-settled graph is one held frame. **One pixel edit** (round 6, owner: "this
-logo next to Wait But Why is ugly"): the site's favicon in the stepper is
-painted out with the sheet's own white (`PATCHES` in the timeline; kit
+the live backend. The camera only frames it: holds keep every word in frame
+(a full-width screen's text spans 16-424pt: z ≤ 2.65px a point), the match
+and the dive go closer by design, and below 3px a point (the capture's own)
+nothing is upscaled. Retimes, all of real footage: the build and answer waits
+are cut, only the stepper's forward steps are used (in the take it fell back
+from "Searching connections" to "Writing the summary" once), "Searching your
+library..." is cut (brand ban), the typing's 60fps steps are shown two frames
+each, the settled graph is one held frame. **Presentation liberties**, none
+of them the app's pixels: the Add dialog is lifted off the screen (its
+pixels and the feed's, never the app's black backdrop, so the grade never
+flips; the house Save scene's rule), its top held still while the keyboard
+would move it; changes of screen dissolve; when the typed question wraps,
+the still empty state above the composer is kept from the step before (the
+app nudges it up 12pt). **Two pixel edits**, both owner requests: the site's
+favicon in the stepper (round 6: "this logo next to Wait But Why is ugly")
+is painted out with the sheet's own white (`PATCHES`; kit
 `TOKENS.captureWhite`, the 253 a simulator capture encodes, so no seam), and
-"waitbutwhy.com" lines up with the step labels.
+"waitbutwhy.com" lines up with the step labels; iOS's keyboard accessory bar
+(round 9: "what is that bottom bar with the arrows and checkmark?", the
+simulator's ∧ ∨ ✓ while the composer has focus) is painted out of the Ask
+frames with the page's own colour (`SCREEN_PATCHES`; kit
+`TOKENS.capturePage`).
 
 **Choosing a save:** check the thumbnail first
 (`https://i.ytimg.com/vi/<id>/mqdefault.jpg`); Apple bans profanity in
@@ -1615,19 +1679,23 @@ previews. Ask's backend cold-starts: the first asks after a quiet spell can
 fail in the app ("Couldn't reach Machina"); relaunching the app and asking
 again worked.
 
-    python3 capture/preview-cut.py out/preview-takes public/clips/preview
+    node capture/preview-frames.mjs        # the takes' frames the edit uses → public/clips/preview/frames/
     GEMINI_VOICE=Sulafat <venv>/bin/python audio/synth-vo.py preview   # from the committed takes
     node audio/preview-score.mjs && node audio/mix-vo.mjs preview
     node audio/house-verify.mjs preview && node scripts/preview-stills.mjs
-    # render MachinaAppPreviewSilent in ranges (house recipe), concat, then:
-    ffmpeg -i master.mp4 -i public/clips/preview/score-vo.wav -map 0:v -map 1:a \
+    node scripts/preview-render.mjs        # every exposure, averaged → out/preview/master.mp4
+    ffmpeg -i out/preview/master.mp4 -i public/clips/preview/score-vo.wav -map 0:v -map 1:a \
       -vf "scale=886:1920:flags=lanczos,format=yuv420p,setsar=1" -r 30 \
       -c:v libx264 -profile:v high -level:v 4.0 -preset slow -b:v 11M -maxrate 12M \
       -bufsize 22M -x264-params keyint=30:min-keyint=30 -color_primaries bt709 \
-      -color_trc bt709 -colorspace bt709 -c:a aac -b:a 256k -ar 48000 -ac 2 \
-      -shortest -movflags +faststart Machina-App-Preview-886x1920.mp4
+      -color_trc bt709 -colorspace bt709 -color_range tv -c:a aac -b:a 256k -ar 48000 \
+      -ac 2 -shortest -movflags +faststart out/preview/Machina-App-Preview-886x1920.mp4
 
-The takes (`capture/preview-cut.py` header): `xcrun simctl io <device>
+One colour matrix end to end (round 7): BT.709, video range, tagged. Rounds
+1-6 rendered BT.601 full-range JPEG frames and tagged the upload BT.709, a
+small hue shift on saturated colours.
+
+The takes (`capture/preview-frames.mjs` header): `xcrun simctl io <device>
 recordVideo --codec=h264`, made 60fps CFR, in `out/preview-takes/` (W60 the
 save through Revisit, X60 Ask through the graph). Not in git.
 
