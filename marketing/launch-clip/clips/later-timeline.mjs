@@ -330,8 +330,10 @@ export const CAPTIONS = [
     cues: [0, 4],
     text: 'Saved it for later?\nLater never comes.',
     say: 'Saved it for later? Later never comes.',
-    style: 'Natural and conversational, like gently teasing a friend about a habit you both have: wry, warm and light. "Later never comes." is a knowing little punchline, never dramatic; no word stressed.',
-    pace: 'Everyday conversational speed, about 175 words a minute; a short natural beat after the question.',
+    // (take 2: the first take dwelt on "later?", 3.3 syllables a second;
+    // the owner's preview hook was re-voiced for exactly that)
+    style: 'Natural and conversational, like gently teasing a friend about a habit you both have: wry, warm and light. The question quick and easy, then "Later never comes." as a knowing little punchline, never dramatic; no word drawn out or stressed.',
+    pace: 'Everyday conversational speed, about 180 words a minute; only a brief natural beat after the question.',
     maxPause: 0.3,
   },
   {
@@ -350,8 +352,9 @@ export const CAPTIONS = [
     cues: [0, 4],
     text: 'It even tells you\nwhat to do with it.',
     say: 'It even tells you what to do with it.',
-    style: 'Natural and conversational, a small pleased surprise on "even", like pointing out a nice detail to a friend; light, never performed.',
-    pace: PACE,
+    // (take 2: the first ran 8 syllables a second, rushed)
+    style: 'Natural and conversational, like pointing out a nice detail to a friend: warm and easy, a little pleased on "even"; relaxed and clear, never rushed or clipped.',
+    pace: 'Relaxed conversational speed, about 160 words a minute; the whole line in one easy breath, every word given its room.',
     maxPause: 0.2,
   },
   {
