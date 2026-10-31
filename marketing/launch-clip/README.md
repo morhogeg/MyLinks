@@ -1797,8 +1797,17 @@ caption: seen, not key.
     node audio/later-verify.mjs && node audio/house-verify.mjs later
     node scripts/later-stills.mjs                               # + -guides.png: safe zone, 3:4 crop
     node scripts/shutter-render.mjs later                       # every exposure, averaged → out/later/master-soon.mp4
-    node scripts/shutter-render.mjs later --ending store        # only the Signature's frames, spliced
-    node scripts/later-encode.mjs                               # posting files + review copy + the frame-by-frame check
+    node scripts/shutter-render.mjs later --ending store        # only the Signature's frames → master-store-tail.mp4
+    node scripts/later-encode.mjs                               # posting files (the tail joined in the same pass) + review copy + frame-by-frame check
+    node capture/take-events.mjs out/later-takes/S60.mp4         # (before the frames) where take S changes: its marks
+
+**Dry run (2026-10-31, this container, numbered stand-in frames in place of
+the takes; nothing of it kept):** the whole picture pipeline ran end to end:
+1,295 exposures (176 frames with a shutter, at most 10) averaged into 720
+frames in ~5 minutes on 4 cores; the launch-day tail; both posting files
+H.264 High 1080 × 1920 30fps BT.709 video range, AAC 48kHz; the review copy.
+It found two bugs, both fixed: an unmeasured take read as its frame 0, and a
+splice that cost the store file a generation.
 
 `scripts/frame-jumps.mjs <video>` is the owner's frame-by-frame check on any
 render: a frame that changes more than three times both frames beside it
