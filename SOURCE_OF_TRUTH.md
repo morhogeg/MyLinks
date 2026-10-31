@@ -2746,6 +2746,11 @@ native iOS share sheet, so that beat is a brand graphic.
   - nothing merges to `main` until the owner has reviewed the cut.
 
   The copy for each ad is in `CAMPAIGN.md` §8.
+- **The App Store preview** (the product page's App Preview video, 28.9s,
+  886 × 1920; owner approved 2026-10-31) is on branch
+  `claude/onboard-app-store-listing-373bac`, which sits on the reel kit
+  branch `claude/machina-instagram-tiktok-reel-a799fc`, so it merges with the
+  rest of this work. Files, Drive copy and upload notes: §9, 2026-10-31.
 - **Merging later:** each clip and ad keeps its own files (timeline, scenes,
   take, score, gates), so they merge together. The exceptions are one-line
   entries in `Root.tsx`, `synth-vo.py`, `mix-vo.mjs` and `capture/shoot.mjs`,
@@ -2762,6 +2767,34 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-31 — APP STORE PREVIEW VIDEO: FINAL CUT, OWNER APPROVED ("It's
+  perfect"); kept off `main` with the rest of the video work (owner).** The
+  App Preview for the product page: 28.9s, 886 × 1920, H.264 High 4.0, 30fps,
+  AAC 48kHz, narrated (Gemini, Sulafat), all real simulator footage of a
+  build of `main` (`0db534f2`) on the review account. Seven lines: "Save
+  anything, from any app." / "Share it straight to Machina. No copying, no
+  pasting." / "Every save, analyzed and summarized." / "Turn what you save
+  into what you do." / "Ask about anything you've saved." / "Every answer
+  comes from your own sources." / "And Machina notices which saves belong
+  together." (the "And" spoken only), then the house Signature. Rounds 7–10
+  rebuilt the motion (owner: "jittery", then "very jumpy"): one phone under a
+  spring camera with its whole width always in frame (no cut text), every
+  change of screen a cross-blur on that phone, the Add dialog lifted off the
+  feed (the app's black backdrop never shown), a real 180° shutter averaged
+  in floating point, BT.709 end to end; no + tap or pasted link (the save
+  arrives under the hook). Two pixel edits, both owner asks: the stepper's
+  site favicon and iOS's keyboard accessory bar. **Where it lives:** branch
+  `claude/onboard-app-store-listing-373bac` @ `a35f6c1e` (build recipe:
+  `marketing/launch-clip/README.md`, "THE APP STORE PREVIEW"); the upload
+  file and the raw 60fps simulator takes (not in git, the only copies) in
+  `~/MyLinks/marketing/launch-clip/out/app-store-preview/`; a full-resolution
+  9.4 MB copy in Drive (Machina - App Store featuring › Videos › "App Store
+  banner video.mp4": Chrome uploads cap at 10 MB, so the 37.8 MB upload file
+  itself is not there). **Owner to decide:** add it to 1.0 (in review with
+  build 1388: previews are per-version metadata, so that means removing 1.0
+  from review, adding it and resubmitting) or ship it with 1.0.1. Upload:
+  App Store Connect → the version → iPhone 6.9" → App Previews; set the poster
+  frame to 0s (Apple's default, 5s, lands mid-analysis).
 - **2026-10-26 — WEBSITE SEO + AEO: BLOG, FAQ, CRAWLER-READABLE HOME
   (§4 task 28; merge `7f4eefac`, LIVE on Vercel, no TestFlight build:
   web-only).** Before this, `/` served crawlers a 33-character boot shell, and
