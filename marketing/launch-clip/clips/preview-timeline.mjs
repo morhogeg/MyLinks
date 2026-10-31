@@ -195,7 +195,7 @@ export const CAPTIONS = [
   { at: BEATS.todo + 8, to: BEATS.ask - 6, cues: [0, 4], text: 'Turn what you save\ninto what you do.', say: 'Turn what you save into what you do.', style: 'Warm, a neat turn of phrase; a gentle stress on "save" and on "do".', pace: PACE },
   { at: BEATS.ask + 8, to: HITS.send - 9, cues: [0, 3], text: 'Ask about anything\nyou’ve saved.', say: 'Ask about anything you’ve saved.', style: 'Curious and inviting; an easy lift on "anything".', pace: PACE },
   { at: HITS.answer + 8, to: BEATS.graph - 6, cues: [0, 3], text: 'Every answer comes\nfrom your own sources.', say: 'Every answer comes from your own sources.', style: 'Reassuring and clear; "from your own sources" with quiet confidence, a small stress on "own".', pace: PACE },
-  { at: BEATS.graph + 8, to: SIGNATURE_AT - 4, cues: [0, 2], text: 'Every save,\nconnected.', say: 'Every save, connected.', style: 'Calm, with a little wonder, slowing slightly; "connected" landing softly, leaving space before the logo.', pace: PACE },
+  { at: BEATS.graph + 8, to: SIGNATURE_AT - 4, cues: [1, 3], text: 'Machina notices\nwhich saves belong together.', say: 'And Machina notices which saves belong together.', style: 'Natural and conversational, with a little warmth and wonder, like pointing out something clever a friend did; light and unforced, no word stressed.', pace: 'Everyday conversational speed, about 170 words a minute; easy, never drawn out; "together" landing softly, leaving space before the logo.', maxPause: 0.2 },
 ];
 
 /** chords, warm, a step at each beat */
