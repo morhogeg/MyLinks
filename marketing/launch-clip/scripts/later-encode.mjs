@@ -17,27 +17,37 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { SIGNATURE_AT } from '../clips/later-timeline.mjs';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const out = path.join(root, 'out', 'later');
 const mix = path.join(root, 'public', 'clips', 'later', 'score-vo.wav');
 const COLOUR = ['-color_primaries', 'bt709', '-color_trc', 'bt709', '-colorspace', 'bt709', '-color_range', 'tv'];
-const posting = (master, dest) =>
+const ENCODE = ['-c:v', 'libx264', '-preset', 'slow', '-crf', '15', '-profile:v', 'high', '-level:v', '4.1', '-pix_fmt', 'yuv420p', ...COLOUR, '-c:a', 'aac', '-b:a', '320k', '-ar', '48000', '-ac', '2', '-shortest', '-movflags', '+faststart'];
+/** today's master; or, with a tail, today's frames up to the Signature and the tail's from it, joined in this one encode */
+const posting = (master, tail, dest) =>
   execFileSync('ffmpeg', [
-    '-v', 'error', '-y', '-i', master, '-i', mix, '-map', '0:v', '-map', '1:a',
-    '-c:v', 'libx264', '-preset', 'slow', '-crf', '15', '-profile:v', 'high', '-level:v', '4.1', '-pix_fmt', 'yuv420p', ...COLOUR,
-    '-c:a', 'aac', '-b:a', '320k', '-ar', '48000', '-ac', '2', '-shortest', '-movflags', '+faststart', dest,
+    '-v', 'error', '-y', '-i', master, ...(tail ? ['-i', tail] : []), '-i', mix,
+    ...(tail
+      ? ['-filter_complex', `[0:v]trim=end_frame=${SIGNATURE_AT},setpts=PTS-STARTPTS[a];[1:v]setpts=PTS-STARTPTS[b];[a][b]concat=n=2:v=1:a=0[v]`, '-map', '[v]', '-map', '2:a']
+      : ['-map', '0:v', '-map', '1:a']),
+    ...ENCODE, dest,
   ]);
 
 const made = [];
+const master = path.join(out, 'master-soon.mp4');
+if (!fs.existsSync(master)) {
+  console.log(`(no ${path.relative(root, master)}: run scripts/shutter-render.mjs later)`);
+  process.exit(1);
+}
 for (const [ending, name] of [['soon', 'Machina-Later-Reel.mp4'], ['store', 'Machina-Later-Reel-store.mp4']]) {
-  const master = path.join(out, `master-${ending}.mp4`);
-  if (!fs.existsSync(master)) {
-    console.log(`(no ${path.relative(root, master)}: run scripts/shutter-render.mjs later${ending === 'soon' ? '' : ' --ending store'})`);
+  const tail = ending === 'soon' ? null : path.join(out, `master-${ending}-tail.mp4`);
+  if (tail && !fs.existsSync(tail)) {
+    console.log(`(no ${path.relative(root, tail)}: run scripts/shutter-render.mjs later --ending ${ending})`);
     continue;
   }
   const dest = path.join(out, name);
-  posting(master, dest);
+  posting(master, tail, dest);
   made.push(dest);
   console.log(`posting file: ${path.relative(root, dest)} (${(fs.statSync(dest).size / 1e6).toFixed(1)}MB)`);
 }

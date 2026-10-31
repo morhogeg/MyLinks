@@ -3,7 +3,7 @@
  * scripts/preview-render.mjs, made generic for the videos after it).
  *
  *   node scripts/shutter-render.mjs later                 →  out/later/master-soon.mp4
- *   node scripts/shutter-render.mjs later --ending store  →  out/later/master-store.mp4
+ *   node scripts/shutter-render.mjs later --ending store  →  out/later/master-store-tail.mp4
  *   (--fresh re-renders the exposures even if they exist; CONCURRENCY=n)
  *
  * 1. Renders the video's Shutter composition: every exposure of every frame,
@@ -13,9 +13,12 @@
  *    point, encoding the master. (Summing them in the browser rounds to 8
  *    bits at every exposure: text tones drifted by up to 4 levels at 8.)
  *
- * The store ending differs from today's only in the Signature's footer, so
- * with --ending store and an existing master-soon.mp4 only the frames from
- * the Signature on are rendered, and spliced after today's frames.
+ * Another ending differs from today's only in the Signature's footer, so
+ * for it only the Signature's frames are rendered (master-<ending>-tail.mp4,
+ * from SIGNATURE_AT); the posting encode (scripts/later-encode.mjs) joins
+ * them to today's frames in the same pass, so both files are the same
+ * generation. (Decoding today's master to splice it here cost the store
+ * file one more encode: 0.6–0.8 levels off on frames that should match.)
  *
  * One colour matrix end to end: BT.709, video range, tagged as such.
  * BROWSER= a Chrome binary; unset, Remotion finds a local one (Mac).
@@ -53,12 +56,10 @@ if (counts.length !== TOTAL_FRAMES) throw new Error(`${counts.length} exposure c
 const starts = [0];
 for (let f = 0; f < TOTAL_FRAMES; f++) starts.push(starts[f] + counts[f]);
 
-// the store ending re-renders only the Signature's frames, over today's
-const soonMaster = path.join(out, 'master-soon.mp4');
-const splice = ending !== 'soon' && fs.existsSync(soonMaster);
-const first = splice ? SIGNATURE_AT : 0;
+// another ending renders only the Signature's frames
+const first = ending === 'soon' ? 0 : SIGNATURE_AT;
 const exposures = path.join(out, `exposures-${ending}.mp4`);
-const master = path.join(out, `master-${ending}.mp4`);
+const master = path.join(out, ending === 'soon' ? 'master-soon.mp4' : `master-${ending}-tail.mp4`);
 const moving = counts.filter((n) => n > 1).length;
 console.log(`${ending}: ${starts[TOTAL_FRAMES] - starts[first]} exposures for frames ${first}–${TOTAL_FRAMES - 1} (${moving} frames with a shutter, up to ${Math.max(...counts)} exposures)`);
 
@@ -91,7 +92,7 @@ if (!fs.existsSync(exposures) || process.argv.includes('--fresh')) {
   console.log(`\nexposures rendered in ${Math.round((Date.now() - t0) / 1000)}s`);
 }
 
-// 2. each frame, the mean of its exposures (spliced after today's frames for another ending)
+// 2. each frame, the mean of its exposures
 const SIZE = WIDTH * HEIGHT * 3;
 const enc = spawn('ffmpeg', [
   '-v', 'error', '-y', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', `${WIDTH}x${HEIGHT}`, '-r', '30', '-i', '-',
@@ -102,32 +103,10 @@ enc.stderr.pipe(process.stderr);
 const write = async (buf) => {
   if (!enc.stdin.write(buf)) await new Promise((r) => enc.stdin.once('drain', r));
 };
-const decode = (file, frames) =>
-  spawn('ffmpeg', ['-v', 'error', '-i', file, ...(frames ? ['-frames:v', String(frames)] : []), '-vf', 'scale=in_color_matrix=bt709:in_range=tv,format=rgb24', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-']);
+const decode = (file) =>
+  spawn('ffmpeg', ['-v', 'error', '-i', file, '-vf', 'scale=in_color_matrix=bt709:in_range=tv,format=rgb24', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-']);
 
-let f = 0;
-if (splice) {
-  // today's frames before the Signature, as they are
-  const dec = decode(soonMaster, first);
-  dec.stderr.pipe(process.stderr);
-  let filled = 0;
-  const frame = Buffer.alloc(SIZE);
-  for await (const chunk of dec.stdout) {
-    let off = 0;
-    while (off < chunk.length) {
-      const take = Math.min(SIZE - filled, chunk.length - off);
-      chunk.copy(frame, filled, off, off + take);
-      filled += take;
-      off += take;
-      if (filled === SIZE) {
-        await write(Buffer.from(frame));
-        filled = 0;
-        f++;
-      }
-    }
-  }
-  if (f !== first) throw new Error(`took ${f} frames from ${path.basename(soonMaster)}, expected ${first}`);
-}
+let f = first;
 const dec = decode(exposures);
 dec.stderr.pipe(process.stderr);
 const sum = new Uint16Array(SIZE);
@@ -158,5 +137,5 @@ for await (const chunk of dec.stdout) {
 }
 enc.stdin.end();
 await new Promise((r) => enc.on('close', r));
-if (f !== TOTAL_FRAMES) throw new Error(`wrote ${f} frames, expected ${TOTAL_FRAMES}`);
-console.log(`master: ${path.relative(root, master)} (${f} frames)`);
+if (f !== TOTAL_FRAMES) throw new Error(`wrote frames ${first}–${f - 1}, expected ${first}–${TOTAL_FRAMES - 1}`);
+console.log(`master: ${path.relative(root, master)} (frames ${first}–${f - 1})`);
