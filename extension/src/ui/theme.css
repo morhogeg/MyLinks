@@ -1,0 +1,128 @@
+/*
+ * Machina's design tokens for the extension's own pages (popup, settings).
+ * Values mirror web/app/globals.css (`.light` and the dark `:root`) so the
+ * extension looks like the app; rules below use the tokens, never raw colors.
+ * The extension follows the system appearance (it can't see the app's
+ * own theme setting).
+ */
+
+@font-face {
+    font-family: "Geist";
+    src: url("fonts/Geist-Variable.woff2") format("woff2");
+    font-weight: 100 900;
+    font-display: swap;
+}
+
+:root {
+    color-scheme: light dark;
+    --background: #F9FAFB;
+    --card: #ffffff;
+    --card-hover: #F3F4F6;
+    --text: #111827;
+    --text-secondary: #4B5563;
+    --text-muted: #68707C;
+    --border: rgba(0, 0, 0, 0.05);
+    --border-strong: rgba(0, 0, 0, 0.10);
+    --accent: #22222A;
+    --accent-ink: #F7F7F9;
+    --accent-hover: #34343F;
+    --accent-ring: rgba(90, 88, 80, 0.22);
+    --danger: #DC2626;
+    --warning: #B45309;
+    --success: #15803D;
+    --ease-modal: cubic-bezier(0.32, 0.72, 0, 1);
+    --focus: var(--accent);
+    --font: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --background: #050505;
+        --card: #121212;
+        --card-hover: #1a1a1a;
+        --text: #E5E5E5;
+        --text-secondary: #A0A0A0;
+        --text-muted: #858585;
+        --border: rgba(255, 255, 255, 0.05);
+        --border-strong: rgba(255, 255, 255, 0.10);
+        --accent: #E9E9F2;
+        --accent-ink: #101016;
+        --accent-hover: #FFFFFF;
+        --accent-ring: rgba(174, 184, 206, 0.34);
+        --danger: #F87171;
+        --warning: #F59E0B;
+        --success: #22C55E;
+    }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body { margin: 0; }
+
+body {
+    font-family: var(--font);
+    font-size: 14px;
+    line-height: 1.4;
+    color: var(--text);
+    background: var(--card);
+    -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, p { margin: 0; }
+
+[hidden] { display: none !important; }
+
+.sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+.icon { width: 20px; height: 20px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Controls: 40px tall (≥ 24px target, WCAG 2.5.8); visible focus everywhere. */
+.button {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    min-height: 40px; padding: 0 16px; border-radius: 10px;
+    font: 600 14px/1 var(--font); cursor: pointer;
+    border: 1px solid transparent; text-decoration: none;
+    transition: background-color .15s var(--ease-modal), border-color .15s var(--ease-modal);
+}
+.button.primary { background: var(--accent); color: var(--accent-ink); }
+.button.primary:hover { background: var(--accent-hover); }
+.button.secondary { background: var(--card-hover); color: var(--text); border-color: var(--border-strong); }
+.button.secondary:hover { border-color: var(--text-muted); }
+.button .icon { width: 18px; height: 18px; }
+.button:disabled { opacity: .55; cursor: default; }
+
+.link-button {
+    background: none; border: 0; padding: 4px 0; margin: 0; min-height: 24px;
+    font: 600 13px/1.3 var(--font); color: var(--text); cursor: pointer;
+    text-decoration: underline; text-underline-offset: 2px;
+}
+
+.icon-button {
+    display: inline-grid; place-items: center; width: 32px; height: 32px;
+    border-radius: 8px; border: 0; background: none; color: var(--text-secondary); cursor: pointer;
+}
+.icon-button:hover { background: var(--card-hover); color: var(--text); }
+
+:is(.button, .link-button, .icon-button, a, input, summary):focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+}
+
+kbd {
+    font: 600 12px/1 var(--mono); padding: 3px 6px; border-radius: 6px;
+    background: var(--card-hover); border: 1px solid var(--border-strong); color: var(--text);
+}
+
+/* Result tones: the status color carries meaning only next to an icon and words. */
+[data-tone="ok"] .tone-icon { color: var(--success); }
+[data-tone="neutral"] .tone-icon { color: var(--text-secondary); }
+[data-tone="warn"] .tone-icon { color: var(--warning); }
+[data-tone="error"] .tone-icon { color: var(--danger); }
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+}

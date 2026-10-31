@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title data-i18n="optionsTitle">Machina settings</title>
+    <link rel="icon" href="../../icons/icon-32.png">
+    <link rel="stylesheet" href="../ui/theme.css">
+    <link rel="stylesheet" href="options.css">
+    <script type="module" src="options.js"></script>
+</head>
+<body>
+    <main class="page">
+        <header class="masthead">
+            <img src="../../icons/icon-48.png" alt="" width="40" height="40">
+            <h1 data-i18n="optionsTitle"></h1>
+        </header>
+
+        <p class="sr-only" id="announcer" role="status" aria-live="polite"></p>
+
+        <section class="card" aria-labelledby="account-heading">
+            <h2 id="account-heading" data-i18n="accountHeading"></h2>
+            <p class="lead" id="account-status"></p>
+            <p class="warning" id="disconnect-warning" hidden></p>
+            <div class="row">
+                <button class="button primary" id="connect" type="button" data-i18n="connectButton" hidden></button>
+                <button class="button secondary" id="disconnect" type="button" data-i18n="disconnectButton" hidden></button>
+                <button class="button secondary danger" id="disconnect-confirm" type="button" data-i18n="disconnectConfirm" hidden></button>
+            </div>
+
+            <details class="token" id="token-details">
+                <summary data-i18n="tokenHeading"></summary>
+                <p class="help" data-i18n="tokenHelp"></p>
+                <form id="token-form" novalidate>
+                    <label for="token-input" data-i18n="tokenLabel"></label>
+                    <div class="row">
+                        <input id="token-input" name="token" type="text" autocomplete="off" spellcheck="false"
+                               autocapitalize="off" inputmode="text" aria-describedby="token-message">
+                        <button class="button primary" id="token-submit" type="submit" data-i18n="tokenConnect"></button>
+                    </div>
+                    <p class="message" id="token-message" aria-live="polite"></p>
+                </form>
+            </details>
+        </section>
+
+        <section class="card" aria-labelledby="queue-heading">
+            <h2 id="queue-heading" tabindex="-1" data-i18n="queueHeading"></h2>
+            <p class="lead" id="queue-empty" data-i18n="queueEmpty"></p>
+            <ul class="queue" id="queue-list"></ul>
+            <div class="row">
+                <button class="button secondary" id="send-all" type="button" data-i18n="queueSendAll" hidden></button>
+            </div>
+        </section>
+
+        <section class="card" aria-labelledby="shortcuts-heading">
+            <h2 id="shortcuts-heading" data-i18n="shortcutsHeading"></h2>
+            <dl class="shortcuts" id="shortcuts"></dl>
+            <p class="help" data-i18n="shortcutsHelp"></p>
+            <div class="row">
+                <button class="button secondary" id="change-shortcuts" type="button" data-i18n="shortcutsChange"></button>
+            </div>
+        </section>
+
+        <section class="card" aria-labelledby="privacy-heading">
+            <h2 id="privacy-heading" data-i18n="privacyHeading"></h2>
+            <p class="help" data-i18n="privacyBody"></p>
+            <p><a id="privacy-link" target="_blank" rel="noopener noreferrer" data-i18n="privacyLink"></a></p>
+        </section>
+
+        <footer class="version" id="version"></footer>
+    </main>
+</body>
+</html>

@@ -1,0 +1,68 @@
+/* Settings page (opens in a tab). Tokens in ../ui/theme.css. */
+
+body { background: var(--background); }
+
+.page {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 32px 16px 48px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.masthead { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.masthead img { border-radius: 10px; }
+.masthead h1 { font-size: 24px; font-weight: 600; letter-spacing: -.01em; }
+
+.card {
+    background: var(--card);
+    border: 1px solid var(--border-strong);
+    border-radius: 14px;
+    padding: 18px 18px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.card h2 { font-size: 16px; font-weight: 600; }
+
+.lead { color: var(--text); }
+.help { color: var(--text-secondary); }
+.warning { color: var(--warning); font-weight: 600; }
+.message { min-height: 1.4em; color: var(--text-secondary); }
+.message[data-tone="error"] { color: var(--danger); }
+.message[data-tone="ok"] { color: var(--success); }
+
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.button.danger { color: var(--danger); }
+
+.token summary {
+    cursor: pointer; font-weight: 600; min-height: 32px; display: flex; align-items: center;
+    border-radius: 6px;
+}
+.token[open] summary { margin-bottom: 8px; }
+.token form { display: flex; flex-direction: column; gap: 8px; }
+.token label { font-weight: 600; font-size: 13px; color: var(--text-secondary); }
+.token input {
+    flex: 1 1 260px; min-height: 40px; padding: 0 12px; border-radius: 10px;
+    font: 14px/1 var(--mono); color: var(--text); background: var(--background);
+    border: 1px solid var(--border-strong);
+}
+
+.queue { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.queue li {
+    display: flex; align-items: center; gap: 12px; padding: 10px 12px;
+    border-radius: 10px; background: var(--background); border: 1px solid var(--border-strong);
+}
+.queue .item-text { flex: 1; min-width: 0; }
+.queue .item-title { font-weight: 600; overflow-wrap: anywhere; unicode-bidi: plaintext; }
+.queue .item-meta { font-size: 12.5px; color: var(--text-muted); }
+.queue .item-meta[data-failed] { color: var(--danger); }
+
+.shortcuts { margin: 0; display: grid; grid-template-columns: 1fr auto; gap: 8px 16px; align-items: center; }
+.shortcuts dt { color: var(--text); }
+.shortcuts dd { margin: 0; color: var(--text-muted); text-align: end; }
+
+a { color: var(--text); font-weight: 600; text-underline-offset: 2px; }
+
+.version { text-align: center; font-size: 12.5px; color: var(--text-muted); }

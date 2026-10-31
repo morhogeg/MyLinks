@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width">
+    <title data-i18n="brand">Machina</title>
+    <link rel="stylesheet" href="../ui/theme.css">
+    <link rel="stylesheet" href="popup.css">
+    <script type="module" src="popup.js"></script>
+</head>
+<body>
+    <svg class="sprite" aria-hidden="true" focusable="false">
+        <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+        <symbol id="i-clock" viewBox="0 0 24 24"><path d="M12 7v5l3 2"/><circle cx="12" cy="12" r="9"/></symbol>
+        <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 8v5"/><path d="M12 16.5v.01"/><circle cx="12" cy="12" r="9"/></symbol>
+        <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1"/><path d="M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1"/></symbol>
+        <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></symbol>
+        <symbol id="i-camera" viewBox="0 0 24 24"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3Z"/><circle cx="12" cy="13" r="3.5"/></symbol>
+        <symbol id="i-open" viewBox="0 0 24 24"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></symbol>
+        <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18Z"/></symbol>
+    </svg>
+
+    <main class="popup">
+        <header class="bar">
+            <img class="mark" src="../../icons/icon-32.png" alt="" width="22" height="22">
+            <span class="brand" data-i18n="brand">Machina</span>
+            <button class="icon-button" id="open-settings" type="button" data-i18n-aria-label="settings" data-i18n-title="settings">
+                <svg class="icon" aria-hidden="true"><use href="#i-gear"/></svg>
+            </button>
+        </header>
+
+        <section class="page" id="page" hidden>
+            <img class="favicon" id="favicon" alt="" width="16" height="16" hidden>
+            <svg class="icon favicon-fallback" id="favicon-fallback" aria-hidden="true"><use href="#i-globe"/></svg>
+            <div class="page-text">
+                <p class="page-title" id="page-title" dir="auto"></p>
+                <p class="page-url" id="page-url" dir="ltr"></p>
+            </div>
+        </section>
+
+        <section class="result" id="result" data-tone="neutral" role="status" aria-live="polite" aria-atomic="true">
+            <span class="result-icon tone-icon" id="result-icon" aria-hidden="true">
+                <span class="spinner" id="spinner"></span>
+                <svg class="icon" id="result-svg" hidden><use id="result-use" href="#i-check"/></svg>
+            </span>
+            <div class="result-text">
+                <h1 class="result-title" id="result-title"></h1>
+                <p class="result-detail" id="result-detail"></p>
+            </div>
+        </section>
+
+        <figure class="quote" id="quote" hidden>
+            <figcaption class="quote-label" data-i18n="quoteLabel"></figcaption>
+            <blockquote class="quote-text" id="quote-text" dir="auto"></blockquote>
+        </figure>
+
+        <p class="hint" id="hint" hidden></p>
+
+        <div class="actions" id="actions"></div>
+
+        <footer class="footer">
+            <p class="footer-line" id="queue-line" hidden>
+                <svg class="icon small" aria-hidden="true"><use href="#i-clock"/></svg>
+                <span id="queue-text"></span>
+                <button class="link-button" id="send-now" type="button" data-i18n="sendNow"></button>
+            </p>
+            <p class="footer-line" id="account-line" hidden></p>
+            <p class="footer-line" id="shortcut-line" hidden></p>
+        </footer>
+    </main>
+</body>
+</html>
