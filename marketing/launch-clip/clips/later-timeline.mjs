@@ -355,19 +355,15 @@ export const CAPTIONS = [
   {
     at: HITS.revisit,
     to: 262,
-    // said in one breath (measured: no pause anywhere in the take), so both
-    // rows arrive together; a row only waits for its word after a pause
+    // round 4 (owner): was "It even tells you what to do with it."; the
+    // approved App Store preview's line, made the reel's ("…what you do" →
+    // "…what you need to do")
     cues: [0, 0],
-    text: 'It even tells you\nwhat to do with it.',
-    say: 'It even tells you what to do with it.',
-    // (take 2: the first ran 8 syllables a second, rushed)
-    style: 'Natural and conversational, like pointing out a nice detail to a friend: warm and easy, a little pleased on "even"; relaxed and clear, never rushed or clipped.',
-    pace: 'Relaxed conversational speed, about 160 words a minute; the whole line in one easy breath, every word given its room.',
+    text: 'Turn what you save\ninto what you need to do.',
+    say: 'Turn what you save into what you need to do.',
+    style: 'Natural and conversational, like telling a friend about a small thing that makes life easier: warm and easy, a light natural stress on "save" and on "need to do"; relaxed and clear, never rushed or clipped.',
+    pace: 'Everyday conversational speed; the whole line in one easy breath of about two seconds, only the briefest beat after "save".',
     maxPause: 0.2,
-    // take 2 still ran 7 syllables a second (Gemini reads this line quick
-    // however it is asked): eased to ~5.6 in assembly, the approved
-    // preview's top pace (Rubber Band, formants preserved)
-    tempo: 0.82,
   },
   {
     at: HITS.ask,
