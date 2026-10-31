@@ -1702,6 +1702,110 @@ save through Revisit, X60 Ask through the graph). Not in git.
 **Poster frame:** set it to 0s in App Store Connect (the hook over the
 feed). Apple's default, 5s, lands mid-stepper.
 
+## LATER NEVER COMES (the Instagram Reel, 2026-10-31)
+
+`MachinaLater` is the organic Instagram Reel built on THE APP STORE PREVIEW:
+24.0s, 1080 × 1920, narrated, music-led, on the house rules (branch
+`claude/instagram-reel-app-store-012mo2`, on the preview's a35f6c1e; video
+work merges only after the owner reviews the cut). `MachinaLaterStore` is the
+same reel with launch day's footer, `MachinaLaterSilent` the picture alone.
+**The idea:** everyone saves things for later, and later never comes; Machina
+reads what you share to it, and it pays off. Owner-approved wording:
+
+| Time | Picture | Caption = voice |
+|---|---|---|
+| 0:00 | The cover: Safari's share sheet on a plain-text passage of the Wait But Why article, Machina first in its row; a slow push | **Saved it for later?** (the house hook, big) |
+| 0:01.9 | | **Later never comes.** (rising on its word) |
+| 0:03.0 | The tap on Machina; the groove drops; Machina's own share card reads it: Reading the page, Writing the summary, Searching connections, "Saved ✓" | Share it to Machina, / and it reads it for you. |
+| 0:06.5 | Cross-blur into Revisit: the article's task tops Do this, lifts, ink ring | It even tells you / what to do with it. |
+| 0:09.0 | The Ask tab; "Briefly, how is procrastination linked to phone addiction?" types itself; send | Ask about anything / you've saved. |
+| 0:12.0 | The answer; its three sources ring on "Sources included." | It answers from your own saves. / Sources included. |
+| 0:15.5 | The Graph chip; the graph blooms, the three cited saves lit | And it notices / which saves belong together. |
+| 0:19.0 | The kit's Signature, footer "Coming soon · mymachina.app" (launch day: "Now on the App Store · mymachina.app") | (the Signature's take) |
+
+**Why it is built this way (the owner asked for the best practice of the
+most viral tech Reels, made to the standard of Apple's social team).**
+Instagram's insights measure a 3-second skip rate, and its ranking reportedly
+leads on watch time, then sends per reach, then likes per reach: so frame 0
+is both the cover and the hook, the voice starts on frame 4, and the app is
+moving by 0:03. Sends come from recognition: the hook is a habit nearly
+everyone shares. Instagram tells creators to keep Reels short and recommends
+less often a Reel whose picture is mostly text: 24 seconds, something new
+every 1–1.5s, never more than two short rows of type. Business accounts get
+only Meta's Sound Collection and Instagram ranks originality: the score is
+the house synth, original. The profile grid crops covers to 3:4 (the centred
+1080 × 1440): the hook sits inside it and inside Meta's safe zones. Apple's
+craft is restraint: one phone, one statement at a time, the answer with its
+sources the longest hold. A second hook for a Trial Reels test ("You'll save
+this reel / and never see it again.", same body) was offered, not built.
+
+**What it shows, and what it never shows.** The ads brief (SOURCE_OF_TRUTH
+§8) rules out third-party images and real people endorsing. The preview's
+feed shows YouTube thumbnails (Kurzgesagt's art, a TED speaker's face), so
+this reel never shows the feed: not the opening, not behind the lifted sheet,
+not under the new card. Checked in the app's code at the takes' build
+(0db534f2): articles never get an image; the share card and the in-app
+stepper show only the site's favicon (painted out, the preview's round-6
+precedent); Revisit's Do this rows carry no images by design (the Reminders
+rows above them can: framed out); Ask's source chips are the app's own
+platform marks and names in type; the graph is plain discs. Not yet checked
+on the new take's frames.
+
+**The takes.** W and X are the preview's (`out/preview-takes/`; the reel
+reads Revisit from W, all of Ask from X, and shares the preview's frame cache
+in `public/clips/preview/frames/`). **S is new: the share sheet.** Record it
+the preview's way on the same simulator (iPhone 17 Pro Max, review account,
+status bar overridden, light): Safari on the Wait But Why article ("How to
+Beat Procrastination"), scrolled to a passage of plain text (no drawings);
+••• → Share; the share sheet up and still for two seconds; tap Machina (a
+Favorite, first in the row); let Machina's card run to "Saved ✓". That
+article is already saved on the review account, so archive its card first
+and restore it after (delete the new one), or the card says it is already
+saved. `xcrun simctl io booted recordVideo --codec=h264 S.mp4`, then
+`ffmpeg -i S.mp4 -vf fps=60 -crf 8 out/later-takes/S60.mp4`. Then measure
+its marks into `S` in `clips/later-timeline.mjs` (the sheet still, the tap,
+each step, "Saved ✓"), the tap's position into `TAPS`, and the two icons to
+paint out (the page's icon in the sheet's header, the favicon in Machina's
+card) into `SCREEN_PATCHES`. `audio/later-verify.mjs` fails until they are.
+
+**The voice.** Gemini TTS, Sulafat, every line directed as a person talking
+to a friend at ~175 wpm (narration-tts runs 77–78). Measured in syllables a
+second (words a minute misleads on short words): the approved preview's
+conversational lines run 4.6–5.6. The first takes: the to-do line ran 8.1
+(rushed) and the hook dwelt on "later?" (3.3); both were re-voiced; the
+to-do line still ran 7.0 and is eased to 0.82 in assembly (`tempo`, Rubber
+Band, formants preserved: 1.83s, 5.5 a second). Content checked with
+PocketSphinx (its bundled model: HuggingFace is not reachable from a cloud
+session): every line says its words.
+
+**Measured.** The mix: −14.01 LUFS, −1.26 dBTP; every line 8.0–17.8dB over
+the music in the speech band; the Signature's take in it (0.83). Against the
+approved preview's mix, the groove put 4.4dB more energy below 100Hz; trimmed
+to +3.3 (phone speakers barely play it). The camera (computed exactly as
+rendered): peak 27.4px a frame (the preview's: 24), its speed never changing
+more than 2.3px a frame in one frame; zoom at most 2.23px a point (the
+screen's text clear of Meta's 65px margins up to 2.33). Every lift and ring
+inside the safe zone below the band for its whole life. The type: the widest
+row 772px of the 950 between the margins; the hook's ink from 276px (Meta's
+top 14% ends at 269). The Ask tab's tap lands at y 1722px, under Instagram's
+caption: seen, not key.
+
+    # the frames (needs out/preview-takes/{W60,X60}.mp4 and out/later-takes/S60.mp4)
+    node capture/take-frames.mjs later
+    GEMINI_VOICE=Sulafat python3 audio/synth-vo.py later        # from the committed takes
+    node audio/later-score.mjs && node audio/mix-vo.mjs later
+    node audio/later-verify.mjs && node audio/house-verify.mjs later
+    node scripts/later-stills.mjs                               # + -guides.png: safe zone, 3:4 crop
+    node scripts/shutter-render.mjs later                       # every exposure, averaged → out/later/master-soon.mp4
+    node scripts/shutter-render.mjs later --ending store        # only the Signature's frames, spliced
+    node scripts/later-encode.mjs                               # posting files + review copy + the frame-by-frame check
+
+`scripts/frame-jumps.mjs <video>` is the owner's frame-by-frame check on any
+render: a frame that changes more than three times both frames beside it
+(SPIKE), a frame its neighbours agree without (FLIP), or 8% of the picture
+changing by more than 24 levels at once (STEP). It passes the reel's type
+and Signature over paper, and catches a single frame swapped in.
+
 ## Motion language
 
 The rules every Machina video follows, and the kit component that implements

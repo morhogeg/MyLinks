@@ -2659,6 +2659,29 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-31 — INSTAGRAM REEL "LATER NEVER COMES", BUILT BUT FOR ITS
+  PICTURE (branch `claude/instagram-reel-app-store-012mo2`, on the App Store
+  preview's a35f6c1e; off `main` until the owner reviews the cut).** A 24.0s
+  1080×1920 organic Reel on the preview, to the owner's brief (best practice
+  of viral tech Reels, Apple-social-team polish). Owner-approved script:
+  "Saved it for later? / Later never comes." · "Share it to Machina, and it
+  reads it for you." · "It even tells you what to do with it." · "Ask about
+  anything you've saved." · "It answers from your own saves. Sources
+  included." · "And it notices which saves belong together." · the kit
+  Signature (footer today and on launch day). **Done and verified:** the
+  narration (Gemini Sulafat, runs 77–78; two lines re-voiced on measured
+  pace), the score and mix (−14.01 LUFS, −1.26 dBTP), `later-verify` (bans,
+  dwell, Meta safe zones, zoom, camera smoothness) and `house-verify` all
+  pass except the two gates that need the new take; the preview's one-phone
+  system extracted into the kit (`kit/phone.tsx`, `spring.mjs`, `runs.mjs`)
+  with every preview file untouched; a frame-by-frame jump checker. **No
+  third-party images:** the preview's feed (Kurzgesagt, a TED speaker) is
+  never shown. **Blocked:** the picture needs the simulator takes, which live
+  only on the owner's Mac, plus one new take (Safari's share sheet → Machina's
+  card; needs the review account's Wait But Why card archived and restored
+  around it). Recipe and details: `marketing/launch-clip/README.md`, "LATER
+  NEVER COMES". Nobody has listened to the mix; the owner has a sound check.
+
 - **2026-10-25 — POV round 3 (owner, three edits, "keep everything else
   the same").** Same branch. (1) "Finding it again is." became the payoff
   caption's third line, on its spoken word, weight 760 (kit `KineticLine`
