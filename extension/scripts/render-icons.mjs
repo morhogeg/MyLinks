@@ -1,49 +1,64 @@
-// Render the extension's PNG icons from the SVG sources in icons-src/.
-//
-//   node extension/scripts/render-icons.mjs
-//
-// Uses the Playwright Chromium that e2e/ already installs (cd e2e && npm ci &&
-// npx playwright install chromium). Output is committed, so this only needs
-// to run when the artwork changes.
-import { createRequire } from 'module';
-import { readFileSync, mkdirSync } from 'fs';
-import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
+#!/usr/bin/env node
+/**
+ * Render the extension's PNG icons from the app's own mark
+ * (web/public/icon.svg: the graphite tile and porcelain brackets), so the
+ * extension never drifts from the brand.
+ *
+ *   node extension/scripts/render-icons.mjs
+ *
+ * Sizes: 16, 24, 32 fill the frame (toolbar and favicon use); 48 and 128
+ * carry transparent padding, and 128 follows the Chrome Web Store rule of
+ * 96×96 artwork inside 16 px of padding.
+ *
+ * Needs Playwright's Chromium (preinstalled in cloud sessions; elsewhere
+ * `npm i -D playwright && npx playwright install chromium`).
+ */
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 
-const EXT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const require = createRequire(join(EXT, '..', 'e2e', 'package.json'));
-const { chromium } = require('playwright');
+const here = dirname(fileURLToPath(import.meta.url));
+const root = resolve(here, '..', '..');
+const svg = readFileSync(join(root, 'web/public/icon.svg'), 'utf8');
+const outDir = join(root, 'extension/icons');
+mkdirSync(outDir, { recursive: true });
 
-const svg = (name) => 'data:image/svg+xml;base64,' + readFileSync(join(EXT, 'icons-src', name)).toString('base64');
-const TILE = svg('tile.svg');
-const TILE16 = svg('tile16.svg');
-
-// [file, canvas size, artwork size, source]. The store icon keeps Chrome's
-// recommended 16px of transparent padding around a 96px mark.
-const JOBS = [
-    ['icons/toolbar16.png', 16, 16, TILE16],
-    ['icons/toolbar24.png', 24, 24, TILE],
-    ['icons/toolbar32.png', 32, 32, TILE],
-    ['icons/icon16.png', 16, 16, TILE16],
-    ['icons/icon32.png', 32, 32, TILE],
-    ['icons/icon48.png', 48, 44, TILE],
-    ['icons/icon128.png', 128, 96, TILE],
-    ['store/icon128.png', 128, 96, TILE],
+// size: canvas, art: the drawn tile inside it
+const ICONS = [
+    { size: 16, art: 16 },
+    { size: 24, art: 24 },
+    { size: 32, art: 32 },
+    { size: 48, art: 40 },
+    { size: 128, art: 96 },
 ];
 
-const browser = await chromium.launch();
-const page = await browser.newPage({ deviceScaleFactor: 1 });
-for (const [file, canvas, art, src] of JOBS) {
-    await page.setViewportSize({ width: canvas, height: canvas });
-    const pad = (canvas - art) / 2;
-    await page.setContent(
-        `<html><body style="margin:0;background:transparent">` +
-        `<img src="${src}" width="${art}" height="${art}" style="position:absolute;left:${pad}px;top:${pad}px;display:block">` +
-        `</body></html>`,
-    );
-    await page.waitForFunction(() => document.images[0].complete);
-    mkdirSync(dirname(join(EXT, file)), { recursive: true });
-    await page.screenshot({ path: join(EXT, file), omitBackground: true, clip: { x: 0, y: 0, width: canvas, height: canvas } });
-    console.log(`wrote ${file} (${canvas}px)`);
+function loadPlaywright() {
+    const require = createRequire(import.meta.url);
+    try {
+        return require('playwright');
+    } catch {
+        return require(require.resolve('playwright', { paths: [join(root, 'e2e'), '/opt/node-tools'] }));
+    }
 }
-await browser.close();
+
+const { chromium } = loadPlaywright();
+const browser = await chromium.launch();
+try {
+    const page = await browser.newPage({ deviceScaleFactor: 1 });
+    const src = `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
+    for (const { size, art } of ICONS) {
+        const pad = (size - art) / 2;
+        await page.setViewportSize({ width: size, height: size });
+        await page.setContent(
+            `<html><body style="margin:0;background:transparent">
+             <img src="${src}" width="${art}" height="${art}" style="display:block;margin:${pad}px"></body></html>`,
+        );
+        await page.locator('img').evaluate((img) => img.decode());
+        const png = await page.screenshot({ omitBackground: true, clip: { x: 0, y: 0, width: size, height: size } });
+        writeFileSync(join(outDir, `icon-${size}.png`), png);
+        console.log(`icons/icon-${size}.png (${art}px art)`);
+    }
+} finally {
+    await browser.close();
+}

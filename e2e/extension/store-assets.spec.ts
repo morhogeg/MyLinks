@@ -1,201 +1,152 @@
-import { writeFileSync, mkdirSync } from 'fs';
+/**
+ * Chrome Web Store images, rendered from the REAL extension UI (popup,
+ * on-page confirmation, settings) over a demo article, so the listing never
+ * shows anything the extension doesn't do. No text is added on top.
+ *
+ *   cd e2e && npm run extension:assets      (writes extension/store/*.png)
+ *
+ * Sizes follow the Web Store: screenshots 1280×800, small promo tile
+ * 440×280, marquee 1400×560 (extension/store/LISTING.md, "Images").
+ */
+import { test, expect, type Page } from '@playwright/test';
+import { readFileSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { test, expect, EXTENSION_SRC, type Ext } from './fixtures';
+import { ARTICLE, EXTENSION_SRC, launchExtension, type Ext } from './fixtures';
 
-// Chrome Web Store screenshots (1280x800) and the small promo tile (440x280),
-// built from the REAL popup: each shot drives the loaded extension against
-// the stub backend, screenshots the popup itself, then places it over the
-// page it saved inside a plain browser frame. The pages are made up for the
-// shots (no real site or brand).
-//
-//   npm run extension:assets      (writes extension/store/*.png)
+test.skip(!process.env.STORE_ASSETS, 'set STORE_ASSETS=1 (npm run extension:assets)');
 
 const OUT = join(EXTENSION_SRC, 'store');
+const W = 1280;
+const H = 800;
+const ACCOUNT = 'you@example.com';
 
-const ENGLISH_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Why bridges sing in the wind</title>
-<style>
-body{margin:0;background:#fbfaf7;color:#1d1d1f;font:18px/1.65 Georgia,"Times New Roman",serif}
-header{border-bottom:1px solid #e7e3da;padding:18px 56px;font:600 15px -apple-system,Segoe UI,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#6b665c}
-main{width:560px;margin:44px 0 0 56px}
-h1{font-size:40px;line-height:1.15;margin:0 0 14px;letter-spacing:-.01em}
-.dek{font-size:20px;color:#55524b;margin:0 0 26px}
-.meta{font:14px -apple-system,Segoe UI,sans-serif;color:#8a857b;margin-bottom:26px}
-p{margin:0 0 18px}
-</style></head><body><header>Field Notes</header><main>
-<h1>Why bridges sing in the wind</h1>
-<p class="dek">Long spans hum, flutter, and sometimes twist. Engineers have learned to listen.</p>
-<div class="meta">12 min read</div>
-<p>Stand under a long suspension bridge on a gusty day and you may hear it: a low, steady tone that rises and falls with the wind. The deck and cables are vibrating, shedding small whirlpools of air in a regular rhythm.</p>
-<p>Most of the time the sound is harmless. The trouble starts when that rhythm lines up with the structure's own natural frequency, and each push arrives at exactly the wrong moment.</p>
-</main></body></html>`;
+/** A believable address for the demo article (.example is reserved for docs). */
+const DEMO_URL = 'https://fieldnotes.example/spaced-review';
 
-const HEBREW_PAGE = `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><title>איך גשרים נושאים את המשקל של עצמם</title>
-<style>
-body{margin:0;background:#141416;color:#ececef;font:18px/1.7 -apple-system,"Segoe UI","Noto Sans Hebrew",Arial,sans-serif}
-header{border-bottom:1px solid #2a2a2f;padding:18px 56px;font-weight:600;font-size:15px;color:#9a9aa3}
-main{width:560px;margin:44px auto 0 56px}
-h1{font-size:38px;line-height:1.2;margin:0 0 14px}
-.dek{font-size:20px;color:#b4b4bc;margin:0 0 26px}
-.meta{font-size:14px;color:#85858e;margin-bottom:26px}
-p{margin:0 0 18px;color:#d6d6db}
-</style></head><body><header>יומן שדה</header><main>
-<h1>איך גשרים נושאים את המשקל של עצמם</h1>
-<p class="dek">קשתות דוחפות החוצה, כבלים מושכים פנימה. כך זה מחזיק.</p>
-<div class="meta">8 דקות קריאה</div>
-<p>גשר ארוך צריך קודם כל לשאת את עצמו. לפני כל מכונית ולפני כל הולך רגל, המשקל של הגשר עצמו הוא העומס הגדול ביותר שהוא נושא.</p>
-<p>לכן מהנדסים מחפשים צורות שמעבירות את הכוח לקרקע בדרך הקצרה ביותר.</p>
-</main></body></html>`;
-
-interface Shot {
-    file: string;
-    headline: string;
-    sub: string;
-    dark: boolean;
-    host: string;
-    page: Buffer;
-    popup: Buffer;
-}
-
-// Serve a made-up page at a made-up https address, so the popup shows a
-// plausible host instead of the stub's 127.0.0.1.
-async function pageShot(ext: Ext, url: string, html: string) {
-    await ext.context.route(url, (route) => route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: html }));
-    const page = await ext.context.newPage();
-    await page.setViewportSize({ width: 1120, height: 760 });
-    await page.goto(url);
-    const tabId = await ext.worker.evaluate(async (u) => (await chrome.tabs.query({ url: u }))[0]?.id ?? -1, url);
-    return { tabId, png: await page.screenshot() };
-}
-
-async function popupShot(popup: import('@playwright/test').Page) {
-    // Let fonts settle; the result line has already appeared.
-    await popup.waitForTimeout(150);
-    return popup.locator('.wrap').screenshot({ omitBackground: true });
-}
+let ext: Ext;
+test.beforeEach(async () => {
+    ext = await launchExtension();
+    await ext.connect(undefined, ACCOUNT);
+    await ext.context.route('https://fieldnotes.example/**', (route) => route.fulfill({ contentType: 'text/html', body: ARTICLE }));
+    mkdirSync(OUT, { recursive: true });
+});
+test.afterEach(async () => { await ext.close(); });
 
 const b64 = (buf: Buffer) => `data:image/png;base64,${buf.toString('base64')}`;
 
-function frameHtml(s: Shot, toolbarIcon: Buffer): string {
-    const bg = s.dark ? 'linear-gradient(160deg,#1c1c22,#0b0b0e)' : 'linear-gradient(160deg,#f4f4f6,#e3e4e9)';
-    const ink = s.dark ? '#f2f2f5' : '#111827';
-    const sub = s.dark ? '#a8a8b3' : '#4b5563';
-    const chrome = s.dark ? '#2a2a30' : '#e9e9ee';
-    const bar = s.dark ? '#1f1f24' : '#ffffff';
-    const pill = s.dark ? '#34343c' : '#f1f1f4';
-    const pillInk = s.dark ? '#c9c9d1' : '#4b5563';
-    const popupBorder = s.dark ? 'rgba(255,255,255,.10)' : 'rgba(0,0,0,.10)';
-    return `<!doctype html><html><head><meta charset="utf-8"><style>
-*{box-sizing:border-box}html,body{margin:0;width:1280px;height:800px;overflow:hidden}
-body{background:${bg};font-family:-apple-system,"SF Pro Display","Segoe UI",Roboto,Arial,sans-serif;position:relative}
-.copy{position:absolute;left:64px;top:0;bottom:0;width:330px;display:flex;flex-direction:column;justify-content:center}
-.brand{display:flex;align-items:center;gap:10px;font-weight:650;font-size:18px;color:${ink};margin-bottom:28px}
-.brand img{width:34px;height:34px;border-radius:9px}
-h1{margin:0 0 16px;font-size:40px;line-height:1.1;letter-spacing:-.025em;color:${ink};font-weight:700}
-p{margin:0;font-size:19px;line-height:1.45;color:${sub}}
-.win{position:absolute;left:440px;top:88px;width:800px;height:624px;border-radius:14px;overflow:hidden;
- box-shadow:0 30px 80px -20px rgba(0,0,0,${s.dark ? '.7' : '.35'}),0 0 0 1px rgba(0,0,0,.08);background:${bar}}
-.tabs{height:38px;background:${chrome};display:flex;align-items:flex-end;padding:0 12px;gap:8px}
-.dots{display:flex;gap:7px;align-self:center;margin-right:10px}.dots i{width:11px;height:11px;border-radius:50%;background:${s.dark ? '#4a4a52' : '#c9c9d0'};display:block}
-.tab{height:30px;width:220px;border-radius:9px 9px 0 0;background:${bar};padding:0 12px;display:flex;align-items:center;font-size:12px;color:${pillInk};white-space:nowrap;overflow:hidden}
-.toolbar{height:44px;display:flex;align-items:center;gap:10px;padding:0 12px;border-bottom:1px solid ${s.dark ? '#2c2c33' : '#e5e5ea'}}
-.url{flex:1;height:30px;border-radius:15px;background:${pill};color:${pillInk};font-size:13px;display:flex;align-items:center;padding:0 14px}
-.ext{width:32px;height:32px;border-radius:8px;display:grid;place-items:center;background:${s.dark ? '#3a3a42' : '#e4e4ea'}}
-.ext img{width:20px;height:20px}
-.content{position:absolute;top:82px;left:0;right:0;bottom:0;overflow:hidden}
-.content img{width:1120px;transform-origin:0 0;transform:scale(.7143);display:block}
-.popup{position:absolute;right:28px;top:122px;border-radius:12px;overflow:hidden;box-shadow:0 18px 48px -8px rgba(0,0,0,${s.dark ? '.75' : '.30'}),0 0 0 1px ${popupBorder}}
-.popup img{display:block;width:340px}
-</style></head><body>
-<div class="copy">
-  <div class="brand"><img src="${b64(toolbarIcon)}" alt="">Machina</div>
-  <h1>${s.headline}</h1>
-  <p>${s.sub}</p>
-</div>
-<div class="win">
-  <div class="tabs"><div class="dots"><i></i><i></i><i></i></div><div class="tab">${s.host}</div></div>
-  <div class="toolbar"><div class="url">${s.host}</div><div class="ext"><img src="${b64(toolbarIcon)}" alt=""></div></div>
-  <div class="content"><img src="${b64(s.page)}" alt=""></div>
-</div>
-<div class="popup" style="right:${1280 - 440 - 800 + 16}px;top:${88 + 82 + 6}px"><img src="${b64(s.popup)}" alt=""></div>
-</body></html>`;
-}
-
-async function compose(ext: Ext, shots: Shot[]) {
-    const { readFileSync } = await import('fs');
-    const icon = readFileSync(join(EXTENSION_SRC, 'icons', 'icon128.png'));
+async function demoArticle(scheme: 'light' | 'dark', select = false): Promise<Page> {
     const page = await ext.context.newPage();
-    await page.setViewportSize({ width: 1280, height: 800 });
-    mkdirSync(OUT, { recursive: true });
-    for (const s of shots) {
-        await page.setContent(frameHtml(s, icon));
-        await page.waitForFunction(() => Array.from(document.images).every((i) => i.complete));
-        writeFileSync(join(OUT, s.file), await page.screenshot({ type: 'png' }));
+    await page.setViewportSize({ width: W, height: H });
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.goto(DEMO_URL);
+    if (select) {
+        await page.evaluate(() => {
+            const range = document.createRange();
+            range.selectNodeContents(document.getElementById('quote')!);
+            getSelection()!.removeAllRanges();
+            getSelection()!.addRange(range);
+        });
     }
-
-    // Small promo tile, 440x280.
-    await page.setViewportSize({ width: 440, height: 280 });
-    await page.setContent(`<!doctype html><html><head><meta charset="utf-8"><style>
-html,body{margin:0;width:440px;height:280px;overflow:hidden}
-body{background:radial-gradient(120% 120% at 30% 20%,#3a3a46 0%,#16161c 55%,#0a0a0d 100%);font-family:-apple-system,"SF Pro Display","Segoe UI",Roboto,Arial,sans-serif;color:#f4f4f7;display:flex;flex-direction:column;justify-content:center;padding:0 40px}
-.row{display:flex;align-items:center;gap:16px;margin-bottom:18px}
-img{width:72px;height:72px;filter:drop-shadow(0 8px 18px rgba(0,0,0,.5))}
-.name{font-size:38px;font-weight:700;letter-spacing:-.02em}
-.tag{font-size:21px;line-height:1.35;color:#c9ccd6;max-width:340px}
-</style></head><body><div class="row"><img src="${b64(icon)}" alt=""><div class="name">Machina</div></div>
-<div class="tag">Save any page in one click. Find it again when you need it.</div></body></html>`);
-    await page.waitForFunction(() => Array.from(document.images).every((i) => i.complete));
-    writeFileSync(join(OUT, 'promo-small-440x280.png'), await page.screenshot({ type: 'png' }));
+    return page;
 }
 
-test('store screenshots and promo tile @assets', async ({ ext }) => {
-    test.setTimeout(120_000);
-    const shots: Shot[] = [];
+/** The popup's own pixels, at 2x for crisp text. */
+async function popupShot(popup: Page, scheme: 'light' | 'dark'): Promise<Buffer> {
+    await popup.emulateMedia({ colorScheme: scheme });
+    await popup.mouse.move(1, 1);
+    await popup.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    return popup.locator('main.popup').screenshot({ scale: 'device' });
+}
 
-    // 1. Save a page: light, English.
-    await ext.connect();
-    const en = await pageShot(ext, 'https://fieldnotes.example/bridges', ENGLISH_PAGE);
-    let popup = await ext.openPopup(en.tabId, { colorScheme: 'light' });
-    await expect(popup.getByText('Saved to Machina')).toBeVisible();
-    shots.push({
-        file: 'screenshot-1-save.png', dark: false, host: 'fieldnotes.example/bridges',
-        headline: 'Save any page in one click', sub: 'Click the Machina icon, or press Ctrl+Shift+S. The page lands in your library and Machina reads it for you.',
-        page: en.png, popup: await popupShot(popup),
-    });
+/**
+ * The page with the popup where Chrome draws it (under the toolbar, at the
+ * right). Only real captures are composed; nothing is drawn or written.
+ */
+async function compose(name: string, pageShot: Buffer, popup: Buffer, scheme: 'light' | 'dark') {
+    const stage = await ext.context.newPage();
+    await stage.setViewportSize({ width: W, height: H });
+    const shadow = scheme === 'dark'
+        ? '0 24px 60px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.08)'
+        : '0 24px 60px rgba(17,24,39,.22), 0 0 0 1px rgba(17,24,39,.08)';
+    await stage.setContent(`<html><body style="margin:0;width:${W}px;height:${H}px;overflow:hidden;position:relative">
+        <img src="${b64(pageShot)}" style="position:absolute;inset:0;width:${W}px;height:${H}px">
+        <img id="popup" src="${b64(popup)}" style="position:absolute;top:16px;right:24px;width:360px;border-radius:12px;box-shadow:${shadow}">
+        </body></html>`);
+    await stage.locator('#popup').evaluate((img: HTMLImageElement) => img.decode());
+    writeFileSync(join(OUT, name), await stage.screenshot({ type: 'png' }));
+    await stage.close();
+}
 
-    // 2. Dark mode and a right-to-left page.
-    const he = await pageShot(ext, 'https://yoman.example/gesher', HEBREW_PAGE);
-    popup = await ext.openPopup(he.tabId, { colorScheme: 'dark' });
-    await expect(popup.getByText('Saved to Machina')).toBeVisible();
-    shots.push({
-        file: 'screenshot-2-dark-rtl.png', dark: true, host: 'yoman.example/gesher',
-        headline: 'Any page, any language', sub: 'Light or dark, left to right or right to left. The popup follows your system.',
-        page: he.png, popup: await popupShot(popup),
-    });
-
-    // 3. Already saved, and saved for later.
-    ext.stub.reply = () => ({ status: 200, body: { success: true, duplicate: true } });
-    popup = await ext.openPopup(en.tabId, { colorScheme: 'light' });
-    await expect(popup.getByText('Already in your library')).toBeVisible();
-    shots.push({
-        file: 'screenshot-3-already-saved.png', dark: false, host: 'fieldnotes.example/bridges',
-        headline: 'Never save the same page twice', sub: 'Machina tells you when a page is already in your library, so it stays tidy.',
-        page: en.png, popup: await popupShot(popup),
-    });
-
-    // 4. Connect in one click.
-    await ext.worker.evaluate(() => chrome.storage.local.remove(['token', 'account']));
-    popup = await ext.openPopup(en.tabId, { colorScheme: 'light' });
-    await expect(popup.getByRole('heading', { name: 'Save anything in one click' })).toBeVisible();
-    shots.push({
-        file: 'screenshot-4-connect.png', dark: false, host: 'fieldnotes.example/bridges',
-        headline: 'Connect in one click', sub: 'Signed in to Machina in this browser? One click links the extension to your account. Nothing to copy.',
-        page: en.png, popup: await popupShot(popup),
-    });
-
-    await compose(ext, shots);
+test('screenshot 1: one click saves the page', async () => {
+    const page = await demoArticle('light');
+    const popup = await ext.openPopup(page);
+    await expect(popup.locator('#result-title')).toHaveText('Saved to Machina');
+    await compose('screenshot-1-save-page.png', await page.screenshot(), await popupShot(popup, 'light'), 'light');
 });
 
-declare const chrome: {
-    storage: { local: { remove(k: string[]): Promise<void> } };
-    tabs: { query(q: object): Promise<Array<{ id?: number }>> };
-};
+test('screenshot 2: the text you selected is kept with the page', async () => {
+    const page = await demoArticle('dark', true);
+    const popup = await ext.openPopup(page, { colorScheme: 'dark' });
+    await expect(popup.locator('#quote-text')).toBeVisible();
+    await compose('screenshot-2-save-quote.png', await page.screenshot(), await popupShot(popup, 'dark'), 'dark');
+});
+
+test('screenshot 3: right-click save, confirmed on the page', async () => {
+    const page = await demoArticle('light');
+    const tabId = await ext.tabIdOf(page);
+    await ext.worker.evaluate(async (id) => {
+        const tab = await chrome.tabs.get(id);
+        await (globalThis as any).__machina.onMenuClick({ menuItemId: 'machina-link', linkUrl: 'https://example.com/read-later', frameId: 0 }, tab);
+    }, tabId);
+    await expect(page.locator('machina-save-toast')).toHaveCount(1);
+    await page.waitForTimeout(400); // entrance animation
+    writeFileSync(join(OUT, 'screenshot-3-right-click.png'), await page.screenshot());
+});
+
+test('screenshot 4: a screenshot of what you see', async () => {
+    const page = await demoArticle('light');
+    const popup = await ext.openPopup(page);
+    await expect(popup.locator('#result-title')).toHaveText('Saved to Machina');
+    await popup.getByRole('button', { name: 'Save a screenshot' }).click();
+    await expect(popup.locator('#result-title')).toHaveText('Screenshot saved');
+    await compose('screenshot-4-screenshot.png', await page.screenshot(), await popupShot(popup, 'light'), 'light');
+});
+
+test('screenshot 5: offline saves wait, settings show where they go', async () => {
+    ext.stub.down = true;
+    const article = await demoArticle('dark');
+    const popup = await ext.openPopup(article, { colorScheme: 'dark' });
+    await expect(popup.locator('#result-title')).toHaveText('Saved on this computer');
+    await popup.close();
+    const settings = await ext.context.newPage();
+    await settings.setViewportSize({ width: W, height: H });
+    await settings.emulateMedia({ colorScheme: 'dark' });
+    await settings.goto(`chrome-extension://${ext.id}/src/options/options.html`);
+    await expect(settings.locator('#queue-list li')).toHaveCount(1);
+    writeFileSync(join(OUT, 'screenshot-5-settings.png'), await settings.screenshot());
+});
+
+/** Promo tiles: the mark on its own ground, no words (Web Store: "avoid text"). */
+test('promo tiles: small 440x280 and marquee 1400x560', async () => {
+    const svg = readFileSync(join(EXTENSION_SRC, '..', 'web/public/icon.svg'), 'utf8');
+    const mark = `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
+    const page = await ext.context.newPage();
+    for (const [name, w, h, size] of [['promo-small-440x280.png', 440, 280, 132], ['promo-marquee-1400x560.png', 1400, 560, 248]] as const) {
+        await page.setViewportSize({ width: w, height: h });
+        // Saved "cards" drift in toward the mark: the product in one image.
+        const cards = [
+            [-0.36, -0.22, 0.9, -8], [-0.30, 0.20, 0.75, 6], [0.30, -0.24, 0.8, 7], [0.34, 0.18, 0.95, -5],
+        ].map(([x, y, s, r]) => `<div style="position:absolute;left:${w / 2 + x * w - size * 0.42 * s}px;top:${h / 2 + y * h - size * 0.28 * s}px;
+            width:${size * 0.84 * s}px;height:${size * 0.56 * s}px;border-radius:${size * 0.08 * s}px;transform:rotate(${r}deg);
+            background:linear-gradient(160deg,rgba(242,245,250,.16),rgba(203,210,224,.05));
+            box-shadow:inset 0 0 0 1px rgba(242,245,250,.14),0 10px 30px rgba(0,0,0,.35)">
+            <div style="margin:${size * 0.09 * s}px;height:${size * 0.05 * s}px;width:60%;border-radius:4px;background:rgba(242,245,250,.28)"></div>
+            <div style="margin:0 ${size * 0.09 * s}px;height:${size * 0.035 * s}px;width:78%;border-radius:4px;background:rgba(242,245,250,.14)"></div></div>`).join('');
+        await page.setContent(`<html><body style="margin:0;width:${w}px;height:${h}px;overflow:hidden;position:relative;
+            background:radial-gradient(120% 140% at 50% 30%,#282833 0%,#16161D 45%,#07070A 100%)">${cards}
+            <img id="mark" src="${mark}" style="position:absolute;left:${(w - size) / 2}px;top:${(h - size) / 2}px;width:${size}px;height:${size}px;
+            filter:drop-shadow(0 18px 40px rgba(0,0,0,.6))"></body></html>`);
+        await page.locator('#mark').evaluate((img: HTMLImageElement) => img.decode());
+        writeFileSync(join(OUT, name), await page.screenshot({ type: 'png' }));
+    }
+});

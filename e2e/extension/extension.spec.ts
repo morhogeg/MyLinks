@@ -1,213 +1,392 @@
-import { createHash } from 'node:crypto';
-import type { Page } from '@playwright/test';
-import { test, expect, article, GOOD_TOKEN } from './fixtures';
+import { test, expect, type Page } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
+import { readFileSync } from 'fs';
+import { createRequire } from 'module';
+import { dirname, join } from 'path';
+import { ACCOUNT, EXTENSION_SRC, GOOD_TOKEN, launchExtension, type Ext } from './fixtures';
 
-// The real extension in real Chromium, against a stub share_ingest.
-// `npm run test:extension` in e2e/. No emulators, no dev server, no shared ports.
+const REPO = dirname(EXTENSION_SRC);
 
-const ARTICLE = article('How bridges carry their own weight', '<p>Arches push outward; cables pull inward.</p>');
+let ext: Ext;
+test.beforeEach(async () => { ext = await launchExtension(); });
+test.afterEach(async () => { await ext.close(); });
 
-test('first install opens the web app connect page', async ({ ext }) => {
-    await expect.poll(() => ext.context.pages().map((p) => p.url())).toContain('https://mymachina.app/?connect=extension');
-});
+const IG_POST = `<!doctype html><html><head><title>Instagram</title>
+<meta property="og:title" content="Chef Ana on Instagram: &quot;Five-minute pasta&quot;">
+<meta property="og:description" content="1,204 likes - chefana: Five-minute pasta, here is how.">
+<meta property="og:image" content="https://scontent.cdninstagram.com/v/t51/pasta.jpg">
+<meta property="og:url" content="https://www.instagram.com/chefana/p/ABC123/">
+</head><body><main><p>post</p></main></body></html>`;
 
-test('not connected: the popup offers Connect, and saves nothing', async ({ ext }) => {
-    const { tabId } = await ext.openPage('/bridges', ARTICLE);
-    const popup = await ext.openPopup(tabId);
-    await expect(popup.getByRole('heading', { name: 'Save anything in one click' })).toBeVisible();
-    await expect(popup.getByRole('button', { name: 'Connect to Machina' })).toBeVisible();
+const LINKEDIN_POST = `<!doctype html><html><head><title>A post | LinkedIn</title></head>
+<body><main><p>Hiring news from the team.</p></main></body></html>`;
+
+async function article(): Promise<Page> {
+    const page = await ext.context.newPage();
+    await page.goto(`${ext.stub.origin}/article`);
+    return page;
+}
+
+const title = (popup: Page) => popup.locator('#result-title');
+const detail = (popup: Page) => popup.locator('#result-detail');
+
+async function badge(tabId?: number) {
+    return ext.worker.evaluate((id) => chrome.action.getBadgeText(id === undefined ? {} : { tabId: id }), tabId);
+}
+
+async function a11y(page: Page) {
+    const res = await new AxeBuilder({ page })
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
+        .analyze();
+    expect(res.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)).toEqual([]);
+}
+
+test('not connected: the popup offers one-click connect and saves nothing', async () => {
+    const page = await article();
+    const popup = await ext.openPopup(page);
+    await expect(title(popup)).toHaveText('Connect Machina');
+    await expect(popup.locator('#hint')).toHaveText(/reads a page only when you save it/);
     await expect(popup.getByRole('button', { name: 'Use a token instead' })).toBeVisible();
-    expect(ext.stub.saves()).toHaveLength(0);
+    await expect(popup.getByRole('button', { name: 'Read the privacy policy' })).toBeVisible();
+    await a11y(popup);
+    const [opened] = await Promise.all([
+        ext.context.waitForEvent('page', (p) => p.url().includes('connect=extension')),
+        popup.getByRole('button', { name: 'Connect to Machina' }).click(),
+    ]);
+    expect(new URL(opened.url()).origin).toBe(ext.stub.origin);
+    expect(ext.stub.shareCalls()).toHaveLength(0);
 });
 
-test('connected: opening the popup saves the page and says so', async ({ ext }) => {
+test('one click saves the page, says so, and marks the badge', async () => {
     await ext.connect();
-    const { tabId } = await ext.openPage('/bridges', ARTICLE);
-    const popup = await ext.openPopup(tabId);
-    await expect(popup.getByText('How bridges carry their own weight')).toBeVisible();
-    await expect(popup.getByRole('status').filter({ hasText: 'Saved to Machina' })).toBeVisible();
-    await expect(popup.getByText(/Machina is reading it now/)).toBeVisible();
-    await expect(popup.getByRole('button', { name: 'Open Machina' })).toBeVisible();
-    const [call] = ext.stub.saves();
-    expect(call.body).toEqual({ url: `${ext.stub.origin}/bridges` });
+    const page = await article();
+    const popup = await ext.openPopup(page);
+    await expect(title(popup)).toHaveText('Saved to Machina');
+    await expect(detail(popup)).toContainText('reading it now');
+    await expect(popup.locator('#result-svg')).toBeVisible();
+    await expect(popup.locator('#spinner')).toBeHidden();
+    const [call] = ext.stub.shareCalls();
     expect(call.headers['x-ingest-token']).toBe(GOOD_TOKEN);
-    expect(await ext.worker.evaluate(() => chrome.action.getBadgeText({}))).toBe('✓');
+    expect(call.headers.cookie).toBeUndefined();
+    expect(call.body).toEqual({ url: `${ext.stub.origin}/article` });
+    await expect(popup.locator('#page-title')).toHaveText('The quiet power of spaced review');
+    await expect(popup.locator('#account-line')).toHaveText(`Saving to ${ACCOUNT}`);
+    await expect(popup.locator('#shortcut-line')).toContainText('Ctrl+Shift+S');
+    await expect(popup.getByRole('button', { name: 'Open Machina' })).toBeFocused();
+    expect(await badge(await ext.tabIdOf(page))).toBe('✓');
+    await a11y(popup);
+    await popup.emulateMedia({ colorScheme: 'dark' });
+    await a11y(popup);
 });
 
-test('past the monthly limit: saved for later, with Get Pro', async ({ ext }) => {
+test('selected text rides along as a quote, never as a reminder', async () => {
     await ext.connect();
-    ext.stub.reply = () => ({ status: 200, body: {
-        success: true, saved: true, queued: false, waiting: true, id: 'c1', kind: 'saves', upgrade: true,
-        used: 100, limit: 100, waitingCount: 1, message: 'Saved. Machina will read it on the 1st, or now with Pro.',
-    } });
-    const { tabId } = await ext.openPage('/bridges', ARTICLE);
-    const popup = await ext.openPopup(tabId);
-    await expect(popup.getByText('Saved for later')).toBeVisible();
-    await expect(popup.getByText('Saved. Machina will read it on the 1st, or now with Pro.')).toBeVisible();
-    await expect(popup.getByRole('button', { name: 'Get Pro' })).toBeVisible();
-    await expect(popup.getByText('Saved to Machina')).toHaveCount(0);
+    const page = await article();
+    await page.evaluate(() => {
+        const range = document.createRange();
+        range.selectNodeContents(document.getElementById('quote')!);
+        getSelection()!.removeAllRanges();
+        getSelection()!.addRange(range);
+    });
+    const popup = await ext.openPopup(page);
+    await expect(title(popup)).toHaveText('Saved to Machina');
+    await expect(detail(popup)).toHaveText('Saved with the text you selected. Machina is reading it now.');
+    await expect(popup.locator('#quote-text')).toContainText('Coming back to an idea after a day');
+    const [call] = ext.stub.shareCalls();
+    expect(call.body.noteKind).toBe('quote');
+    expect(call.body.url).toBeUndefined();
+    expect(String(call.body.shared)).toMatch(new RegExp(`^${ext.stub.origin}/article\\n\\nComing back to an idea`));
 });
 
-test('already saved reads as already saved', async ({ ext }) => {
+test('already saved, saved for later, and final errors read plainly', async () => {
     await ext.connect();
-    ext.stub.reply = () => ({ status: 200, body: { success: true, duplicate: true } });
-    const { tabId } = await ext.openPage('/bridges', ARTICLE);
-    const popup = await ext.openPopup(tabId);
-    await expect(popup.getByText('Already in your library')).toBeVisible();
+    const page = await article();
+    const cases: Array<[number, unknown, string, string]> = [
+        [200, { success: true, duplicate: true }, 'Already in your library', 'nothing new was added'],
+        [200, { success: true, saved: true, waiting: true, message: 'Machina will read it next month, or now with Pro.' },
+            'Saved for later', 'Machina will read it next month, or now with Pro.'],
+        [413, { success: false, error: 'Image is too large' }, 'Too large to save', 'Image is too large'],
+        [400, { success: false, error: 'URL is too long' }, "Couldn't save this", 'URL is too long'],
+    ];
+    for (const [status, body, heading, words] of cases) {
+        ext.stub.reply = () => ({ status, body });
+        const popup = await ext.openPopup(page);
+        await expect(title(popup)).toHaveText(heading);
+        await expect(detail(popup)).toContainText(words);
+        await popup.close();
+    }
+    expect((await ext.storage()).queue ?? []).toHaveLength(0);
 });
 
-test('a reset token asks to reconnect', async ({ ext }) => {
+test('offline: kept on this computer, sent when Machina answers again', async () => {
     await ext.connect();
-    ext.stub.reply = () => ({ status: 403, body: { success: false, error: 'Invalid ingest token' } });
-    const { tabId } = await ext.openPage('/bridges', ARTICLE);
-    const popup = await ext.openPopup(tabId);
-    await expect(popup.getByText('Reconnect Machina')).toBeVisible();
-    await expect(popup.getByRole('button', { name: 'Reconnect' })).toBeVisible();
+    const page = await article();
+    ext.stub.down = true;
+    const popup = await ext.openPopup(page);
+    await expect(title(popup)).toHaveText('Saved on this computer');
+    await expect(popup.locator('#queue-text')).toHaveText('1 save is waiting to be sent.');
+    expect(((await ext.storage()).queue as unknown[]).length).toBe(1);
+    expect(await badge()).toBe('1');
+
+    ext.stub.down = false;
+    await popup.getByRole('button', { name: 'Send now' }).click();
+    await expect(popup.locator('#queue-line')).toBeHidden();
+    expect(ext.stub.shareCalls().map((c) => c.body.url)).toEqual([`${ext.stub.origin}/article`]);
+    expect((await ext.storage()).queue).toEqual([]);
+    expect(await badge()).toBe('');
 });
 
-test('server down, then Try again works', async ({ ext }) => {
+test('server trouble and rate limits queue the save; the retry alarm sends it', async () => {
     await ext.connect();
-    ext.stub.reply = () => ({ status: 503, body: { success: false, error: 'busy' } });
-    const { tabId } = await ext.openPage('/bridges', ARTICLE);
-    const popup = await ext.openPopup(tabId);
-    await expect(popup.getByText('Machina hit a problem')).toBeVisible();
-    ext.stub.reply = () => ({ status: 200, body: { success: true, queued: true, id: 'q2' } });
-    await popup.getByRole('button', { name: 'Try again' }).click();
-    await expect(popup.getByText('Saved to Machina')).toBeVisible();
-    expect(ext.stub.saves()).toHaveLength(2);
-});
+    const page = await article();
+    ext.stub.reply = () => ({ status: 503, body: null });
+    let popup = await ext.openPopup(page);
+    await expect(title(popup)).toHaveText('Saved on this computer');
+    await expect(detail(popup)).toContainText("didn't answer");
+    await popup.close();
 
-test('right-click a selection saves the page with the quote', async ({ ext }) => {
-    await ext.connect();
-    // The menu click itself can't be driven headlessly; fire the same handler
-    // Chrome calls with the same info object.
-    await ext.worker.evaluate((url) => (self as unknown as { handleMenuClick: (i: object, t: object) => Promise<unknown> })
-        .handleMenuClick({ menuItemId: 'machina-save-selection', selectionText: 'Arches push outward', pageUrl: url }, { title: 'Bridges', url }),
-    `${ext.stub.origin}/bridges`);
-    const [call] = ext.stub.saves();
-    expect(call.body).toEqual({ url: `${ext.stub.origin}/bridges`, note: 'Arches push outward', noteKind: 'quote' });
-});
-
-test('no notifications API (as in Safari): a toast on the page says it, with a link', async ({ ext }) => {
-    await ext.connect();
-    ext.stub.reply = () => ({ status: 200, body: {
-        success: true, saved: true, waiting: true, upgrade: true, message: 'Saved. Machina will read it on the 1st, or now with Pro.',
-    } });
-    const { page, tabId } = await ext.openPage('/bridges', ARTICLE);
-    await ext.worker.evaluate(async ([url, id]) => {
-        // Newer Chromium also exposes the same APIs as `browser`; hide both.
-        for (const ns of [chrome, (globalThis as { browser?: object }).browser]) {
-            if (ns) Object.defineProperty(ns, 'notifications', { value: undefined, configurable: true });
-        }
-        await (self as unknown as { handleMenuClick: (i: object, t: object) => Promise<unknown> })
-            .handleMenuClick({ menuItemId: 'machina-save-page', pageUrl: url }, { id, title: 'Bridges', url });
-    }, [`${ext.stub.origin}/bridges`, tabId] as const);
-    const toast = page.locator('#machina-extension-toast');
-    await expect(toast).toBeAttached();
-    await expect(toast.getByRole('status')).toContainText('Saved for later');
-    await expect(toast.getByRole('link', { name: 'Get Pro' })).toHaveAttribute('href', 'https://mymachina.app/?paywall=saves');
-    await toast.getByRole('button', { name: 'Close' }).click();
-    await expect(toast).toHaveCount(0);
-});
-
-test('the web app root can connect; a share page and other sites cannot', async ({ ext }) => {
-    // Through the stub server: it stands in for the real check (empty POST, 400).
-    await ext.worker.evaluate((b) => chrome.storage.local.set({ baseUrl: b }), ext.stub.origin);
-    // The web app's side of the handshake (web/lib/extension.ts): post to this
-    // window, wait for the content script's answer with the same id.
-    const send = (page: Page, msg: object) => page.evaluate((m) => new Promise((resolve) => {
-        const id = String(Math.random());
-        const t = setTimeout(() => resolve('no answer'), 1500);
-        window.addEventListener('message', (e) => {
-            const d = e.data as { source?: string; id?: string; reply?: unknown };
-            if (e.source !== window || !d || d.source !== 'machina-extension' || d.id !== id) return;
-            clearTimeout(t);
-            resolve(d.reply);
-        });
-        window.postMessage({ source: 'machina-web', id, ...m }, location.origin);
-    }), msg);
-
-    // http://localhost is in the dev build's content-script matches.
-    const port = new URL(ext.stub.origin).port;
-    ext.stub.pages.set('/', '<!doctype html><title>app</title>');
-    ext.stub.pages.set('/s', '<!doctype html><title>share</title>');
-    const app = await ext.context.newPage();
-    await app.goto(`http://localhost:${port}/`);
-    expect(await send(app, { type: 'machina-ping' })).toMatchObject({ ok: true, connected: false });
-
-    const share = await ext.context.newPage();
-    await share.goto(`http://localhost:${port}/s?id=1`);
-    expect(await send(share, { type: 'machina-connect', token: GOOD_TOKEN })).toEqual({ ok: false, reason: 'untrusted' });
-    expect((await ext.storage()).token).toBeUndefined();
-
-    // A site the content script doesn't run on gets no answer at all.
-    await ext.context.route('https://other.example/', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<title>x</title>' }));
+    ext.stub.reply = () => ({ status: 429, body: { success: false, error: 'Too many requests. Please slow down.' } });
     const other = await ext.context.newPage();
-    await other.goto('https://other.example/');
-    expect(await send(other, { type: 'machina-ping' })).toBe('no answer');
+    await other.goto(`${ext.stub.origin}/article?second`);
+    popup = await ext.openPopup(other);
+    await expect(detail(popup)).toContainText('a lot of saves at once');
 
-    // A frame on the web app's own origin: the content script doesn't run in frames.
-    ext.stub.pages.set('/framed', `<!doctype html><iframe src="http://localhost:${port}/"></iframe>`);
-    const framed = await ext.context.newPage();
-    await framed.goto(`http://localhost:${port}/framed`);
-    const frame = framed.frames()[1];
-    await frame.waitForLoadState();
-    expect(await send(frame as unknown as Page, { type: 'machina-ping' })).toBe('no answer');
-
-    const r = await send(app, { type: 'machina-connect', token: GOOD_TOKEN, account: 'reader@example.com' });
-    expect(r).toMatchObject({ ok: true });
-    expect(JSON.stringify(r)).not.toContain(GOOD_TOKEN);
-    expect(await ext.storage()).toMatchObject({ token: GOOD_TOKEN, account: 'reader@example.com' });
-    expect(await send(app, { type: 'machina-ping' })).toMatchObject({ ok: true, connected: true });
-
-    // Signing out of the web app (web/lib/extension.ts disconnectExtensionFor)
-    // disconnects only an extension holding that account's token.
-    const tag = (t: string) => createHash('sha256').update(`machina-ext:${t}`).digest('hex').slice(0, 12);
-    expect(await send(app, { type: 'machina-disconnect', tokenTag: tag('someone-else') })).toEqual({ ok: false, reason: 'other-account' });
-    expect((await ext.storage()).token).toBe(GOOD_TOKEN);
-    expect(await send(app, { type: 'machina-disconnect', tokenTag: tag(GOOD_TOKEN) })).toEqual({ ok: true, connected: false });
-    expect((await ext.storage()).token).toBeUndefined();
-    expect(await send(app, { type: 'machina-ping' })).toMatchObject({ ok: true, connected: false });
+    // The alarm is armed; fire the same handler it runs.
+    expect(await ext.worker.evaluate(async () => Boolean(await chrome.alarms.get('machina-retry')))).toBe(true);
+    ext.stub.reply = () => ({ status: 200, body: { success: true, queued: true } });
+    await ext.worker.evaluate(() => (globalThis as any).__machina.flushQueue({ force: true }));
+    expect((await ext.storage()).queue).toEqual([]);
 });
 
-test('the options page is settings and saves nothing', async ({ ext }) => {
+test('a reset token: save kept, Reconnect offered, sent after connecting again', async () => {
     await ext.connect();
-    const page = await ext.openPopup(undefined, { search: '?view=settings' });
-    await expect(page.getByText('Connected', { exact: true })).toBeVisible();
-    await expect(page.getByText('Saving to reader@example.com')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Disconnect this browser' })).toBeVisible();
-    expect(ext.stub.saves()).toHaveLength(0);
+    const page = await article();
+    ext.stub.reply = (c) => (Object.keys(c.body).length ? { status: 403, body: { success: false, error: 'Invalid ingest token' } } : { status: 403, body: {} });
+    const popup = await ext.openPopup(page);
+    await expect(title(popup)).toHaveText('Reconnect Machina');
+    await expect(popup.getByRole('button', { name: 'Reconnect' })).toBeVisible();
+    const stored = await ext.storage();
+    expect(stored.needsReconnect).toBe(true);
+    expect(stored.queue.map((i: { status: string }) => i.status)).toEqual(['reconnect']);
+
+    // Connect again from the website: the held save goes out.
+    ext.stub.reply = (c) => (Object.keys(c.body).length ? { status: 200, body: { success: true, queued: true } } : { status: 400, body: {} });
+    const site = await ext.context.newPage();
+    await site.goto(`${ext.stub.origin}/`);
+    expect(await site.evaluate(([t, a]) => (window as any).machina.connect(t, a), ['e2e_NewToken_9876543210xyz', ACCOUNT])).toEqual({ ok: true });
+    await expect.poll(async () => (await ext.storage()).queue?.length).toBe(0);
+    expect(ext.stub.shareCalls().at(-1)!.headers['x-ingest-token']).toBe('e2e_NewToken_9876543210xyz');
 });
 
-test('paste a token: checked, then stored', async ({ ext }) => {
-    await ext.worker.evaluate((b) => chrome.storage.local.set({ baseUrl: b }), ext.stub.origin);
-    const { tabId } = await ext.openPage('/bridges', ARTICLE);
-    const popup = await ext.openPopup(tabId);
-    await popup.getByRole('button', { name: 'Use a token instead' }).click();
-    await popup.getByLabel('Your token').fill(GOOD_TOKEN);
-    await popup.getByRole('button', { name: 'Save and connect' }).click();
-    await expect(popup.getByText(/^Connected\./)).toBeVisible();
+test('one-click connect: ping, connect (token checked first), disconnect by tag', async () => {
+    const site = await ext.context.newPage();
+    await site.goto(`${ext.stub.origin}/`);
+    await site.waitForFunction(() => (window as any).ready === true);
+    const before = await site.evaluate(() => (window as any).machina.ping());
+    expect(before).toMatchObject({ ok: true, connected: false, tokenTag: null });
+
+    expect(await site.evaluate(([t, a]) => (window as any).machina.connect(t, a), [GOOD_TOKEN, ACCOUNT])).toEqual({ ok: true });
+    expect(ext.stub.calls[0].body).toEqual({});
+    expect(ext.stub.calls[0].headers['x-ingest-token']).toBe(GOOD_TOKEN);
+    expect(await ext.storage()).toMatchObject({ token: GOOD_TOKEN, account: ACCOUNT });
+
+    const after = await site.evaluate(() => (window as any).machina.ping());
+    expect(after.connected).toBe(true);
+    expect(after.tokenTag).toBe(await site.evaluate((t) => (window as any).machina.tokenTag(t), GOOD_TOKEN));
+    expect(JSON.stringify(after)).not.toContain(GOOD_TOKEN);
+
+    expect(await site.evaluate(() => (window as any).machina.disconnect('e2e_SomeoneElse_000000000'))).toEqual({ ok: false });
+    expect(await site.evaluate((t) => (window as any).machina.disconnect(t), GOOD_TOKEN)).toEqual({ ok: true });
+    expect((await ext.storage()).token).toBeUndefined();
+
+    ext.stub.reply = () => ({ status: 403, body: { success: false } });
+    expect(await site.evaluate(([t, a]) => (window as any).machina.connect(t, a), [GOOD_TOKEN, ACCOUNT]))
+        .toEqual({ ok: false, reason: 'invalid' });
+});
+
+test('share pages on the same site cannot connect the extension', async () => {
+    const page = await ext.context.newPage();
+    await page.goto(`${ext.stub.origin}/s/abc123`);
+    const reply = await page.evaluate(() => new Promise((resolve) => {
+        addEventListener('message', (e) => {
+            if (e.data?.source === 'machina-extension' && e.data.id === 'x1') resolve(e.data.reply);
+        });
+        postMessage({ source: 'machina-web', id: 'x1', type: 'machina-connect', token: 'e2e_Attacker_000000000000', account: 'a' }, location.origin);
+    }));
+    expect(reply).toEqual({ ok: false, reason: 'untrusted' });
+    expect(ext.stub.calls).toHaveLength(0);
+});
+
+test('Instagram: the post as the page shows it travels as pagePreview', async () => {
+    await ext.connect();
+    await ext.context.route('https://www.instagram.com/**', (route) => route.fulfill({ contentType: 'text/html', body: IG_POST }));
+    const page = await ext.context.newPage();
+    await page.goto('https://www.instagram.com/p/ABC123/');
+    const popup = await ext.openPopup(page);
+    await expect(title(popup)).toHaveText('Saved to Machina');
+    const [call] = ext.stub.shareCalls();
+    expect(call.body).toEqual({
+        url: 'https://www.instagram.com/p/ABC123/',
+        pagePreview: {
+            url: 'https://www.instagram.com/chefana/p/ABC123/',
+            title: 'Chef Ana on Instagram: "Five-minute pasta"',
+            description: '1,204 likes - chefana: Five-minute pasta, here is how.',
+            image: 'https://scontent.cdninstagram.com/v/t51/pasta.jpg',
+            author: 'chefana',
+        },
+    });
+});
+
+test('LinkedIn: honest hint, and a screenshot from the popup becomes an image save', async () => {
+    await ext.connect();
+    await ext.context.route('https://www.linkedin.com/**', (route) => route.fulfill({ contentType: 'text/html', body: LINKEDIN_POST }));
+    const page = await ext.context.newPage();
+    await page.goto('https://www.linkedin.com/posts/team-hiring-123');
+    const popup = await ext.openPopup(page);
+    await expect(title(popup)).toHaveText('Saved to Machina');
+    await expect(popup.locator('#hint')).toHaveText(/only read a preview of posts on LinkedIn/);
+
+    await popup.getByRole('button', { name: 'Save a screenshot' }).click();
+    await expect(title(popup)).toHaveText('Screenshot saved');
+    const shot = ext.stub.shareCalls().at(-1)!.body;
+    expect(Object.keys(shot).sort()).toEqual(['image', 'mimeType']);
+    expect(shot.mimeType).toBe('image/jpeg');
+    const bytes = Buffer.from(String(shot.image), 'base64');
+    expect(bytes.subarray(0, 3).toString('hex')).toBe('ffd8ff');
+    expect(bytes.length).toBeLessThan(5 * 1024 * 1024);
+});
+
+test('browser pages are refused before anything is sent', async () => {
+    await ext.connect();
+    // A tab the harness can't read the address of without a toolbar click
+    // (about:blank): the popup refuses it the same way it refuses chrome:// pages.
+    const tabId = await ext.worker.evaluate(async () => (await chrome.tabs.create({ url: 'about:blank' })).id!);
+    const popup = await ext.openPopupForTab(tabId);
+    await expect(title(popup)).toHaveText("Can't save this page");
+    await expect(popup.getByRole('button', { name: 'Open Machina' })).toBeVisible();
+    expect(ext.stub.calls).toHaveLength(0);
+});
+
+test('right-click saves: link, selection, image, page; toast and badge confirm', async () => {
+    await ext.connect();
+    const page = await article();
+    const tabId = await ext.tabIdOf(page);
+    const click = (info: Record<string, unknown>) => ext.worker.evaluate(async ([i, id]) => {
+        const tab = await chrome.tabs.get(id as number);
+        await (globalThis as any).__machina.onMenuClick(i, tab);
+    }, [info, tabId] as const);
+
+    await click({ menuItemId: 'machina-link', linkUrl: 'https://example.com/linked', frameId: 0 });
+    expect(ext.stub.shareCalls().at(-1)!.body).toEqual({ url: 'https://example.com/linked' });
+    await expect(page.locator('machina-save-toast')).toHaveCount(1);
+    expect(await badge(tabId)).toBe('✓');
+
+    await page.evaluate(() => {
+        const range = document.createRange();
+        range.selectNodeContents(document.getElementById('lede')!);
+        getSelection()!.removeAllRanges();
+        getSelection()!.addRange(range);
+    });
+    await click({ menuItemId: 'machina-selection', selectionText: 'fallback text', frameId: 0 });
+    const sel = ext.stub.shareCalls().at(-1)!.body;
+    expect(sel.noteKind).toBe('quote');
+    expect(String(sel.shared)).toContain('Most of what we read is gone within a week.');
+
+    await click({ menuItemId: 'machina-image', srcUrl: 'https://example.com/photo.jpg', frameId: 0 });
+    expect(ext.stub.shareCalls().at(-1)!.body).toEqual({ url: 'https://example.com/photo.jpg' });
+
+    await page.evaluate(() => getSelection()!.removeAllRanges());
+    await click({ menuItemId: 'machina-page', frameId: 0 });
+    expect(ext.stub.shareCalls().at(-1)!.body).toEqual({ url: `${ext.stub.origin}/article` });
+
+    // Only one toast at a time.
+    await expect(page.locator('machina-save-toast')).toHaveCount(1);
+});
+
+test('screenshot shortcut: captures what is visible, without our own toast in it', async () => {
+    await ext.connect();
+    const page = await article();
+    const tabId = await ext.tabIdOf(page);
+    await ext.worker.evaluate(async (id) => {
+        const tab = await chrome.tabs.get(id);
+        await (globalThis as any).__machina.onMenuClick({ menuItemId: 'machina-page', frameId: 0 }, tab);
+        await (globalThis as any).__machina.onCommand('save-screenshot', tab);
+    }, tabId);
+    const shot = ext.stub.shareCalls().at(-1)!.body;
+    expect(shot.mimeType).toBe('image/jpeg');
+    expect(Buffer.from(String(shot.image), 'base64').subarray(0, 2).toString('hex')).toBe('ffd8');
+    await expect(page.locator('machina-save-toast')).toHaveCount(1); // the screenshot's own confirmation
+});
+
+test('menu and shortcuts are registered as planned', async () => {
+    const commands = await ext.worker.evaluate(() => chrome.commands.getAll());
+    expect(commands.map((c) => [c.name, c.shortcut])).toEqual([
+        ['_execute_action', 'Ctrl+Shift+S'],
+        ['save-screenshot', 'Alt+Shift+S'],
+    ]);
+    await ext.worker.evaluate(() => (globalThis as any).__machina.createMenus());
+});
+
+test('settings: token form, waiting saves, two-step disconnect, accessible in both themes', async () => {
+    const page = await ext.context.newPage();
+    await page.goto(`chrome-extension://${ext.id}/src/options/options.html`);
+    await expect(page.locator('#account-status')).toHaveText("This browser isn't connected to Machina yet.");
+
+    await page.getByText('Connect with a token').click();
+    await page.getByLabel('Token').fill('nope');
+    await page.getByRole('button', { name: 'Connect', exact: true }).click();
+    await expect(page.locator('#token-message')).toContainText("doesn't look like a Machina token");
+
+    await page.getByLabel('Token').fill(GOOD_TOKEN);
+    await page.getByRole('button', { name: 'Connect', exact: true }).click();
+    await expect(page.locator('#token-message')).toHaveText('Connected. You can start saving.');
+    await expect(page.locator('#account-status')).toHaveText('This browser is connected to Machina.');
     expect((await ext.storage()).token).toBe(GOOD_TOKEN);
-    expect(ext.stub.saves()).toHaveLength(0);
+
+    ext.stub.down = true;
+    const target = await article();
+    const popup = await ext.openPopup(target);
+    await expect(title(popup)).toHaveText('Saved on this computer');
+    await popup.close();
+    await expect(page.locator('#queue-list li')).toHaveCount(1);
+    await expect(page.locator('#queue-list li')).toContainText('Page: The quiet power of spaced review');
+    await a11y(page);
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await a11y(page);
+
+    await page.getByRole('button', { name: 'Disconnect' }).click();
+    await expect(page.locator('#disconnect-warning')).toContainText("1 saves haven't reached Machina yet");
+    await page.getByRole('button', { name: 'Disconnect and discard waiting saves' }).click();
+    await expect(page.locator('#account-status')).toHaveText("This browser isn't connected to Machina yet.");
+    expect((await ext.storage()).queue).toEqual([]);
 });
 
-test('keyboard: Connect is reachable and works from the keyboard', async ({ ext }) => {
-    const popup = await ext.openPopup();
-    // Wait for the popup to pick its screen before tabbing through it.
-    await expect(popup.getByRole('heading', { name: 'Save anything in one click' })).toBeVisible();
-    // Header gear first, then the primary action.
-    await popup.keyboard.press('Tab');
-    await expect(popup.getByRole('button', { name: 'Settings' })).toBeFocused();
-    await popup.keyboard.press('Tab');
-    await expect(popup.getByRole('button', { name: 'Connect to Machina' })).toBeFocused();
-    // Opening the tab closes the popup, so the key press can outlive its page.
-    await popup.keyboard.press('Enter').catch(() => {});
-    // Poll the open tabs (as the first-install test does): a tab the extension
-    // creates can report about:blank at its 'page' event, before it navigates.
-    await expect.poll(() => ext.context.pages().map((p) => p.url())).toContain('https://mymachina.app/?connect=extension');
-});
+test('the web app\'s own connect code (web/lib/extension.ts) drives this extension', async () => {
+    // Transpile the real module (web/node_modules/typescript; CI installs web first).
+    const ts = createRequire(import.meta.url)(join(REPO, 'web/node_modules/typescript'));
+    const cjs = ts.transpileModule(readFileSync(join(REPO, 'web/lib/extension.ts'), 'utf8'), {
+        compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+    }).outputText;
+    const site = await ext.context.newPage();
+    await site.goto(`${ext.stub.origin}/`);
+    await site.addScriptTag({
+        content: `(function (exports, process) { ${cjs} })(window.machinaWeb = {}, { env: {} });`,
+    });
+    const web = (fn: string, ...args: unknown[]) => site.evaluate(
+        ([f, a]) => (window as any).machinaWeb[f as string](...(a as unknown[])), [fn, args] as const);
 
-declare const chrome: {
-    storage: { local: { set(o: object): Promise<void> } };
-    action: { getBadgeText(o: object): Promise<string> };
-};
+    expect(await web('detectExtension')).toEqual({ version: '1.0.0', connected: false, tokenTag: null });
+    expect(await web('connectExtension', GOOD_TOKEN, ACCOUNT)).toEqual({ ok: true });
+    expect(await ext.storage()).toMatchObject({ token: GOOD_TOKEN, account: ACCOUNT });
+    const status = await web('detectExtension') as { connected: boolean; tokenTag: string };
+    expect(status.connected).toBe(true);
+    expect(status.tokenTag).toBe(await web('tokenTag', GOOD_TOKEN));
+
+    expect(await web('disconnectExtensionFor', 'e2e_SomeoneElse_000000000')).toBe(false);
+    expect((await ext.storage()).token).toBe(GOOD_TOKEN);
+    expect(await web('disconnectExtensionFor', GOOD_TOKEN)).toBe(true);
+    expect((await ext.storage()).token).toBeUndefined();
+
+    ext.stub.reply = () => ({ status: 403, body: { success: false, error: 'Invalid ingest token' } });
+    expect(await web('connectExtension', GOOD_TOKEN, ACCOUNT)).toEqual({ ok: false, reason: 'invalid' });
+});

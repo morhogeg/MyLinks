@@ -1,143 +1,107 @@
 # Machina browser extension
 
-A small Manifest V3 extension that saves the current page, a right-clicked link,
-or selected text into your Machina library. It is a **thin client**: it POSTs to
-the `share_ingest` Cloud Function (`/api/share`), the same endpoint the iOS Share
-Extension uses. The backend scrapes, analyzes, embeds and saves; the card then
-appears in the app through real-time sync.
+A Manifest V3 extension that saves the page you're on (with any text you
+selected), a link, an image, or a screenshot of the visible tab to your
+Machina library. It is a **thin client**: every save is one POST to
+`share_ingest` (`https://mymachina.app/api/share`), the same endpoint the iPhone
+share extension uses. The server reads, analyzes and files the save; the card
+then appears in the app through real-time sync.
 
-Plain HTML, CSS and JS. No build step, no dependencies. The same folder runs in
-Chrome, Edge and Brave, and in Safari through the Mac app in
-[`../safari`](../safari/README.md), which copies this folder into its bundle at
-build time.
+Plain JavaScript modules, no build step, no runtime dependencies, no remote
+code. Chrome 140+ (Edge and Brave install from the same Web Store item; not
+tested here). Store listing, privacy answers and the publishing steps:
+[`store/LISTING.md`](store/LISTING.md).
 
-Store listing copy, permission justifications, data-use answers, the security
-model and the owner's publishing checklist: [`store/LISTING.md`](store/LISTING.md).
+## Using it
 
-## For people using Machina
+1. **Connect.** A new install opens `mymachina.app/?connect=extension`; if you
+   are signed in, it connects in one click. Otherwise: popup, **Connect to
+   Machina**, or Settings (right-click the icon, Options), **Connect with a
+   token** (the token is in Machina's Settings, Browser extension, Advanced).
+2. **Save.**
+   - Click the icon, or press **Ctrl+Shift+S** (Command+Shift+S on a Mac): the
+     popup saves the page at once. Selected text goes with it as a quote.
+   - **Alt+Shift+S**: a screenshot of what you see.
+   - Right-click a page, link, image or selection: **Save to Machina**.
+3. **Results** show in the popup, or (for right-click and shortcut saves) as a
+   short confirmation on the page plus a mark on the toolbar icon.
 
-1. Install it. Chrome, Edge and Brave: from the Chrome Web Store (Settings, then
-   Browser extension in the app has the button once the listing is live; until
-   then it says "Coming soon"). Safari: the Machina app from the Mac App Store
-   (also "Coming soon" until it is listed).
-2. Connect it. A new install opens Machina's connect page on its own; if you are
-   signed in there, it connects in one click. You can also click the toolbar
-   icon and choose **Connect to Machina**, or open
-   `https://mymachina.app/?settings=extension` and click **Connect this browser**.
-   In Safari, first allow Machina on mymachina.app (Safari Settings, Extensions,
-   Machina).
-3. Save. Click the icon on any page, or press `Ctrl+Shift+S` (`Command+Shift+S`
-   on a Mac). Right click a link to save the link, or select text and right click
-   to save the page with that quote.
-
-No one-click connect available (another browser, a locked-down profile)? In the
-extension, open Settings, choose **Use a token instead**, and paste the token
-from Machina's Settings, Browser extension, Advanced.
-
-## What you see
-
-Opening the popup saves the page and shows the server's answer. Nothing says
-"Saved" until the server says it has the page.
-
-| Server answer | Popup |
+| Server answer | What the user sees |
 |---|---|
-| 200 queued | **Saved to Machina**. Machina is reading it now. |
-| 200 `waiting: true` (past the monthly limit) | **Saved for later** with the server's message, plus **Get Pro** on the free plan. Not styled as an error. |
-| 200 `duplicate: true` | **Already in your library** |
-| 401 / 403 | **Reconnect Machina** with a Reconnect button |
-| 429 quota body (older servers) | **Monthly limit reached**, "This page was not saved", Get Pro |
-| 429 plain | **Too many saves**, try again |
-| 400 / 413 | the server's reason, or "Too large to save" |
-| 5xx | **Machina hit a problem**, Try again |
-| no network | **You're offline** / **Couldn't reach Machina**, Try again |
-| no answer in 20 s | **No answer from Machina**. It may still have saved; check your library. |
-| 200 the extension doesn't understand | **Not sure it saved**. Check your library. |
-| browser page, local file, another extension's page | **Can't save this page**, with the reason. Nothing is sent. |
-| Safari with no access to the page | **Allow Machina on this website**, with where to do that |
+| 200 queued / saved | **Saved to Machina** (with the quote, if any) |
+| 200 `duplicate` | **Already in your library** (a new quote is not added: server limit) |
+| 200 `waiting` | **Saved for later** with the server's message |
+| 401 / 403 | **Reconnect Machina**; the save is kept until you reconnect |
+| offline, no answer, 5xx, 429 | **Saved on this computer**; retried with backoff for 24 h |
+| 400 / 413 | The server's reason (**Too large to save**, …) |
+| a screenshot with no answer | **Not sure it saved** (never resent: the server can't spot a duplicate image) |
+| browser pages, files | **Can't save this page**; nothing is sent |
 
-Right-click saves, and a popup closed before the answer came back, report the
-same result as a system notification (Chrome, Edge, Brave) or, where there are
-no notifications (Safari), as a small toast on the page with the same action
-link. The toolbar badge shows a check (saved, grey for already saved, amber for
-saved for later) or `!` for 4 seconds. Safari ignores badge colors, so the glyph
-alone carries it there.
+Instagram and TikTok can't be read by Cloud Functions (login walls), so for
+those posts the extension reads the page's preview tags and sends them as
+`pagePreview`, only when they describe the post on screen. LinkedIn and
+Facebook posts get a hint to save a screenshot too.
 
-The popup follows the system light/dark setting, shows page titles in their own
-direction (Hebrew titles read right to left), and works from the keyboard.
+## Layout
 
-## For developers
-
-### Load it unpacked
-
-1. Open `chrome://extensions` (`edge://extensions`, `brave://extensions`).
-2. Turn on **Developer mode** and click **Load unpacked**. Choose this folder.
-3. Pin Machina to the toolbar.
-
-The dev manifest also runs the connect script on `http://localhost` and
-`http://127.0.0.1`, so the web app's dev server (`npm run dev` in `web/`) can
-connect it. The store package removes those.
-
-To save against something other than production, use the popup's token screen,
-Advanced, **Server address**. The server must allow the extension's origin
-(share_ingest does, see below).
-
-### How connect works
-
-`connect.js` is a content script on the web app. The page posts
-`{source: "machina-web", id, type: "machina-ping" | "machina-connect"}` to its
-own window; the script relays it to the service worker and posts the answer back
-to the same origin. The worker only answers the top frame of the web app's root
-page (`/`) on an allowed host, checks a token with the server (an empty POST,
-which share_ingest answers 400 for a good token and 403 for a bad one) before
-storing it, and never sends a token back. The web side is
-`web/lib/extension.ts`.
-
-### CORS, no host permission
-
-The extension has no host permissions. `share_ingest`, and only it, echoes an
-Origin of the form `chrome-extension://<32 letters a-p>` or
-`safari-web-extension://<uuid>` (`functions/main.py` `_EXTENSION_ORIGIN_RE`). The
-ingest token is the only credential; requests go with `credentials: "omit"`.
-**This needs the functions deploy that carries that change before the extension
-can save at all.**
-
-### Tests
-
-```sh
-node extension/popup.test.mjs        # popup wiring, every state, Safari variants
-node extension/background.test.mjs   # service worker, connect checks, toasts, manifest
-cd e2e && npm run test:extension     # the real extension in Chromium, stub backend
+```
+manifest.json            permissions, commands, CSP; strings come from _locales
+_locales/en/messages.json  every string a person reads (incl. the store name/summary)
+src/background.js        service worker: events → saves (no state between events)
+src/lib/api.js           request bodies; every server answer → one named outcome
+src/lib/saves.js         the five ways to save, end to end
+src/lib/queue.js         offline/retry queue (storage.local + one alarm)
+src/lib/account.js       token check/store, one-way tag shared with the website
+src/lib/capture.js       reading the chosen tab, social post preview, screenshot
+src/lib/image.js         screenshot decode/downscale (under 5 MB)
+src/lib/feedback.js      toolbar badge and on-page toast
+src/lib/describe.js      plain words for every result (popup and toast)
+src/lib/urls.js          what can be saved; site helpers
+src/lib/config.js        the one place the server address lives
+src/content/bridge.js    one-click connect relay on mymachina.app
+src/popup/, src/options/ UI; src/ui/theme.css mirrors web/app/globals.css tokens
+icons/                   rendered from web/public/icon.svg (scripts/render-icons.mjs)
+store/                   listing doc, screenshots, promo tiles
+test/                    unit tests (node --test) with a fake chrome.*
 ```
 
-The web side (Settings, Browser extension, and the real one-click connect
-against the emulators) is `e2e/tests/10-browser-extension.spec.ts`, part of
-`npm test` in `e2e/`.
+## Developing
 
-### Package for the Chrome Web Store
+**Load it:** `chrome://extensions`, Developer mode, **Load unpacked**, pick this
+folder. The manifest in the repo is the one that ships; it only talks to
+production (`src/lib/config.js`). To work against a local server, use the test
+harness below, which patches a copy.
 
-```sh
-node extension/scripts/package.mjs --bump patch   # or minor / major / --set 1.3.0
-```
-
-Writes `extension/dist/machina-extension-<version>.zip` (gitignored): only the
-files the extension runs, localhost removed from the content-script matches.
-Each upload needs a higher version.
-
-### Store images and icons
+**Tests:**
 
 ```sh
-cd e2e && npm run extension:assets      # extension/store/*.png from the real popup
-node extension/scripts/render-icons.mjs # icons/*.png from icons-src/*.svg
+node --test extension/test/*.test.mjs        # 60 unit tests, no dependencies
+cd e2e && npm run test:extension             # the real extension in Chromium, stub share_ingest
+cd e2e && npm run extension:assets           # re-render store/ images from the real UI
+node extension/scripts/render-icons.mjs      # icons/ from web/public/icon.svg
 ```
 
-### Rules
+The browser suite (`e2e/extension/`) covers every popup state, the queue, the
+connect protocol (including the web app's own `web/lib/extension.ts`), the
+Instagram preview, screenshots, the right-click paths, and an axe accessibility
+scan of the popup and settings in light and dark. The website side (Settings,
+Browser extension, against the emulators) is `e2e/tests/10-browser-extension.spec.ts`.
 
-- No em dashes in any string a user reads (the tests check every file).
-- Keep it cross-browser: feature-detect any API Safari lacks (`notifications`,
-  `contextMenus` on iOS, `commands` before 16.4). Keep `notifications` and
-  `options_ui.open_in_tab` in the manifest, and don't add `background.scripts`
-  (Safari would prefer it over the service worker).
-- Keyboard shortcuts are changed in the browser: `chrome://extensions/shortcuts`
-  (Chrome, Brave), `edge://extensions/shortcuts` (Edge, where `Ctrl+Shift+S` may
-  already belong to Web capture; the popup shows "Not set" if so). Safari has no
-  such page.
+**Package for the store:** `node extension/scripts/package.mjs --bump patch`
+writes `extension/dist/machina-chrome-<version>.zip` (gitignored) after the
+store checks. `--check` only checks (CI).
+
+## Rules
+
+- Permissions stay exactly `activeTab`, `scripting`, `contextMenus`, `storage`,
+  `alarms` plus the mymachina.app content script; a unit test fails on any change.
+  Adding a permission with an install warning disables the extension for every
+  user until they accept it.
+- No host permissions: saves work because `share_ingest` admits extension
+  origins over CORS (`functions/main.py` `_EXTENSION_ORIGIN_RE`).
+- Every string in `_locales`; no em dashes; never "Machina AI" (tests check).
+- No `innerHTML`, `eval`, inline scripts or remote code (tests check).
+- The connect protocol is shared with `web/lib/extension.ts`; change both
+  together (a unit test checks the token tag and message names match).
+- `/safari` copies this folder into the Mac app at build time (deferred,
+  §4 26c); its Safari runtime is not verified against this version.

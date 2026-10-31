@@ -2,7 +2,7 @@
  * The Machina browser extension, seen from the web app.
  *
  * One-click connect: the extension runs a tiny content script on this site
- * (extension/connect.js). This page talks to it with `window.postMessage`,
+ * (extension/src/content/bridge.js). This page talks to it with `window.postMessage`,
  * addressed to its own origin, and only listens to answers that come from its
  * own window and origin. The content script relays to the extension, which
  * only trusts the root page of an allowed origin and checks the token with the
@@ -156,7 +156,7 @@ export async function disconnectExtensionFor(token: string, timeoutMs = 600): Pr
     }
 }
 
-/** Same one-way tag as extension/shared.js tokenTag. */
+/** Same one-way tag as extension/src/lib/account.js tokenTag (a unit test checks they match). */
 export async function tokenTag(token: string): Promise<string | null> {
     if (!token || typeof crypto === 'undefined' || !crypto.subtle) return null;
     const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`machina-ext:${token}`)));

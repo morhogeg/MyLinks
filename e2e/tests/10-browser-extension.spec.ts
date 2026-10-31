@@ -91,11 +91,11 @@ test('Safari on a Mac: Mac App Store placeholder, no site hint for an app nobody
 test('with the extension installed: one click connects it, and a deep link connects it by itself @desktop', async () => {
     desktopOnly();
     const baseURL = String(test.info().project.use.baseURL);
-    const ext = await launchExtension();
+    const ext = await launchExtension({ appOrigin: baseURL });
     try {
         // The extension checks a token against share_ingest before keeping it;
         // the stub server answers that check (empty POST, 400) like the real one.
-        await ext.worker.evaluate((b) => chrome.storage.local.set({ baseUrl: b }), ext.stub.origin);
+        // Its connect bridge runs on this dev server (fixtures.ts, appOrigin).
         const user = await createAuthUser('ext');
         await seedReturningUser(user);
         const page = await ext.context.newPage();
@@ -128,17 +128,15 @@ test('with the extension installed: one click connects it, and a deep link conne
         await expect(again.getByTestId('extension-status')).toContainText('Connected in this browser');
         expect((await ext.storage()).token).toBe(TOKEN);
     } finally {
-        await ext.context.close();
-        await ext.stub.stop();
+        await ext.close();
     }
 });
 
 test('signed out, the deep link waits for sign-in @desktop', async () => {
     desktopOnly();
     const baseURL = String(test.info().project.use.baseURL);
-    const ext = await launchExtension();
+    const ext = await launchExtension({ appOrigin: baseURL });
     try {
-        await ext.worker.evaluate((b) => chrome.storage.local.set({ baseUrl: b }), ext.stub.origin);
         const user = await createAuthUser('extlater');
         await seedReturningUser(user);
         const page = await ext.context.newPage();
@@ -151,8 +149,7 @@ test('signed out, the deep link waits for sign-in @desktop', async () => {
         await signIn(page, user);
         await expect.poll(async () => (await ext.storage()).token, { timeout: 20_000 }).toBe(TOKEN);
     } finally {
-        await ext.context.close();
-        await ext.stub.stop();
+        await ext.close();
     }
 });
 

@@ -9,9 +9,10 @@
     "test": "firebase emulators:exec --only auth,firestore --project demo-machina \"playwright test\"",
     "test:against-running-emulators": "playwright test",
     "test:extension": "playwright test -c playwright.extension.config.ts",
-    "extension:assets": "STORE_ASSETS=1 playwright test -c playwright.extension.config.ts"
+    "extension:assets": "STORE_ASSETS=1 playwright test -c playwright.extension.config.ts store-assets"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.11.0",
     "@playwright/test": "^1.63.0",
     "firebase-tools": "^14.27.0"
   }

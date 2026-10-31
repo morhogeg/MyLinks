@@ -1429,22 +1429,32 @@ The multi-user auth work described below **was** fully written but not live:
     (5 workspaces, 0 failed cards); nothing to apply. The tool stays for any
     future use (`functions/tools/convert_quota_failed_to_waiting.py`).
 
-26b. **[ ] Browser extension on the Chrome Web Store — CODE READY 2026-10-05,
-    not published.** Popup saves on open with honest states (incl. "Saved for
-    later" for waiting saves); one-click connect via content script `connect.js`
-    on `https://mymachina.app/*` + `window.postMessage` handshake (token never
-    sent to a page; root `/` only, so `/s` `/c` share pages can't trigger it);
-    paste-token kept under Advanced. **No host permissions:** `share_ingest`
-    echoes `chrome-extension://` / `safari-web-extension://` origins
-    (`_EXTENSION_ORIGIN_RE`, `share_ingest` only, no credentials; B1).
-    Settings → Browser extension rewritten (`web/lib/extension.ts`
-    placeholders `CHROME_WEB_STORE_ITEM_ID`, `MAC_APP_STORE_URL`; deep links
-    `/?settings=extension`, `/?connect=extension`). Packaging:
-    `node extension/scripts/package.mjs` → `extension/dist/*.zip`. **Owner
-    steps:** `extension/store/LISTING.md` (5 USD developer account, upload,
-    listing + data-use answers, submit; then set `CHROME_WEB_STORE_ITEM_ID` and
-    redeploy web). Decisions taken: host permission stays dropped; "Web
-    history" unticked (only pages the user explicitly saves are sent).
+26b. **[ ] Browser extension on the Chrome Web Store — REBUILT FROM SCRATCH
+    2026-10-31 (owner ask), code ready, not published.** Name `Machina: Web
+    Clipper & Screenshot Saver`; summary uses "second brain" (owner extended the
+    D-3 exemption to the Web Store, `docs/BRANDING.md`). One-click save (popup
+    saves on open; selection rides along as a quote via `shared` +
+    `noteKind:'quote'`), right-click Save to Machina (page/link/selection/image/
+    screenshot), visible-tab screenshot (Alt+Shift+S), Instagram/TikTok post read
+    from the page as `pagePreview`, offline/retry queue, one-click connect over
+    the unchanged `web/lib/extension.ts` protocol. Permissions: `activeTab`,
+    `scripting`, `contextMenus`, `storage`, `alarms` + content script on
+    mymachina.app (the only install warning); no host permissions (`share_ingest`
+    CORS, B1). Tests: `node --test extension/test/*.test.mjs` (60) +
+    `cd e2e && npm run test:extension` (17, real Chromium, stub backend, axe).
+    **Owner steps:** `extension/store/LISTING.md` §4 (5 USD developer account,
+    verify publisher + mymachina.app, upload `node extension/scripts/package.mjs`
+    zip, paste listing + privacy answers, reviewer token, submit; then set
+    `CHROME_WEB_STORE_ITEM_ID` and redeploy web). Decisions: host permission
+    stays dropped; data-use form now ticks Website content, Web history AND
+    Authentication information (reverses the 2026-10-05 "Web history unticked").
+    **Server-side follow-ups (post-launch, not started):** (1) a quote saved on an
+    already-saved page is dropped as a duplicate (append it to the card);
+    (2) screenshot cards don't record their source page (a `note` would be parsed
+    for reminders; add `sourceUrl`/`sourceTitle` on image saves); (3) logged-in,
+    paywalled and LinkedIn/Facebook pages stay partial (accept page text the
+    browser read, like `pagePreview`); (4) token check returns no account, so the
+    popup's "Saving to …" is the website's word, not the server's.
 
 26c. **[ ] Machina for Safari on the Mac App Store — DEFERRED TO POST-LAUNCH
     (owner, 2026-10-19: iOS launches first).** Until either store link is
@@ -2767,6 +2777,55 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-10-31 (night) — CHROME EXTENSION REBUILT FROM SCRATCH (owner ask:
+  "delete it and start from scratch"; §4 26b). NOT PUBLISHED; branch
+  `claude/chrome-extension-rebuild-a001a6`.** Old `extension/` and its
+  Playwright harness deleted (`63ce51a`), new MV3 extension written without
+  reusing its code (`520bba2`): popup saves on open (selection as a quote:
+  `shared` + `noteKind:'quote'`, kept as the card's note, never a reminder),
+  right-click Save to Machina, visible-tab screenshot (Alt+Shift+S, downscaled
+  in the worker under 5 MB, sent with no `note` because the image path parses
+  notes for reminders), Instagram/TikTok preview tags read from the page →
+  `pagePreview` (only when `og:url` names the post on screen), offline queue
+  (storage.local + one alarm, 24 h backoff; screenshots never resent after a
+  timeout; private-window saves never stored; a 403 holds saves for
+  reconnect; switching account drops the old account's queue), badge + on-page
+  toast for saves made without the popup; before connecting, the popup states
+  what gets sent (store disclosure). Token storage locked to extension
+  pages (`storage.local.setAccessLevel`, hence `minimum_chrome_version` 140).
+  Connect protocol and `web/lib/extension.ts` unchanged. **Research (search
+  snippets + Chromium source; developer.chrome.com and the Web Store were
+  blocked here):** Google documents name/description relevance, popularity,
+  UX and rating count/average (newer reviews weighted since 20 Aug 2026);
+  everything else is vendor lore. **Featured badge is being retired**
+  (nominations closed 20 Aug 2026; it also required no-login core features).
+  Established Publisher is automatic after months for a verified publisher.
+  "Second brain" is the best keyword (strong fit, no titled listing above ~2K
+  users), "web clipper" the head term; category Workflow & Planning. Chrome
+  leaves Ctrl+Shift+S free, but Edge and Brave use it for screenshots (the
+  popup then offers "Set a keyboard shortcut"). Full ranked keyword table and
+  policy notes: `extension/store/LISTING.md`. **Owner decisions today:** name
+  `Machina: Web Clipper & Screenshot Saver` (not the App Store's "Save, Ask &
+  Recall": the extension only saves); "second brain" allowed in the Web Store
+  summary/description (D-3 scope change, `docs/BRANDING.md`); privacy policy and
+  data-use form updated as needed. **Web:** privacy policy extension paragraph
+  rewritten (screenshots, post previews, local email, private windows,
+  Limited Use statement; "Saving a link" now discloses shared/selected text
+  goes to Gemini), dated 31 Oct; Settings → Browser extension "How to save"
+  lists the screenshot shortcut and right-click menu, and only names Safari
+  once `MAC_APP_STORE_URL` is set. **Verified:** 60 unit tests; 17 Playwright
+  tests of the real extension in Chromium against a stub share_ingest (every
+  popup state, queue + retry, connect/disconnect, share pages refused, the web
+  app's own `web/lib/extension.ts` driving it, Instagram preview, LinkedIn
+  hint + screenshot, right-click paths, axe clean on popup and settings in
+  light and dark); web `tsc` 0, eslint clean on touched files; package check;
+  store images rendered from the real UI. **Not verified:** the production
+  endpoint and CORS through the Vercel → Hosting rewrite (mymachina.app is
+  denied by this sandbox's network policy); web e2e test 10 (moved to the new
+  harness, but the Firestore emulator download is blocked here; CI runs it);
+  the real toolbar, native right-click menu and shortcuts (driven through the
+  same handlers); Edge, Brave, Safari; a real Web Store review. **Owner
+  steps:** `extension/store/LISTING.md` §4.
 - **2026-10-31 — APP STORE PREVIEW VIDEO: FINAL CUT, OWNER APPROVED ("It's
   perfect"); kept off `main` with the rest of the video work (owner).** The
   App Preview for the product page: 28.9s, 886 × 1920, H.264 High 4.0, 30fps,

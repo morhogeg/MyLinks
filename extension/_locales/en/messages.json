@@ -1,0 +1,188 @@
+{
+  "extName": {
+    "message": "Machina: Web Clipper & Screenshot Saver",
+    "description": "Store listing name and the name in chrome://extensions. Max 75 characters."
+  },
+  "extShortName": {
+    "message": "Machina",
+    "description": "Short name where space is tight. Max 12 characters."
+  },
+  "extDescription": {
+    "message": "Save pages, links, quotes and screenshots to your second brain in one click. Machina summarizes and sorts every save for you.",
+    "description": "Store listing summary and manifest description. Max 132 characters."
+  },
+  "actionTitle": {
+    "message": "Save to Machina",
+    "description": "Toolbar button tooltip."
+  },
+  "actionTitleWaiting": {
+    "message": "Save to Machina ($COUNT$ waiting to send)",
+    "description": "Toolbar tooltip while saves are queued.",
+    "placeholders": { "count": { "content": "$1", "example": "2" } }
+  },
+  "commandSavePage": {
+    "message": "Save this page to Machina",
+    "description": "Keyboard shortcut description (opens the popup, which saves)."
+  },
+  "commandSaveScreenshot": {
+    "message": "Save a screenshot of this page to Machina",
+    "description": "Keyboard shortcut description."
+  },
+
+  "menuParent": { "message": "Save to Machina", "description": "Right-click menu parent item." },
+  "menuPage": { "message": "This page", "description": "Right-click menu item." },
+  "menuLink": { "message": "This link", "description": "Right-click menu item." },
+  "menuSelection": { "message": "Selected text, with this page", "description": "Right-click menu item." },
+  "menuImage": { "message": "This image", "description": "Right-click menu item." },
+  "menuScreenshot": { "message": "A screenshot of what you see", "description": "Right-click menu item." },
+
+  "brand": { "message": "Machina", "description": "Product name. Never translate, never add AI." },
+  "settings": { "message": "Settings", "description": "Button label." },
+
+  "saving": { "message": "Saving…", "description": "Status while a page is being sent." },
+  "savingScreenshot": { "message": "Taking a screenshot…", "description": "Status while a screenshot is captured and sent." },
+
+  "savedTitle": { "message": "Saved to Machina", "description": "Result title." },
+  "savedDetail": { "message": "Machina is reading it now. It will show up in your library in a moment.", "description": "Result detail." },
+  "savedQuoteDetail": { "message": "Saved with the text you selected. Machina is reading it now.", "description": "Result detail when a selection was saved with the page." },
+  "screenshotSavedTitle": { "message": "Screenshot saved", "description": "Result title." },
+  "screenshotSavedDetail": { "message": "Machina is reading it now. It will show up in your library in a moment.", "description": "Result detail." },
+  "duplicateTitle": { "message": "Already in your library", "description": "Result title." },
+  "duplicateDetail": { "message": "You saved this before, so nothing new was added.", "description": "Result detail." },
+  "duplicateQuoteDetail": { "message": "You saved this page before. The text you selected wasn't added to it.", "description": "Result detail." },
+  "waitingTitle": { "message": "Saved for later", "description": "Result title: kept past the monthly free reads." },
+  "waitingDetail": { "message": "Machina kept your save and will read it next month, or right away with Pro.", "description": "Fallback when the server sends no message." },
+  "reconnectTitle": { "message": "Reconnect Machina", "description": "Result title when the token was reset." },
+  "reconnectDetail": { "message": "This browser's connection to Machina was reset. Your save is kept here and goes out once you reconnect.", "description": "Result detail." },
+  "reconnectNotKeptDetail": { "message": "This browser's connection to Machina was reset. Reconnect, then save this again.", "description": "Result detail when the save could not be kept (private window or full queue)." },
+  "queueFullTitle": { "message": "Couldn't keep this save", "description": "Result title when the retry queue is full." },
+  "queueFullDetail": { "message": "Too many saves are already waiting to be sent. Send or discard them in Settings first.", "description": "Result detail." },
+  "queuedTitle": { "message": "Saved on this computer", "description": "Result title when a save is queued for retry." },
+  "queuedOfflineDetail": { "message": "You're offline. Machina will send it as soon as you're back online.", "description": "Queued because offline." },
+  "queuedServerDetail": { "message": "Machina didn't answer. It will try again in a few minutes.", "description": "Queued after a server error or timeout." },
+  "queuedRateDetail": { "message": "That was a lot of saves at once. Machina will send this one in a few minutes.", "description": "Queued after a rate limit." },
+  "unsureTitle": { "message": "Not sure it saved", "description": "Result title when the answer is unknown." },
+  "unsureDetail": { "message": "Machina took too long to answer. Check your library before saving it again.", "description": "Result detail." },
+  "unexpectedDetail": { "message": "Machina sent an answer this version doesn't understand. Check your library.", "description": "Result detail." },
+  "tooLargeTitle": { "message": "Too large to save", "description": "Result title." },
+  "tooLargeDetail": { "message": "This is bigger than Machina accepts.", "description": "Result detail." },
+  "rejectedTitle": { "message": "Couldn't save this", "description": "Result title." },
+  "rejectedDetail": { "message": "Machina couldn't accept this save.", "description": "Fallback when the server sends no reason." },
+  "quotaTitle": { "message": "Monthly limit reached", "description": "Result title (older servers)." },
+  "quotaDetail": { "message": "This wasn't saved. Open Machina to see your options.", "description": "Result detail." },
+  "privateFailedTitle": { "message": "Couldn't save", "description": "Result title." },
+  "privateFailedDetail": { "message": "Machina couldn't be reached, and saves from private windows aren't kept for later.", "description": "Result detail." },
+  "notConnectedTitle": { "message": "Connect Machina", "description": "Popup title when there is no token." },
+  "notConnectedDetail": { "message": "Connect this browser to your Machina account to start saving.", "description": "Popup detail." },
+  "connectDisclosure": { "message": "Machina reads a page only when you save it, and sends only that save: the page's address and title, any text you selected, or a screenshot you ask for.", "description": "Shown before connecting: what the extension sends (store disclosure)." },
+  "unsavableTitle": { "message": "Can't save this page", "description": "Popup title on a page that can't be saved." },
+  "unsavableBrowser": { "message": "This is one of the browser's own pages. Machina saves websites.", "description": "Reason." },
+  "unsavableFile": { "message": "This is a file on your computer. Machina saves pages from the web.", "description": "Reason." },
+  "unsavableOther": { "message": "Machina saves web pages, whose addresses start with http or https.", "description": "Reason." },
+  "imageNotSavable": { "message": "This image can't be saved on its own. Save a screenshot instead.", "description": "Reason for data: or blob: images." },
+  "screenshotFailedTitle": { "message": "Couldn't take a screenshot", "description": "Result title." },
+  "screenshotFailedDetail": { "message": "The browser didn't allow a screenshot of this page.", "description": "Result detail." },
+  "noTabTitle": { "message": "No page to save", "description": "Popup title when no tab is available." },
+  "noTabDetail": { "message": "Open a web page, then click Machina again.", "description": "Popup detail." },
+
+  "saveScreenshot": { "message": "Save a screenshot", "description": "Button." },
+  "openMachina": { "message": "Open Machina", "description": "Button or link." },
+  "tryAgain": { "message": "Try again", "description": "Button." },
+  "sendNow": { "message": "Send now", "description": "Button." },
+  "reconnect": { "message": "Reconnect", "description": "Button." },
+  "connectButton": { "message": "Connect to Machina", "description": "Button." },
+  "useToken": { "message": "Use a token instead", "description": "Link to the token form." },
+  "quoteLabel": { "message": "Text you selected", "description": "Label above the saved selection." },
+
+  "queueOne": { "message": "1 save is waiting to be sent.", "description": "Popup footer." },
+  "queueMany": {
+    "message": "$COUNT$ saves are waiting to be sent.",
+    "description": "Popup footer.",
+    "placeholders": { "count": { "content": "$1", "example": "3" } }
+  },
+  "partialHint": {
+    "message": "Machina can only read a preview of posts on $SITE$. Save a screenshot too to keep the whole post.",
+    "description": "Hint on LinkedIn and Facebook.",
+    "placeholders": { "site": { "content": "$1", "example": "LinkedIn" } }
+  },
+  "savingTo": {
+    "message": "Saving to $ACCOUNT$",
+    "description": "Popup footer: the connected account.",
+    "placeholders": { "account": { "content": "$1", "example": "you@example.com" } }
+  },
+  "connectedNoAccount": { "message": "Connected to Machina", "description": "Popup footer when the account name is unknown." },
+  "shortcutHint": {
+    "message": "Shortcut: $KEYS$",
+    "description": "Popup footer.",
+    "placeholders": { "keys": { "content": "$1", "example": "Ctrl+Shift+S" } }
+  },
+  "shortcutNotSet": { "message": "Set a keyboard shortcut", "description": "Link when no shortcut is assigned." },
+
+  "toastOpen": { "message": "Open Machina", "description": "Link in the on-page confirmation." },
+  "toastDismiss": { "message": "Dismiss", "description": "Close button in the on-page confirmation." },
+
+  "optionsTitle": { "message": "Machina settings", "description": "Options page title." },
+  "accountHeading": { "message": "Account", "description": "Options section." },
+  "accountConnected": {
+    "message": "Connected to $ACCOUNT$.",
+    "description": "Options account status.",
+    "placeholders": { "account": { "content": "$1", "example": "you@example.com" } }
+  },
+  "accountConnectedNoEmail": { "message": "This browser is connected to Machina.", "description": "Options account status." },
+  "accountNotConnected": { "message": "This browser isn't connected to Machina yet.", "description": "Options account status." },
+  "accountNeedsReconnect": { "message": "The connection was reset. Reconnect to keep saving.", "description": "Options account status." },
+  "disconnectButton": { "message": "Disconnect", "description": "Button." },
+  "disconnectConfirm": { "message": "Disconnect and discard waiting saves", "description": "Second-step button when saves are queued." },
+  "disconnectWarning": {
+    "message": "$COUNT$ saves haven't reached Machina yet. Disconnecting discards them.",
+    "description": "Warning before disconnecting.",
+    "placeholders": { "count": { "content": "$1", "example": "2" } }
+  },
+  "disconnected": { "message": "Disconnected. Saves from this browser stop until you connect again.", "description": "Status after disconnecting." },
+  "tokenHeading": { "message": "Connect with a token", "description": "Options section." },
+  "tokenHelp": { "message": "Use this if one-click connect isn't available. In Machina on the web, open Settings, then Browser extension, then Advanced, and copy the token.", "description": "Help text." },
+  "tokenLabel": { "message": "Token", "description": "Input label." },
+  "tokenConnect": { "message": "Connect", "description": "Button." },
+  "tokenChecking": { "message": "Checking the token with Machina…", "description": "Status." },
+  "tokenOk": { "message": "Connected. You can start saving.", "description": "Status." },
+  "tokenBadFormat": { "message": "That doesn't look like a Machina token. Copy it again from Settings in Machina.", "description": "Error." },
+  "tokenInvalid": { "message": "Machina didn't recognize this token. It may have been reset; copy the current one.", "description": "Error." },
+  "tokenOffline": { "message": "You're offline. Connect again when you're back online.", "description": "Error." },
+  "tokenNetwork": { "message": "Couldn't reach Machina. Check your connection and try again.", "description": "Error." },
+  "tokenServer": { "message": "Machina hit a problem. Try again in a moment.", "description": "Error." },
+  "tokenRateLimited": { "message": "Too many tries. Wait a minute, then try again.", "description": "Error." },
+  "tokenUnexpected": { "message": "Machina answered in a way this version doesn't understand. Try again later.", "description": "Error." },
+  "shortcutsHeading": { "message": "Keyboard shortcuts", "description": "Options section." },
+  "shortcutsHelp": { "message": "Shortcuts are set on the browser's own shortcuts page. If one shows as not set, another extension or the browser already uses those keys.", "description": "Help text." },
+  "shortcutsChange": { "message": "Change shortcuts", "description": "Button." },
+  "shortcutNotSetLabel": { "message": "Not set", "description": "Shortcut value." },
+  "queueHeading": { "message": "Waiting to send", "description": "Options section." },
+  "queueEmpty": { "message": "Nothing is waiting. Every save reached Machina.", "description": "Empty state." },
+  "queueSendAll": { "message": "Send all now", "description": "Button." },
+  "queueDiscard": { "message": "Discard", "description": "Button." },
+  "queueDiscardLabel": {
+    "message": "Discard $TITLE$",
+    "description": "Accessible label for a discard button.",
+    "placeholders": { "title": { "content": "$1", "example": "An article" } }
+  },
+  "queuePending": { "message": "Will be sent automatically.", "description": "Queue item status." },
+  "queueNeedsReconnect": { "message": "Waiting for you to reconnect.", "description": "Queue item status." },
+  "queueFailed": {
+    "message": "Couldn't be sent: $REASON$",
+    "description": "Queue item status.",
+    "placeholders": { "reason": { "content": "$1", "example": "Too large to save" } }
+  },
+  "queueExpired": { "message": "Gave up after a day of tries.", "description": "Queue failure reason." },
+  "kindPage": { "message": "Page", "description": "Queue item kind." },
+  "kindLink": { "message": "Link", "description": "Queue item kind." },
+  "kindImage": { "message": "Image", "description": "Queue item kind." },
+  "kindScreenshot": { "message": "Screenshot", "description": "Queue item kind." },
+  "privacyHeading": { "message": "Privacy", "description": "Options section." },
+  "privacyBody": { "message": "Machina reads a page only when you save it, and sends only what that save needs: the address and title, any text you selected, the post preview on Instagram and TikTok, or the screenshot you asked for. It sends nothing about pages you don't save, and it keeps its connection token on this computer.", "description": "Privacy summary." },
+  "privacyLink": { "message": "Read the privacy policy", "description": "Link." },
+  "versionLabel": {
+    "message": "Version $VERSION$",
+    "description": "Footer.",
+    "placeholders": { "version": { "content": "$1", "example": "1.0.0" } }
+  }
+}

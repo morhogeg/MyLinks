@@ -71,8 +71,7 @@ jobs:
 
       - name: Browser extension (unit tests + package check)
         run: |
-          node extension/popup.test.mjs
-          node extension/background.test.mjs
+          node --test extension/test/*.test.mjs
           node extension/scripts/package.mjs --check
 
       - name: Browser extension in Chromium (stub backend)

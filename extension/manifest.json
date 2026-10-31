@@ -1,38 +1,36 @@
 {
   "manifest_version": 3,
-  "name": "Machina: one-click save",
-  "short_name": "Machina",
-  "description": "Save any page, link, or selection to your Machina library in one click.",
-  "version": "1.2.0",
+  "name": "__MSG_extName__",
+  "short_name": "__MSG_extShortName__",
+  "description": "__MSG_extDescription__",
+  "version": "1.0.0",
+  "default_locale": "en",
+  "minimum_chrome_version": "140",
   "homepage_url": "https://mymachina.app",
-  "minimum_chrome_version": "116",
   "icons": {
-    "16": "icons/icon16.png",
-    "32": "icons/icon32.png",
-    "48": "icons/icon48.png",
-    "128": "icons/icon128.png"
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
   },
   "action": {
-    "default_title": "Save to Machina",
-    "default_popup": "popup.html",
+    "default_title": "__MSG_actionTitle__",
+    "default_popup": "src/popup/popup.html",
     "default_icon": {
-      "16": "icons/toolbar16.png",
-      "24": "icons/toolbar24.png",
-      "32": "icons/toolbar32.png"
+      "16": "icons/icon-16.png",
+      "24": "icons/icon-24.png",
+      "32": "icons/icon-32.png"
     }
   },
-  "options_ui": {
-    "page": "popup.html?view=settings",
-    "open_in_tab": false
-  },
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "src/background.js",
+    "type": "module"
   },
-  "permissions": ["activeTab", "contextMenus", "storage", "notifications", "scripting"],
+  "permissions": ["activeTab", "scripting", "contextMenus", "storage", "alarms"],
   "content_scripts": [
     {
-      "matches": ["https://mymachina.app/*", "http://localhost/*", "http://127.0.0.1/*"],
-      "js": ["connect.js"],
+      "matches": ["https://mymachina.app/*"],
+      "js": ["src/content/bridge.js"],
       "run_at": "document_start",
       "all_frames": false
     }
@@ -43,7 +41,21 @@
         "default": "Ctrl+Shift+S",
         "mac": "Command+Shift+S"
       },
-      "description": "Save the current page to Machina"
+      "description": "__MSG_commandSavePage__"
+    },
+    "save-screenshot": {
+      "suggested_key": {
+        "default": "Alt+Shift+S",
+        "mac": "Alt+Shift+S"
+      },
+      "description": "__MSG_commandSaveScreenshot__"
     }
+  },
+  "options_ui": {
+    "page": "src/options/options.html",
+    "open_in_tab": true
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; connect-src https://mymachina.app; img-src 'self' data: https:"
   }
 }

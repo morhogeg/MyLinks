@@ -30,6 +30,7 @@ mkdir -p "${DEST}"
   --exclude 'package-lock.json' \
   --exclude 'store/' \
   --exclude 'scripts/' \
+  --exclude 'test/' \
   --exclude 'icons-src/' \
   --exclude 'dist/' \
   "${SRC}/" "${DEST}/"

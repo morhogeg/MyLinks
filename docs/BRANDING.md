@@ -211,6 +211,13 @@ freely. Still in force everywhere: D-1 (never "Machina AI"), and the landing
 page's own on-page copy is unchanged (it also renders as the iPhone app's
 signed-out screen, so D-3 still applies to it). Constants: `web/lib/site.ts`.
 
+**Scope change to D-3 (owner, 2026-10-31): the Chrome Web Store listing is exempt
+too.** The Web Store has no hidden keyword field, so a term ranks only where users
+can see it, and "second brain" is the strongest low-competition fit there (the
+research is in `extension/store/LISTING.md`). It may appear in the listing's summary
+and description. The item name stays `Machina: Web Clipper & Screenshot Saver`,
+without "second brain". D-1 still applies (never "Machina AI").
+
 **Scope note on D-3:** Apple Search Ads keywords are invisible to users in the
 same way the App Store keywords field is, so bidding on `second brain` there is
 permitted. D-3 restricts *user-visible surfaces*, not the search index.
@@ -321,6 +328,7 @@ Domains in 2023) at a markup, and coupling the domain to an email vendor.
 | `Machina` | Everything a user reads: app label, tab title, in-app copy, legal pages, extension, marketing prose. | — |
 | `MACHINA` | The letterspaced wordmark only (splash, boot screen, header lockup). | Body copy. |
 | `Machina: Save, Ask & Recall` | The App Store Connect **Name** field, and nowhere else (D-2a). | In-app, or in prose — it is a storefront string, not the brand. |
+| `Machina: Web Clipper & Screenshot Saver` | The Chrome Web Store item name, which Chrome also shows in `chrome://extensions` (`extension/_locales/en/messages.json` `extName`; owner-approved 2026-10-31). It describes what the extension does, because the extension only saves: Ask and Recall live in the app. | In prose, or for the app. |
 | ~~`Machina AI`~~ | **Retired 2026-07-27.** | Anywhere. |
 
 **Where the name is stored** (the full set, so a future rename misses nothing):
@@ -332,7 +340,8 @@ Domains in 2023) at a markup, and coupling the domain to an email vendor.
   `apple-mobile-web-app-title` meta tag
 - `web/app/privacy/page.tsx`, `web/app/terms/page.tsx` — titles, back-links,
   footer links, and the legal-entity sentence in each
-- `extension/manifest.json` (`name`, `description`), `extension/popup.html`
+- `extension/_locales/en/messages.json` (`extName`, `extShortName`, `extDescription` and
+  every string the extension shows; the manifest only points at them)
 - `functions/ai_service.py` — the model's *self-name* in the analysis system
   prompt, the RAG answer prompt, and the weekly-synthesis prompt
 - `README.md`, `extension/README.md`, `safari/README.md`, `CLAUDE.md`
