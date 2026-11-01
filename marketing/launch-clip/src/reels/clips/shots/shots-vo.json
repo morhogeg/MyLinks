@@ -1,19 +1,18 @@
 [
  {
   "frame": 3,
-  "text": "Same screenshots: your camera roll, versus Makeena.",
+  "text": "My screenshots, before and after Makeena.",
   "words": [
    0.03,
-   0.251,
-   0.825,
-   1.146,
-   1.455,
-   1.82,
-   2.249
+   0.173,
+   0.93,
+   1.326,
+   1.552,
+   1.981
   ]
  },
  {
-  "frame": 99,
+  "frame": 92,
   "text": "Before: 2,847 screenshots.",
   "words": [
    0.03,
@@ -22,7 +21,7 @@
   ]
  },
  {
-  "frame": 197,
+  "frame": 190,
   "text": "No idea why I took most of them.",
   "words": [
    0.05,
@@ -36,42 +35,47 @@
   ]
  },
  {
-  "frame": 266,
-  "text": "After: share each screenshot to Makeena.",
+  "frame": 269,
+  "text": "So I started sharing them to Makeena.",
   "words": [
    0.05,
-   0.364,
-   0.903,
+   0.185,
+   0.275,
+   0.635,
+   0.995,
+   1.22,
+   1.355
+  ]
+ },
+ {
+  "frame": 333,
+  "text": "After: each one is analyzed, categorized, summarized and tagged.",
+  "words": [
+   0.05,
+   0.393,
+   0.838,
+   1.033,
+   1.33,
+   1.98,
+   3.02,
+   3.656,
+   3.887
+  ]
+ },
+ {
+  "frame": 481,
+  "text": "Now I find any of them in my own words.",
+  "words": [
+   0.03,
+   0.274,
+   0.396,
+   0.701,
+   0.945,
    1.128,
-   1.621,
-   1.756
-  ]
- },
- {
-  "frame": 342,
-  "text": "Each one is analyzed, categorized, summarized and tagged.",
-  "words": [
-   0.07,
-   0.378,
-   0.624,
-   0.809,
-   1.424,
-   2.224,
-   2.901,
-   3.148
-  ]
- },
- {
-  "frame": 462,
-  "text": "Find it again in your own words.",
-  "words": [
-   0.02,
-   0.244,
-   0.379,
-   0.648,
-   0.782,
-   1.007,
-   1.186
+   1.433,
+   1.616,
+   1.799,
+   2.043
   ]
  }
 ]

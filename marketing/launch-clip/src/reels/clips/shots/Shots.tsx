@@ -410,11 +410,14 @@ export const Shots: React.FC<{ withAudio?: boolean; withCaptions?: boolean; endi
       {/* the app: the feed, out of the mark's point */}
       {inFeed && (
         <AppShot take={TAKE} i={feedFrame(f)} cam={feedCam(f)} iris={iris < 1 ? { x: IRIS_AT.x, y: IRIS_AT.y, r: 500 * iris } : null} motion={{ x: 0, y: ds }}>
-          {/* the parts: each Lift mounted from the frame the feed comes to
-              rest (a frame that changes anyway) until the cut, never on a
-              still one; the ring and a small rise in on its word */}
+          {/* the parts: each Lift mounted on the frame its own ring starts
+              (a frame that changes anyway; round 5: mounted earlier, even at
+              rest its hairline shadow outlined every part before it was
+              named), and kept until the cut; the ring and a small rise in on
+              its word, a faint lift left on what has been named */}
           {f >= HITS.cards + 22 &&
             PARTS.map(([rect, radius], k) => {
+              if (f < HITS.parts[k] + 1) return null;
               const r = partRing(k, f);
               return (
                 <React.Fragment key={k}>

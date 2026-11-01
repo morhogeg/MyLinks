@@ -10,8 +10,8 @@
  *    quiet pulse; the roll's flick is a ratchet of soft ticks that speeds up
  *    and slows down with the scroll itself, and stops on a low note where
  *    the flick lands; a tick on the tap, air on each swipe;
- *  - AFTER: the groove drops on "After:" (kick, sub, the pulse in 8ths,
- *    hats), on a bright I; a tick on each Share and a rising bell as each
+ *  - the hinge ("So I started sharing them to Machina."): the groove drops
+ *    (kick, sub, the pulse in 8ths, hats), on a bright I; a tick on each Share and a rising bell as each
  *    screenshot lands in the mark (the third lands on "Machina", so its bell
  *    waits until the word is said and rings into the iris);
  *  - the feed: the groove on, air as it reads down to each card;
@@ -48,7 +48,9 @@ const VOICINGS = {
   Cmaj7: { bass: 48, upper: [59, 64, 67, 71] },
   G6: { bass: 43, upper: [59, 62, 64, 69] },
 };
-/** where the narration turns: "After:" is the drop */
+/** where the story turns (round 5): the hinge, "So I started sharing them to
+ *  Machina." The groove drops on it (the name is still `AFTER`: from here on
+ *  it is the after) */
 const AFTER = CAPTIONS[3].at;
 const CHORDS = [
   [0, 'Am7'],

@@ -103,13 +103,42 @@ else ok(`the third share lands on "Machina" (frame ${HITS.land3}, said at ${name
 const cardLine = CAPTIONS[4];
 const cardVo = vo.find((x) => x.frame === cardLine.at);
 const VERBS = ['analyzed,', 'categorized,', 'summarized', 'tagged.'];
-const sayWords = cardLine.say.split(/\s+/);
+const sayWords = (cardLine.say ?? cardLine.text.replace(/\n/g, ' ')).split(/\s+/);
 const off = VERBS.map((w, k) => {
   const i = sayWords.indexOf(w);
   return HITS.parts[k] + 2 - (cardLine.at + Math.round(cardVo.words[i] * FPS));
 });
 if (off.some((d) => Math.abs(d) > 3)) fail(`the card's parts ring off their words by ${off.join(', ')} frames`);
 else ok(`the card's four parts ring on "analyzed", "categorized", "summarized", "tagged" (within ${Math.max(...off.map(Math.abs))} frames)`);
+
+// ── every row inside Meta's side margins (round 5) ─────────────────────
+// measured in the house face at the house sizes, the font EMBEDDED in the
+// page: loaded by file:// it silently fell back to another face and measured
+// a 1028px row as 893px (later-verify.mjs loads it that way too)
+{
+  const exe = ['/opt/pw-browsers/chromium-1243/chrome-linux64/chrome', '/opt/pw-browsers/chromium'].find((p) => fs.existsSync(p));
+  if (!exe) console.log('! rows not measured (no browser here)');
+  else {
+    const { chromium } = await import('playwright-core');
+    const b64 = fs.readFileSync(path.join(root, 'node_modules/geist/dist/fonts/geist-sans/Geist-Variable.woff2')).toString('base64');
+    const rows = CAPTIONS.flatMap((c) => c.text.split('\n').map((r) => ({ r, hook: c.place === 'hook' })));
+    const b = await chromium.launch({ executablePath: exe });
+    const page = await b.newPage();
+    await page.setContent(
+      `<style>@font-face{font-family:G;src:url(data:font/woff2;base64,${b64}) format('woff2');font-weight:100 900}span{font-family:G;white-space:nowrap}</style>` +
+        rows.map(({ r, hook }, i) => `<div><span id=r${i} style="font-size:${hook ? 96 : 60}px;font-weight:${hook ? 720 : 650};letter-spacing:${hook ? '-0.042em' : '-0.028em'}">${r}</span></div>`).join(''),
+    );
+    await page.evaluate(() => document.fonts.ready);
+    const loaded = await page.evaluate(() => document.fonts.check('650 60px G'));
+    const widths = [];
+    for (let i = 0; i < rows.length; i++) widths.push(await page.$eval(`#r${i}`, (e) => e.getBoundingClientRect().width));
+    await b.close();
+    const wide = rows.map((x, i) => [x.r, widths[i]]).filter(([, w]) => w > 950);
+    if (!loaded) fail('the house face did not load: rows not measured');
+    else if (wide.length) wide.forEach(([r, w]) => fail(`"${r}" is ${Math.round(w)}px wide (950 between Meta's side margins)`));
+    else ok(`every row inside Meta's margins: the widest ${Math.round(Math.max(...widths))}px of 950`);
+  }
+}
 
 // ── the mix ──────────────────────────────────────────────────────────────
 const wav = (rel) => {

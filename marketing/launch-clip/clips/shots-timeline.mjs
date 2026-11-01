@@ -49,11 +49,11 @@ export const BEAT = BEAT_FRAMES / FPS;
 /** Beat (quarter note, may be fractional) → frame. */
 export const beat = (n) => Math.round(n * BEAT_FRAMES);
 
-/** 44 beats, 22.0s: 34 beats of story, then the shared ending. (Round 2:
+/** 46 beats, 23.0s: 36 beats of story, then the shared ending. (Round 2:
  *  the voice is no longer sped up in assembly, the owner heard the stretch
- *  as metallic; round 3's card line names what Machina does, half a second
- *  longer. The natural takes need 15.1s) */
-export const TOTAL_FRAMES = beat(44);
+ *  as metallic; round 5's before-and-after script, cast for natural reads,
+ *  needs 16.2s of voice) */
+export const TOTAL_FRAMES = beat(46);
 export const TOTAL_SEC = TOTAL_FRAMES / FPS;
 /** the kit's Signature is the last SIGNATURE.frames frames (house rule) */
 export const SIGNATURE_AT = TOTAL_FRAMES - SIGNATURE.frames;
@@ -89,30 +89,30 @@ export const CAPTIONS_ALT = [
  * voice lines sit between them (CAPTIONS `at`).
  */
 export const HITS = {
-  hook: 0, // two screens: the roll on the left scrolling, Machina still on the right
-  grow: 95, // the roll's screen takes the frame; Machina's slides away; the flick begins
-  land: 165, // the flick comes to rest on the last row: the three, and "2,847 Screenshots"
-  tap: 196, // the first of them tapped open (no idea why)
-  swipe1: 220, // swiped to the next
-  swipe2: 243, // and the next
-  row: 264, // the three line up; the mark assembles under them
-  share1: 277, // each one's Share tapped…
-  share2: 292,
-  share3: 307,
-  land1: 289, // …and pulled into the mark (8th notes; the last on "Machina")
-  land2: 304,
-  land3: 319,
-  iris: 323, // the mark's point opens into the app: the newest card
-  cards: 340, // (round 3) the feed reads down past all three, to rest on the camera card
+  hook: 0, // the cover: BEFORE (the roll, scrolling) | AFTER (Machina, still)
+  grow: 88, // the roll's screen takes the frame; Machina's slides away; the flick begins
+  land: 158, // the flick comes to rest on the last row: the three, and "2,847 Screenshots"
+  tap: 189, // the first of them tapped open (no idea why)
+  swipe1: 213, // swiped to the next
+  swipe2: 236, // and the next
+  row: 248, // the three line up; the mark assembles under them
+  share1: 268, // each one's Share tapped…
+  share2: 283,
+  share3: 298,
+  land1: 280, // …and pulled into the mark, a beat apart; the last on "Machina"
+  land2: 295,
+  land3: 310,
+  iris: 314, // the mark's point opens into the app: the newest card
+  cards: 331, // the feed reads down past all three, to rest on the camera card
   // …whose parts ring as the line names them, each 2 frames ahead of its
   // word (the eye leads the ear): the screenshot "analyzed", the category
   // "categorized", the summary "summarized", the tags "tagged" (word starts
   // from the measured take, src/reels/clips/shots/shots-vo.json; verify
   // holds them to it)
-  parts: [364, 383, 407, 435],
-  find: 457, // CUT: Find: the field focuses (8 frames), the query typed under a rack focus
-  result: 477, // the one card it means (the app's own card-enter)
-  ring: 489, // its ink ring, once it has settled
+  parts: [371, 390, 422, 448],
+  find: 477, // CUT: Find: the field focuses (8 frames), the query typed under a rack focus
+  result: 497, // the one card it means (the app's own card-enter)
+  ring: 509, // its ink ring, once it has settled
   signature: SIGNATURE_AT,
 };
 
@@ -190,12 +190,14 @@ export const CAPTIONS = [
   // hinge between them, not labelled "After" (round 4's "After: share each
   // screenshot" put the label on a step). Every screen row = the voice's
   // words, except the cover, which drops "Machina" (the right screen wears
-  // the app's own wordmark). Rows measured in Geist at the house sizes: the
-  // widest, "categorized, summarized and tagged.", 893px of the 950 between
-  // Meta's side margins.
+  // the app's own wordmark), and the After line, which drops "each one is"
+  // (below). Rows measured in Geist at the house sizes, the font embedded in
+  // the page (loaded by file:// it silently fell back to another face and
+  // measured short): the widest, "After: analyzed, categorized,", is 780px
+  // of the 950 between Meta's side margins.
   {
     at: 3,
-    to: 96,
+    to: 88,
     place: 'hook',
     // the cover: the big line names the subject and the format; the labels
     // over the two screens (Shots.tsx) say which side is which
@@ -210,8 +212,8 @@ export const CAPTIONS = [
     maxPause: 0.2,
   },
   {
-    at: 99,
-    to: 193,
+    at: 92,
+    to: 186,
     cues: [0],
     text: 'Before: 2,847 screenshots.',
     style: 'Natural and conversational, wry and light, like owning up to a habit everyone has: "Before:" a light set-up, then the number read out plainly and a little ruefully, "screenshots" landing softly. Never dramatic.',
@@ -219,8 +221,8 @@ export const CAPTIONS = [
     maxPause: 0.22,
   },
   {
-    at: 197,
-    to: 262,
+    at: 190,
+    to: 255,
     cues: [0, 3],
     text: 'No idea why\nI took most of them.',
     style: 'Natural and conversational, amused at yourself, a small self-aware laugh in the voice without actually laughing; easy and light, no word stressed.',
@@ -228,41 +230,49 @@ export const CAPTIONS = [
     maxPause: 0.2,
   },
   {
-    at: 266,
-    to: 338,
+    at: 269,
+    to: 329,
     // the hinge: what I did. "Started sharing them" is true however they are
     // shared (several at once make ONE card, G3; the picture shows one share
     // per screenshot)
     cues: [0, 5],
     text: 'So I started sharing them\nto Machina.',
     // re-directed (run 86): run 85's two readings both moved ~38, under the
-    // approved band; "matter-of-fact" and "easy" read flat
+    // approved band ("matter-of-fact" and "easy" read flat); this reading
+    // moves 62.7 smoothed (LATER's approved lines 41 to 42), 1.78s
     style: 'Natural and conversational, with a little warmth and a smile, like telling a friend the simple thing you finally did: "So" bright and light, "I started sharing them" flowing, "to Machina" warm, like good news. Not an announcer, no word drawn out.',
     pace: PACE,
     maxPause: 0.2,
   },
   {
-    at: 342,
-    to: 458,
+    at: 333,
+    to: 477,
     // the after: a state, like the before. The verbs run top to bottom as
     // their parts sit on the card, and each one rings its part as it is said
     // (the screenshot, the category, the summary, the tags; HITS.parts). The
     // app's own steps for a screenshot are Scanning image / Reading text /
     // Understanding content / Organizing & tagging (web/lib/scanPhases.ts).
-    // Rows arrive on "After:" and "categorized"
-    cues: [0, 5],
-    text: 'After: each one is analyzed,\ncategorized, summarized and tagged.',
-    // cast (run 85): this reading moved 49.7 (range 12.4); the other 40.7
-    style: 'Natural and conversational, quietly pleased: "After:" a light turn, then an easy, even rhythm through the four words, each one light and clear, "and tagged" landing softly. Not a list read off a page, not an announcer.',
-    pace: 'Everyday conversational speed, about 180 words a minute; short natural beats at the commas, the whole line in one easy breath.',
+    // The screen drops "each one is" (round 3's approved layout): the
+    // voice's full row "categorized, summarized and tagged." is 1028px in
+    // Geist, past the 950 between Meta's margins. Rows arrive on "After:" and
+    // "summarized"
+    cues: [0, 6],
+    text: 'After: analyzed, categorized,\nsummarized and tagged.',
+    say: 'After: each one is analyzed, categorized, summarized and tagged.',
+    // cast (run 85) from two readings by pitch movement: this one moved 49.7
+    // (range 12.4 semitones); the other ("quietly pleased") 40.7 (9.0)
+    style: 'Warm and a little impressed, like telling a friend what changed: "After:" a light, bright turn, "each one is" easy and quick, then the four words with a gentle, satisfying rhythm, a small smile on "and tagged". Conversational, never a sales pitch.',
+    pace: 'Brisk everyday conversational speed, about 185 words a minute; only the briefest beats at the commas.',
     maxPause: 0.2,
   },
   {
-    at: 462,
-    to: 513,
+    at: 481,
+    to: 562,
     cues: [0, 6],
     text: 'Now I find any of them\nin my own words.',
-    // re-directed (run 86): "quietly satisfied" read flat (33)
+    // re-directed (run 86): "quietly satisfied" read flat (33); this reading
+    // is calmer than LATER's lines but livelier than round 4's accepted "Find
+    // it again in your own words." (21.9 against 14.5, smoothed), 2.47s
     style: 'Natural and conversational, with warmth and a little wonder, like pointing out something clever to a friend: "Now I find any of them" bright and light, "in my own words" landing with a smile, leaving space before the logo.',
     pace: 'Everyday conversational speed, about 175 words a minute; easy, never drawn out.',
     maxPause: 0.2,

@@ -2696,7 +2696,17 @@ exact-match, capped.
   "SAME SCREENSHOTS / Camera roll vs Machina.", voiced as one flowing
   sentence ("Same screenshots: your camera roll, versus Machina."), cast
   from three readings by measured pitch movement (the bare fragment with a
-  full stop was what read robotic).
+  full stop was what read robotic). **Round 5 (owner: "camera roll vs
+  Machina, then before and after: a whole mess"):** one spine, before and
+  after, first person: cover "My screenshots, before and after." with the
+  two screens labelled BEFORE / AFTER; "Before: 2,847 screenshots." / "No
+  idea why I took most of them." / "So I started sharing them to Machina." /
+  "After: analyzed, categorized, summarized and tagged." / "Now I find any of
+  them in my own words."; new lines cast by pitch movement against LATER's
+  approved lines, never sped up; posting captions rewritten to match. 23.0s.
+  Found on the way: the row-width check loaded Geist by file://, which fell
+  back to another face (a 1028px row measured 893px); `shots-verify.mjs` now
+  embeds it, `later-verify.mjs` still loads it the old way.
 - **2026-10-31 — INSTAGRAM REEL "LATER NEVER COMES", BUILT BUT FOR ITS
   PICTURE (branch `claude/instagram-reel-app-store-012mo2`, on the App Store
   preview's a35f6c1e; off `main` until the owner reviews the cut).** A 24.0s

@@ -1818,7 +1818,7 @@ and Signature over paper, and catches a single frame swapped in.
 ## SAME SCREENSHOTS (the before-and-after Reel, 2026-11-01)
 
 `MachinaShots` is the owner's F04 idea ("before and after: your
-screenshots"), refined: 22.0s, 1080 × 1920, narrated, music-led, on the
+screenshots"), refined: 23.0s, 1080 × 1920, narrated, music-led, on the
 house rules (branch `claude/reel-screenshots`, on LATER NEVER COMES'
 c8fdeb85; video work merges only after the owner reviews the cut).
 `MachinaShotsStore` is the launch-day footer, `MachinaShotsSilent` the
@@ -1828,15 +1828,15 @@ they are a pile you scroll past and open with no idea why you took them;
 shared to Machina, each becomes a card that says what it is, and you find
 it again in your own words.
 
-| Time | Picture | Caption = voice |
-|---|---|---|
-| 0:00 | The cover: two screens side by side, the camera roll (left, "2,847 items") scrolling steadily, Machina's feed (right) still, the three cards on it | **SAME SCREENSHOTS / Camera roll vs Machina.** (the house hook: kicker over big type; voice: "Same screenshots: your camera roll, versus Machina.") |
-| 0:03 | The roll's screen takes the frame, Machina's slides away; one long flick lands on the last row: the three, and "2,847 Screenshots" | Before: 2,847 screenshots. |
-| 0:06.5 | The first is tapped open (the roll pushed back) and swiped through: a used film camera, a Seneca quote, a pin on a map | No idea why / I took most of them. |
-| 0:09 | The three line up, the mark assembles under them; each one's Share is tapped and it is pulled into the mark (one share, one card), the third landing on "Machina" | After: share each screenshot / to Machina. |
-| 0:11 | The mark's point irises open into the real app on the newest card; the feed reads down past all three and rests on the camera card, whose parts ring one by one as they are named: its screenshot, its category, its summary, its tags | Analyzed, categorized, / summarized and tagged. (voice: "Each one is analyzed, categorized, summarized and tagged.") |
-| 0:15.2 | CUT to Find: "quote about overthinking" typed under a rack focus; the one card it means lands (no word shared), its ink ring | Find it again / in your own words. |
-| 0:17 | The kit's Signature, footer "Coming soon · mymachina.app" (launch day: "Now on the App Store · mymachina.app") | (the Signature's take) |
+| Time | Picture | On screen | Voice |
+|---|---|---|---|
+| 0:00 | The cover: two screens side by side, labelled **BEFORE** (the camera roll, "2,847 items", scrolling) and **AFTER** (Machina's feed, still) | **My screenshots, / before and after.** (the house hook, no kicker) | "My screenshots, before and after Machina." |
+| 0:03 | The roll's screen takes the frame, Machina's slides away; one long flick lands on the last row: the three, and "2,847 Screenshots" | Before: 2,847 screenshots. | same |
+| 0:06.3 | The first tapped open, the roll pushed back; swiped through: a used film camera, a Seneca quote, a pin on a map | No idea why / I took most of them. | same |
+| 0:08.3 | The three line up, the mark assembles under them; each one's Share tapped and pulled into the mark (one share, one card), the third landing on "Machina" | So I started sharing them / to Machina. | same |
+| 0:10.5 | The mark's point irises open into the real app; the feed reads down past all three and rests on the camera card, whose parts ring as they are named: its screenshot, its category, its summary, its tags | After: analyzed, categorized, / summarized and tagged. | "After: each one is analyzed, categorized, summarized and tagged." |
+| 0:15.9 | CUT to Find: "quote about overthinking" typed under a rack focus; the one card it means lands (no word shared), its ink ring | Now I find any of them / in my own words. | same |
+| 0:18 | The kit's Signature, footer "Coming soon · mymachina.app" (launch day: "Now on the App Store · mymachina.app") | (the Signature's) | (the Signature's take) |
 
 **What changed from the brief, and why.**
 - **No recipe** (owner, 2026-10-02: no recipe or cooking content): the
@@ -1930,12 +1930,43 @@ moves 59.5 (range 11.3 semitones) where the robotic one moved 36.1 (8.5);
 2.93s. The other two: "…two places: your camera roll, and Machina." ran
 3.83s; "…Camera roll, or Machina?" was as flat as before.
 
-**Measured (round 3).** `node audio/shots-verify.mjs`: bans clean on 26
+**Round 5 (owner: "the first half doesn't make sense: we say camera roll vs
+Machina, and then before and after. It's a whole mess").** It was: two
+framings at once (a side-by-side "vs" and a timeline), "After:" put on a step
+("share each screenshot") while "Before:" named a state, and the speaker
+changing from "I" to "your" to a command. Now one spine, **before and after**
+(the reel's own title, F04, and the order the picture already runs in), in
+the **first person** throughout. "Before:" and "After:" both name a state;
+the share is the hinge between them ("So I started sharing them to
+Machina."), true however they are shared. The cover labels the two screens
+BEFORE and AFTER under "My screenshots, before and after.", so it reads as a
+before-and-after with the sound off. Every row is the voice's words except
+the cover (drops "Machina": the right screen wears the wordmark) and the
+After line (drops "each one is": the full row is 1028px, past Meta's 950).
+
+Voice (runs 85 and 86): each new line voiced in two directions and cast by
+pitch movement against LATER NEVER COMES' six approved lines (movement 50 to
+65, range 9.4 to 18.5 semitones), never sped up: the hook 57.9 / 15.8 (its
+other reading came back flat, 26.6); the hinge re-directed after two flat
+readings and cast at 62.7 smoothed; the After line 49.7 / 12.4; the payoff
+calmer than LATER's lines but livelier than round 4's accepted "Find it again
+in your own words." (21.9 against 14.5, smoothed). Directions with "quietly",
+"matter-of-fact" or "easy" came back flat; "warmth", "a smile", "a little
+wonder" did not. 16.2s of voice; the cut is 23.0s.
+
+The row widths in this README's earlier rounds were measured with the font
+loaded by `file://`, which silently fell back to another face and measured
+short (a 1028px row as 893px); `shots-verify.mjs` now embeds the font and
+gates every row at 950px. `later-verify.mjs` loads it the old way, so its
+width check may be measuring the fallback too.
+
+**Measured (round 5).** `node audio/shots-verify.mjs`: bans clean on 26
 strings and on all 106 distinct texts of the 329 captured frames; Find
-shares no word with its card; every line inside its window; the third share
-lands on the spoken "Machina" (frame 319 both); the card's four parts ring
-on their words (within 1 frame); every line 8.6–20.2dB over the music in the
-speech band; the mix −14.03 LUFS, −1.26 dBTP. `node
+shares no word with its card; every line inside its window; every row inside
+Meta's margins (the widest 780px of 950); the third share lands on the
+spoken "Machina" (frame 310 both); the card's four parts ring on their words
+(within a frame); every line 13.6–23.7dB over the music in the speech band;
+the mix −14.02 LUFS, −1.26 dBTP. `node
 audio/house-verify.mjs shots` passes (the Signature take in the mix at 0.81).
 `scripts/frame-jumps.mjs` flags only frames that are meant: the hard cut to
 Find, on the beat, and the app swapping the feed for search as typing
@@ -1967,15 +1998,25 @@ In a cloud container the Chromium paths differ from the Mac's: pass
 `--browser-executable=/opt/pw-browsers/chromium_headless_shell-1243/chrome-headless-shell-linux64/chrome-headless-shell`
 to Remotion and `CAPTURE_CHROMIUM=/opt/pw-browsers/chromium-1243/chrome-linux64/chrome` to the capture.
 
-**Captions for posting** (the owner's, tightened; the link stays a
-placeholder until the listing is live):
+**Captions for posting** (round 5: the reel's own story, first line = its
+hook, which is all a feed shows before "more"; a question to invite comments;
+no emoji; the link stays a placeholder until the listing is live):
 
-- Instagram: "Same screenshots: camera roll vs Machina. In the camera roll
-  they're a pile. In Machina, each one is analyzed, categorized, summarized
-  and tagged, and you can find it again in your own words. Download on the
-  App Store: [App Store link] #screenshots #iphone #productivity"
-- TikTok: "Camera roll vs Machina. Same screenshots. Download on the App
-  Store: [App Store link] #screenshots #iphone #productivity"
+- Instagram:
+
+  > My screenshots, before and after Machina.
+  >
+  > Before: 2,847 of them, and no idea why I took most.
+  > After: each one analyzed, categorized, summarized and tagged. Now I find any of them in my own words.
+  >
+  > How many screenshots are in your camera roll right now?
+  >
+  > Download on the App Store: [App Store link]
+  > #screenshots #iphone #productivity
+
+- TikTok: "My screenshots, before and after Machina. How many are in your camera
+  roll? Download on the App Store: [App Store link] #screenshots #iphone
+  #productivity"
 
 ## Motion language
 
