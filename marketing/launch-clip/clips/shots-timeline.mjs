@@ -69,19 +69,32 @@ export const SIGNATURE_AT = TOTAL_FRAMES - SIGNATURE.frames;
 export const CAPTIONS_ALT = [
   {
     at: 3,
-    to: 95,
-    text: 'Same screenshots.\nCamera roll vs Machina.',
-    say: 'Same screenshots, two places: your camera roll, and Machina.',
-    style: 'Natural and conversational, like a friend showing you something on two phones: relaxed and warm, one easy sentence, a light lift on "Machina". Not performed, no word stressed or drawn out.',
-    pace: 'Everyday conversational speed, about 180 words a minute; short natural beats at the commas.',
+    to: 96,
+    text: 'My screenshots,\nbefore and after.',
+    say: 'My screenshots, before and after Machina.',
+    style: 'Casual and a little wry, like holding up your phone to a friend: "My screenshots" with a knowing smile, running straight on into "before and after Machina". Relaxed, nothing announced or drawn out.',
+    pace: 'Brisk everyday conversational speed, about 185 words a minute.',
   },
   {
-    at: 3,
-    to: 95,
-    text: 'Same screenshots.\nCamera roll vs Machina.',
-    say: 'Same screenshots. Camera roll, or Machina?',
-    style: 'Playful and conversational, like a friend asking you to pick: "Same screenshots" light and quick, running into the question, "Camera roll, or Machina?" a genuine, easy question with a little smile. No dramatic pause, nothing drawn out.',
+    at: 266,
+    to: 338,
+    text: 'So I started sharing them\nto Machina.',
+    style: 'Easy and matter-of-fact, the simple fix in a story told to a friend: one light, flowing line, a hint of a smile on "to Machina".',
     pace: 'Brisk everyday conversational speed, about 185 words a minute.',
+  },
+  {
+    at: 342,
+    to: 458,
+    text: 'After: each one is analyzed,\ncategorized, summarized and tagged.',
+    style: 'Natural and conversational, quietly pleased: "After:" a light turn, then an easy, even rhythm through the four words, each one light and clear, "and tagged" landing softly. Not a list read off a page, not an announcer.',
+    pace: 'Everyday conversational speed, about 180 words a minute; short natural beats at the commas, the whole line in one easy breath.',
+  },
+  {
+    at: 462,
+    to: 513,
+    text: 'Now I find any of them\nin my own words.',
+    style: 'Warm and a little delighted, like the happy ending of a story told to a friend: easy and light, a small smile on "in my own words".',
+    pace: 'Everyday conversational speed, about 175 words a minute; easy, never drawn out.',
   },
 ];
 
@@ -183,25 +196,30 @@ const TALK = 'Natural and conversational, like telling a friend about an app you
 const PACE = 'Everyday conversational speed, about 175 words a minute; short natural pauses at the commas, never drawn out, never rushed.';
 
 export const CAPTIONS = [
+  // ROUND 5 (owner: "the first half doesn't make sense: we say camera roll vs
+  // Machina, then before and after"). One spine now, BEFORE AND AFTER (the
+  // reel's own title, F04, and the order the picture already runs in: the
+  // roll, the share, the cards, Find), told in the first person throughout
+  // (the brief's most relatable line, "No idea why I took most of them", is
+  // first person). "Before:" and "After:" both name a STATE; the share is the
+  // hinge between them, not labelled "After" (round 4's "After: share each
+  // screenshot" put the label on a step). Every screen row = the voice's
+  // words, except the cover, which drops "Machina" (the right screen wears
+  // the app's own wordmark). Rows measured in Geist at the house sizes: the
+  // widest, "categorized, summarized and tagged.", 893px of the 950 between
+  // Meta's side margins.
   {
     at: 3,
     to: 96,
     place: 'hook',
-    // round 4 (owner: "two very different places" was not clear, and "Same
-    // screenshots." sounded robotic). The screen names the two screens in
-    // the order they sit, left to right: the kicker is the premise, the big
-    // line the comparison. The voice says it as one flowing sentence: the
-    // bare two-word fragment with a full stop is what came out robotic
+    // the cover: the big line names the subject and the format; the labels
+    // over the two screens (Shots.tsx) say which side is which
     cues: [0, 2],
-    text: 'Same screenshots.\nCamera roll vs Machina.',
-    say: 'Same screenshots: your camera roll, versus Machina.',
-    style: 'Natural and conversational, like holding up two phones side by side to show a friend: easy and light, one flowing sentence. "Same screenshots" as a casual lead-in that runs straight on, "your camera roll" plain, then "versus Machina" with a small, knowing smile. Never announced, no word drawn out.',
+    text: 'My screenshots,\nbefore and after.',
+    say: 'My screenshots, before and after Machina.',
+    style: 'Natural and conversational, like starting to tell a friend a little story about your own phone: easy and warm, one flowing sentence, a small smile on "before and after", "Machina" said lightly. Never announced, no word drawn out.',
     pace: 'Everyday conversational speed, about 180 words a minute; only a comma-length beat after "screenshots".',
-    // cast from three readings (round 4, narration-tts run 84) by measured
-    // pitch movement: this one's "Same screenshots" moves 59.5 (range 11.3
-    // semitones) where round 3's robotic take moved 36.1 (8.5); the line's
-    // range 12.9 semitones, LATER's approved hook 13.1. 2.93s
-    maxPause: 0.22,
+    maxPause: 0.2,
   },
   {
     at: 99,
@@ -224,40 +242,36 @@ export const CAPTIONS = [
   {
     at: 266,
     to: 338,
-    // round 2 (owner): "from any app" is off-topic in a reel about
-    // screenshots. "each", not "all": sharing several at once makes ONE card
-    // (G3), and the picture shows one share per screenshot
+    // the hinge: what I did. "Started sharing them" is true however they are
+    // shared (several at once make ONE card, G3; the picture shows one share
+    // per screenshot)
     cues: [0, 5],
-    text: 'After: share each screenshot\nto Machina.',
-    style: `${TALK} "After:" a light, natural turn, brighter than the line before; "each screenshot" easy and clear; "to Machina" warm.`,
+    text: 'So I started sharing them\nto Machina.',
+    style: 'Natural and conversational, the turn in a story told to a friend: a little brighter than the line before, "So" light and easy, "to Machina" warm. Not a pitch, no word stressed.',
     pace: PACE,
-    maxPause: 0.25,
+    maxPause: 0.2,
   },
   {
     at: 342,
     to: 458,
-    // round 3 (owner): say what Machina does to each one, not just "a card
-    // that says what it is". The app's own steps for a screenshot are
-    // Scanning image / Reading text / Understanding content / Organizing &
-    // tagging (web/lib/scanPhases.ts). The verbs run top to bottom as their
-    // parts sit on the card, and each one rings its part as it is said: the
-    // screenshot, the category, the summary, the tags. The screen drops
-    // "Each one is" (the picture carries it); rows arrive on "analyzed"
-    // and "summarized"
-    cues: [3, 5],
-    text: 'Analyzed, categorized,\nsummarized and tagged.',
-    say: 'Each one is analyzed, categorized, summarized and tagged.',
-    // cast from two takes (round 3): direction B, 3.66s and even (A ran 3.96s)
-    style: 'Warm and a little impressed, like telling a friend what the app just did for you: "Each one is" easy and quick, then the four words with a gentle, satisfying rhythm, a small smile on "and tagged". Conversational, never a sales pitch.',
+    // the after: a state, like the before. The verbs run top to bottom as
+    // their parts sit on the card, and each one rings its part as it is said
+    // (the screenshot, the category, the summary, the tags; HITS.parts). The
+    // app's own steps for a screenshot are Scanning image / Reading text /
+    // Understanding content / Organizing & tagging (web/lib/scanPhases.ts).
+    // Rows arrive on "After:" and "categorized"
+    cues: [0, 5],
+    text: 'After: each one is analyzed,\ncategorized, summarized and tagged.',
+    style: 'Warm and a little impressed, like telling a friend what changed: "After:" a light, bright turn, "each one is" easy and quick, then the four words with a gentle, satisfying rhythm, a small smile on "and tagged". Conversational, never a sales pitch.',
     pace: 'Brisk everyday conversational speed, about 185 words a minute; only the briefest beats at the commas.',
     maxPause: 0.2,
   },
   {
     at: 462,
     to: 513,
-    cues: [0, 3],
-    text: 'Find it again\nin your own words.',
-    style: `${TALK} Easy and warm; "in your own words" landing softly, leaving space before the logo.`,
+    cues: [0, 6],
+    text: 'Now I find any of them\nin my own words.',
+    style: 'Natural and conversational, quietly satisfied, the end of the little story: easy and warm, "in my own words" landing softly, leaving space before the logo.',
     pace: 'Everyday conversational speed, about 170 words a minute; easy, never drawn out.',
     maxPause: 0.2,
   },
