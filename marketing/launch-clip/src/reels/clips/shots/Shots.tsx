@@ -11,7 +11,7 @@ import { HookTitle } from '../../kit/Hook';
 import { Lens, Paper } from '../../kit/Paper';
 import { Signature } from '../../kit/Signature';
 import { addTakes, type Rect } from '../../kit/takes';
-import { TOKENS } from '../../kit/tokens';
+import { TOKENS, uiText } from '../../kit/tokens';
 import { HEAD_LEAD, KineticLine } from '../../kit/Type';
 import { MAX_Y, Roll, heroIndex, tileRect } from './Roll';
 import { HeroImg, SHOT, type HeroId } from './Screens';
@@ -75,6 +75,21 @@ const Slab: React.FC<{ place: Place; children: React.ReactNode; opacity?: number
       }}
     >
       <div style={{ width: SHOT.w, height: SHOT.h, transform: `scale(${z.toFixed(4)})`, transformOrigin: '0 0', position: 'relative' }}>{children}</div>
+    </div>
+  );
+};
+
+/** (round 5) the cover's labels: BEFORE over the camera roll, AFTER over
+ *  Machina, centred over each screen just above its top edge, in the kit's
+ *  chapter-label manner (uppercase, letterspaced). On from frame 0 (the
+ *  cover); they leave as the roll takes the frame, AFTER with its screen */
+const ScreenLabel: React.FC<{ text: string; place: Place; dx: number; opacity: number }> = ({ text, place, dx, opacity }) => {
+  if (opacity <= 0) return null;
+  const top = place.fy - (SHOT.h / 2) * place.z - 62;
+  return (
+    <div style={{ position: 'absolute', left: 0, top, width: 1080, transform: `translateX(${Math.round(place.fx - 540 + dx)}px)`, display: 'flex', justifyContent: 'center', opacity }}>
+      {/* the trailing tracking balanced on the left, so the word sits centred */}
+      <div style={{ ...uiText(32, 700), letterSpacing: '0.32em', paddingLeft: '0.32em', textTransform: 'uppercase', lineHeight: 1 }}>{text}</div>
     </div>
   );
 };
@@ -282,11 +297,9 @@ const Lines: React.FC<{ f: number }> = ({ f }) => (
         return line.split(' ').map(() => s);
       });
       if (c.place === 'hook') {
-        // the cover: the whole hook on screen from frame 0, the kicker over
-        // the big line, broken where it reads ("Two very / different places.")
-        const [kicker, big] = lines;
-        const words = big.split(' ');
-        return <HookTitle key={c.at} kicker={kicker.replace(/\.$/, '')} lines={[words.slice(0, 2).join(' '), words.slice(2).join(' ')]} frame={f} to={c.to} />;
+        // the cover (round 5): two big rows, no kicker ("My screenshots, /
+        // before and after."); the labels over the screens map the sides
+        return <HookTitle key={c.at} lines={lines} frame={f} to={c.to} />;
       }
       return (
         <div key={c.at} style={{ position: 'absolute', left: 0, right: 0, top: HOUSE_BAND.top, display: 'flex', justifyContent: 'center' }}>
@@ -345,6 +358,10 @@ export const Shots: React.FC<{ withAudio?: boolean; withCaptions?: boolean; endi
   return (
     <AbsoluteFill style={{ background: TOKENS.paper }}>
       <Paper drift={f / 900} />
+
+      {/* the cover's labels: which side is which */}
+      <ScreenLabel text="Before" place={HOOK_LEFT} dx={0} opacity={1 - prog(f, HITS.grow - 4, HITS.grow + 6, EASE_IN_OUT)} />
+      <ScreenLabel text="After" place={HOOK_RIGHT} dx={700 * away} opacity={1 - prog(f, HITS.grow - 4, HITS.grow + 6, EASE_IN_OUT)} />
 
       {/* the hook's right screen: Machina, still */}
       {f < HITS.grow + 15 && (

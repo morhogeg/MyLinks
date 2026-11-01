@@ -68,33 +68,18 @@ export const SIGNATURE_AT = TOTAL_FRAMES - SIGNATURE.frames;
  */
 export const CAPTIONS_ALT = [
   {
-    at: 3,
-    to: 96,
-    text: 'My screenshots,\nbefore and after.',
-    say: 'My screenshots, before and after Machina.',
-    style: 'Casual and a little wry, like holding up your phone to a friend: "My screenshots" with a knowing smile, running straight on into "before and after Machina". Relaxed, nothing announced or drawn out.',
-    pace: 'Brisk everyday conversational speed, about 185 words a minute.',
-  },
-  {
     at: 266,
     to: 338,
     text: 'So I started sharing them\nto Machina.',
-    style: 'Easy and matter-of-fact, the simple fix in a story told to a friend: one light, flowing line, a hint of a smile on "to Machina".',
-    pace: 'Brisk everyday conversational speed, about 185 words a minute.',
-  },
-  {
-    at: 342,
-    to: 458,
-    text: 'After: each one is analyzed,\ncategorized, summarized and tagged.',
-    style: 'Natural and conversational, quietly pleased: "After:" a light turn, then an easy, even rhythm through the four words, each one light and clear, "and tagged" landing softly. Not a list read off a page, not an announcer.',
-    pace: 'Everyday conversational speed, about 180 words a minute; short natural beats at the commas, the whole line in one easy breath.',
+    style: 'Warm and playful, like admitting a small life hack to a friend: a little lift on "started", a smile on "to Machina". Conversational and light.',
+    pace: 'Everyday conversational speed, about 180 words a minute.',
   },
   {
     at: 462,
     to: 513,
     text: 'Now I find any of them\nin my own words.',
-    style: 'Warm and a little delighted, like the happy ending of a story told to a friend: easy and light, a small smile on "in my own words".',
-    pace: 'Everyday conversational speed, about 175 words a minute; easy, never drawn out.',
+    style: 'Delighted and warm, the happy ending of a story told to a friend: a lift on "any of them", a smile on "in my own words". Light, never performed.',
+    pace: 'Everyday conversational speed, about 180 words a minute.',
   },
 ];
 
@@ -217,8 +202,11 @@ export const CAPTIONS = [
     cues: [0, 2],
     text: 'My screenshots,\nbefore and after.',
     say: 'My screenshots, before and after Machina.',
-    style: 'Natural and conversational, like starting to tell a friend a little story about your own phone: easy and warm, one flowing sentence, a small smile on "before and after", "Machina" said lightly. Never announced, no word drawn out.',
-    pace: 'Everyday conversational speed, about 180 words a minute; only a comma-length beat after "screenshots".',
+    // cast (run 85) from two readings by pitch movement, against LATER NEVER
+    // COMES' six approved lines (movement 50 to 65, range 9.4 to 18.5
+    // semitones): this one 57.9 / 15.8; the other came back flat (26.6)
+    style: 'Casual and a little wry, like holding up your phone to a friend: "My screenshots" with a knowing smile, running straight on into "before and after Machina". Relaxed, nothing announced or drawn out.',
+    pace: 'Brisk everyday conversational speed, about 185 words a minute.',
     maxPause: 0.2,
   },
   {
@@ -247,7 +235,9 @@ export const CAPTIONS = [
     // per screenshot)
     cues: [0, 5],
     text: 'So I started sharing them\nto Machina.',
-    style: 'Natural and conversational, the turn in a story told to a friend: a little brighter than the line before, "So" light and easy, "to Machina" warm. Not a pitch, no word stressed.',
+    // re-directed (run 86): run 85's two readings both moved ~38, under the
+    // approved band; "matter-of-fact" and "easy" read flat
+    style: 'Natural and conversational, with a little warmth and a smile, like telling a friend the simple thing you finally did: "So" bright and light, "I started sharing them" flowing, "to Machina" warm, like good news. Not an announcer, no word drawn out.',
     pace: PACE,
     maxPause: 0.2,
   },
@@ -262,8 +252,9 @@ export const CAPTIONS = [
     // Rows arrive on "After:" and "categorized"
     cues: [0, 5],
     text: 'After: each one is analyzed,\ncategorized, summarized and tagged.',
-    style: 'Warm and a little impressed, like telling a friend what changed: "After:" a light, bright turn, "each one is" easy and quick, then the four words with a gentle, satisfying rhythm, a small smile on "and tagged". Conversational, never a sales pitch.',
-    pace: 'Brisk everyday conversational speed, about 185 words a minute; only the briefest beats at the commas.',
+    // cast (run 85): this reading moved 49.7 (range 12.4); the other 40.7
+    style: 'Natural and conversational, quietly pleased: "After:" a light turn, then an easy, even rhythm through the four words, each one light and clear, "and tagged" landing softly. Not a list read off a page, not an announcer.',
+    pace: 'Everyday conversational speed, about 180 words a minute; short natural beats at the commas, the whole line in one easy breath.',
     maxPause: 0.2,
   },
   {
@@ -271,8 +262,9 @@ export const CAPTIONS = [
     to: 513,
     cues: [0, 6],
     text: 'Now I find any of them\nin my own words.',
-    style: 'Natural and conversational, quietly satisfied, the end of the little story: easy and warm, "in my own words" landing softly, leaving space before the logo.',
-    pace: 'Everyday conversational speed, about 170 words a minute; easy, never drawn out.',
+    // re-directed (run 86): "quietly satisfied" read flat (33)
+    style: 'Natural and conversational, with warmth and a little wonder, like pointing out something clever to a friend: "Now I find any of them" bright and light, "in my own words" landing with a smile, leaving space before the logo.',
+    pace: 'Everyday conversational speed, about 175 words a minute; easy, never drawn out.',
     maxPause: 0.2,
   },
 ];
