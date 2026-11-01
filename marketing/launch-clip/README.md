@@ -1832,9 +1832,9 @@ it again in your own words.
 |---|---|---|---|
 | 0:00 | The cover: two screens side by side, labelled **BEFORE** (the camera roll, "2,847 items", scrolling) and **AFTER** (Machina's feed, still) | **My screenshots, / before and after.** (the house hook, no kicker) | "My screenshots, before and after Machina." |
 | 0:03 | The roll's screen takes the frame, Machina's slides away; one long flick lands on the last row: the three, and "2,847 Screenshots" | Before: 2,847 screenshots. | same |
-| 0:06.3 | The first tapped open, the roll pushed back; swiped through: a used film camera, a Seneca quote, a pin on a map | No idea why / I took most of them. | same |
-| 0:08.3 | The three line up, the mark assembles under them; each one's Share tapped and pulled into the mark (one share, one card), the third landing on "Machina" | So I started sharing them / to Machina. | same |
-| 0:10.5 | The mark's point irises open into the real app; the feed reads down past all three and rests on the camera card, whose parts ring as they are named: its title (round 6: was the strip of screenshot in its banner), its category, its summary, its tags | After: analyzed, categorized, / summarized and tagged. | "After: each one is analyzed, categorized, summarized and tagged." |
+| 0:06.3 | The newest tapped open, the roll pushed back, and swiped back through as Photos does: a pin on a map, a Seneca quote, a used film camera | No idea why / I took most of them. | same |
+| 0:08.4 | (round 7) The camera screenshot shrinks to share size and Machina's real app icon rises under it, named; a finger taps the icon and the screenshot flies in, then the other two, each sliding back in from the right once the one before has landed (one share, one card); the second lands on "Machina" | So I started sharing them / to Machina. | same |
+| 0:10.9 | The icon opens into the real app, as a tapped icon does; the feed reads down past all three and rests on the camera card, whose parts ring as they are named: its title (round 6: was the strip of screenshot in its banner), its category, its summary, its tags | After: analyzed, categorized, / summarized and tagged. | "After: each one is analyzed, categorized, summarized and tagged." |
 | 0:15.9 | CUT to Find: the field focuses and waits under a rack focus; "quote about overthinking" types itself on "I just describe it"; the one card it means lands (no word shared), its ink ring | When I need one, / I just describe it. | same |
 | 0:18.3 | On "Now", the view pulls back into the cover's pair: BEFORE, the camera roll at its last row (the same three screenshots, "2,847 Screenshots"); AFTER, the card it found | **Now every screenshot / makes sense.** (a touch heavier: the statement) | same |
 | 0:20 | The kit's Signature, footer "Coming soon · mymachina.app" (launch day: "Now on the App Store · mymachina.app") | (the Signature's) | (the Signature's take) |
@@ -1979,12 +1979,37 @@ right as a card. Both lines cast from two readings (run 87) by pitch
 movement: 47.8 and 61.7 (the close's other reading came back flat, 33.3).
 25.0s; gates hold the typing to "describe" and the pull-back to "Now".
 
-**Measured (round 6).** `node audio/shots-verify.mjs`: bans clean on 28
+**Round 7 (owner: the cut on "So I started sharing them to Machina" was
+abrupt and unclear; too much height to the captions, not enough to the
+app).** The share asked the viewer to decode three new things at once (the
+screenshots lining up in a row, a share button on each, an unnamed mark as
+the destination). It is now the gesture everyone knows: the screenshot in
+the viewer shrinks, Machina's real app icon rises under it with its name
+(`public/clips/shots/app-icon.png`, from web/ios's AppIcon: a brand asset,
+not a rebuilt share sheet), a finger taps the icon and the screenshot flies
+in, and the icon bounces with a ring; slowly once, then twice more, each
+next one entering only after the one before has landed. The icon then opens
+into the app, as a tapped icon does (the iris now opens out of it). To keep
+the share order the feed shows (the viewpoint newest), the viewer opens on
+the newest and swipes back through the older ones, as Photos does, ending
+on the camera, which is shared first. The landing on the spoken "Machina"
+gets a low hit, not a bell.
+
+Height: the house band's type is unchanged (top 268, 60px; two rows end at
+410), but its paper scrim faded to clear between 410 and 550, and those 140
+pixels hid app where no caption sits. This reel clears it by 470
+(`BAND = { ...HOUSE_BAND, clear: 470 }`, local, so the other videos stay as
+rendered; proposed for the house band), and the app is framed higher and
+about 12% larger: the feed and Find at 2.35px a point (were 2.1 and 2.3),
+the card's top at 478 and its tags still above Meta's bottom 35%; the
+opened screenshot at 1.9 (was 1.75), from 486 (was 598).
+
+**Measured (round 7).** `node audio/shots-verify.mjs`: bans clean on 28
 strings and on all 106 distinct texts of the 329 captured frames; Find
 shares no word with its card; every line inside its window; every row inside
 Meta's margins (the widest 780px of 950, the statement measured at its
-heavier weight); the third share lands on the spoken "Machina" (frame 310
-both); the card's four parts ring on their words (within a frame); the
+heavier weight); a share lands in the icon on the spoken "Machina" (the
+second, frame 310 both); the card's four parts ring on their words (within a frame); the
 query types on "describe" and the close pulls back on "Now"; every line
 14.4–24.6dB over the music in the speech band; the mix −14.01 LUFS,
 −1.22 dBTP. `node

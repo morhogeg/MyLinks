@@ -1,9 +1,7 @@
 import React from 'react';
-import { AbsoluteFill, Audio, staticFile, useCurrentFrame } from 'remotion';
-import { Share } from 'lucide-react';
+import { AbsoluteFill, Audio, Img, staticFile, useCurrentFrame } from 'remotion';
 import { CAPTIONS, ENDINGS, FPS, HITS, SIGNATURE_AT, rollAt } from '../../../../clips/shots-timeline.mjs';
 import { AppShot, Lift, Ping, SCREEN_RADIUS, Tap } from '../../kit/AppShot';
-import { MarkAssembly } from '../../kit/Brand';
 import type { Cam } from '../../kit/camera';
 import { BandScrim, HOUSE_BAND } from '../../kit/Captions';
 import { EASE_GATHER, EASE_IN_OUT, EASE_MODAL, EASE_SPRING, mix, prog } from '../../kit/curves';
@@ -39,6 +37,12 @@ addTakes(TAKES_JSON);
  */
 
 type Ending = keyof typeof ENDINGS;
+/** (round 7, owner: "too much vertical space to the captions, not enough to
+ *  the app") the house band's type, unchanged (top 268, 60px), over a paper
+ *  scrim that clears by 470 instead of 550: its 140px fade to clear hid app
+ *  where no caption ever sits (two rows end at 410). Proposed for the house
+ *  band; set here for this reel only, so the other videos stay as rendered */
+const BAND = { ...HOUSE_BAND, clear: 470 };
 const TAKE = 'clips/shots/app';
 const HEROES: HeroId[] = ['camera', 'seneca', 'viewpoint'];
 
@@ -111,15 +115,15 @@ const rollY = (f: number) => rollAt(f, MAX_Y);
 
 /** ── the opened screenshot: a viewer, swiped through ─────────────────── */
 
-/** the viewer's box (frame px): the screenshot as a slab under the band */
-const VIEW_Z = 1.75;
-const VIEW = { w: SHOT.w * VIEW_Z, h: SHOT.h * VIEW_Z, x: 540 - (SHOT.w * VIEW_Z) / 2, y: 598 };
+/** the viewer's box (frame px): the screenshot as a slab under the band
+ *  (round 7: higher and larger, the caption fade now ends at 470) */
+const VIEW_Z = 1.9;
+const VIEW = { w: SHOT.w * VIEW_Z, h: SHOT.h * VIEW_Z, x: 540 - (SHOT.w * VIEW_Z) / 2, y: 486 };
 const VIEW_GAP = 240; // the next one wholly out of frame until it is swiped in
-/** the row the three line up in for the share */
-const ROW_Z = 0.62; // (round 2) larger: each screenshot still reads as itself in the row
-const ROW = { w: SHOT.w * ROW_Z, h: SHOT.h * ROW_Z, y: 568, xs: [236, 540, 844] };
-/** where the mark sits under the row: the point every share is pulled into */
-const MARK = { x: 540, y: 1196, w: 160 };
+/** (round 7) the share: the screenshot at share size, Machina's app icon under it */
+const SHARE_Z = 0.66;
+const SHARE_BOX = { w: SHOT.w * SHARE_Z, h: SHOT.h * SHARE_Z, x: 540 - (SHOT.w * SHARE_Z) / 2, y: 474, r: SCREEN_RADIUS * SHARE_Z };
+const ICON = { x: 540, y: 1128, size: 136 };
 
 type Box = { x: number; y: number; w: number; h: number; r: number };
 const lerpBox = (a: Box, b: Box, t: number): Box => ({ x: mix(a.x, b.x, t), y: mix(a.y, b.y, t), w: mix(a.w, b.w, t), h: mix(a.h, b.h, t), r: mix(a.r, b.r, t) });
@@ -132,32 +136,48 @@ const tileBox = (k: number): Box => {
 };
 /** how far the viewer has been swiped (0: the first, 2: the third) */
 const swiped = (f: number) => prog(f, HITS.swipe1, HITS.swipe1 + 10, EASE_IN_OUT) + prog(f, HITS.swipe2, HITS.swipe2 + 10, EASE_IN_OUT);
-const viewBox = (k: number, f: number): Box => ({ ...VIEW, x: VIEW.x + (k - swiped(f)) * (VIEW.w + VIEW_GAP), r: SCREEN_RADIUS * VIEW_Z });
-const rowBox = (k: number): Box => ({ x: ROW.xs[k] - ROW.w / 2, y: ROW.y, w: ROW.w, h: ROW.h, r: SCREEN_RADIUS * ROW_Z });
+/** (round 7) the order they are seen in: Photos opens on the newest (the
+ *  viewpoint, the last tile) and a swipe to the right goes back in time
+ *  (seneca, then the camera), so the older ones wait to the LEFT. The
+ *  viewer ends on the camera, the oldest: it is shared first, so the feed's
+ *  newest card is the viewpoint, as the capture has it */
+const OPEN_ORDER = [2, 1, 0];
+const orderOf = (k: number) => OPEN_ORDER.indexOf(k);
+const viewBox = (k: number, f: number): Box => ({ ...VIEW, x: VIEW.x - (orderOf(k) - swiped(f)) * (VIEW.w + VIEW_GAP), r: SCREEN_RADIUS * VIEW_Z });
 
-/** each share: the tap on its Share button, then the pull into the mark */
-const SHARE = [
-  { tap: HITS.share1, land: HITS.land1 },
-  { tap: HITS.share2, land: HITS.land2 },
-  { tap: HITS.share3, land: HITS.land3 },
+/** each share, in the order they reach the feed: the camera (on screen in
+ *  the viewer, it shrinks to share size), then seneca and the viewpoint, each
+ *  sliding back in from the right where the viewer left them; a tap on the
+ *  icon, then the flight into it */
+const SHARES = [
+  { k: 0, enter: -1, tap: HITS.share1, land: HITS.land1 },
+  // each enters only as the one before lands (entering under a flight read
+  // as two screenshots in a heap)
+  { k: 1, enter: HITS.land1, tap: HITS.share2, land: HITS.land2 },
+  { k: 2, enter: HITS.land2 - 3, tap: HITS.share3, land: HITS.land3 },
 ];
 const TAP_LEAD = 4; // the pad lands 35% into the Tap's 12 frames
 
-/** a screenshot's box at frame f, from tile → viewer → row → the mark */
+/** a screenshot's box at frame f: tile → viewer → share size → into the icon */
 const heroBox = (k: number, f: number): Box | null => {
-  const open = prog(f, HITS.tap, HITS.tap + 12, EASE_MODAL);
-  const toRow = prog(f, HITS.row, HITS.row + 16, EASE_MODAL);
-  // in the viewer: the first opens out of its tile; the others are beside it
   if (f < HITS.tap) return null;
-  let b = k === 0 ? lerpBox(tileBox(0), viewBox(0, f), open) : viewBox(k, f);
-  b = lerpBox(b, rowBox(k), toRow);
-  const s = SHARE[k];
-  const pull = prog(f, s.tap + 2, s.land, EASE_GATHER);
+  const open = prog(f, HITS.tap, HITS.tap + 12, EASE_MODAL);
+  const first = OPEN_ORDER[0];
+  let b = k === first ? lerpBox(tileBox(first), viewBox(first, f), open) : viewBox(k, f);
+  const sh = SHARES.find((x) => x.k === k)!;
+  if (f >= HITS.target) {
+    if (sh.enter < 0) b = lerpBox(b, SHARE_BOX, prog(f, HITS.target, HITS.target + 16, EASE_MODAL));
+    else {
+      const enter = prog(f, sh.enter, sh.enter + 9, EASE_MODAL);
+      b = { ...SHARE_BOX, x: SHARE_BOX.x + (1 - enter) * 760 };
+    }
+  }
+  const pull = prog(f, sh.tap + 2, sh.land, EASE_GATHER);
   if (pull >= 1) return null;
   if (pull > 0) {
-    const cx = mix(b.x + b.w / 2, MARK.x, pull);
-    const cy = mix(b.y + b.h / 2, MARK.y, pull);
-    const k2 = 1 - 0.94 * pull;
+    const cx = mix(b.x + b.w / 2, ICON.x, pull);
+    const cy = mix(b.y + b.h / 2, ICON.y, pull);
+    const k2 = 1 - 0.9 * pull;
     b = { x: cx - (b.w * k2) / 2, y: cy - (b.h * k2) / 2, w: b.w * k2, h: b.h * k2, r: b.r * k2 };
   }
   return b;
@@ -198,45 +218,52 @@ const Opened: React.FC<{ id: HeroId; box: Box; opacity?: number; blurX?: number;
   );
 };
 
-/** the Share button each screenshot shows in the row (a gesture, not iOS's sheet) */
-const ShareButton: React.FC<{ k: number; f: number }> = ({ k, f }) => {
-  const box = heroBox(k, f);
-  if (!box) return null;
-  const pop = EASE_SPRING(prog(f, HITS.row + 10 + 3 * k, HITS.row + 18 + 3 * k, (t) => t));
-  const pull = prog(f, SHARE[k].tap + 2, SHARE[k].land, EASE_GATHER);
-  const press = 1 - 0.12 * Math.sin(Math.PI * prog(f, SHARE[k].tap - TAP_LEAD, SHARE[k].tap + 4, (t) => t));
-  const size = 76 * (1 - 0.94 * pull);
-  const cx = box.x + box.w / 2;
-  const cy = box.y + box.h - 6 * (1 - pull);
-  if (pop <= 0) return null;
+/** (round 7) Machina's app icon, the real one (web/ios AppIcon, 1024 →
+ *  public/clips/shots/app-icon.png), with its name under it, as a share
+ *  target: it rises under the screenshot, presses under each tap, bounces as
+ *  each screenshot lands in it, and opens into the app (it grows and goes as
+ *  the iris opens out of it). A brand asset, not a rebuilt share sheet */
+const AppIcon: React.FC<{ f: number }> = ({ f }) => {
+  const rise = EASE_SPRING(prog(f, HITS.target + 4, HITS.target + 20, (t) => t));
+  if (rise <= 0) return null;
+  const landed = SHARES.map((x) => x.land).filter((l) => l <= f).pop();
+  const bounce = landed === undefined ? 0 : 0.09 * Math.exp(-(f - landed) / 3.5) * Math.cos((f - landed) * 0.9);
+  const press = SHARES.reduce((p, x) => p * (1 - 0.06 * Math.sin(Math.PI * prog(f, x.tap - TAP_LEAD, x.tap + 3, (t) => t))), 1);
+  const out = prog(f, HITS.iris, HITS.iris + 8, EASE_IN_OUT);
+  const scale = (0.7 + 0.3 * rise) * (1 + bounce) * press * (1 + 0.3 * out);
+  const y = ICON.y + (1 - Math.min(1, rise)) * 150;
+  const opacity = Math.min(1, rise * 1.6) * (1 - out);
   return (
-    <div
-      style={{
-        position: 'absolute',
-        left: cx - size / 2,
-        top: cy - size / 2,
-        width: size,
-        height: size,
-        borderRadius: size,
-        background: TOKENS.card,
-        boxShadow: TOKENS.shadowSoft,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        color: TOKENS.ink,
-        transform: `scale(${(pop * press).toFixed(3)})`,
-        opacity: 1 - prog(f, SHARE[k].land - 3, SHARE[k].land, (t) => t),
-      }}
-    >
-      <Share size={size * 0.42} strokeWidth={2.2} />
-    </div>
+    <>
+      <div
+        style={{
+          position: 'absolute',
+          left: ICON.x - ICON.size / 2,
+          top: y - ICON.size / 2,
+          width: ICON.size,
+          height: ICON.size,
+          borderRadius: '22.5%',
+          overflow: 'hidden',
+          boxShadow: TOKENS.shadow,
+          transform: `scale(${scale.toFixed(4)})`,
+          opacity,
+        }}
+      >
+        <Img src={staticFile('clips/shots/app-icon.png')} style={{ width: '100%', height: '100%', display: 'block' }} />
+      </div>
+      <div style={{ position: 'absolute', left: 0, width: 1080, top: Math.round(y + ICON.size / 2 + 14), textAlign: 'center', ...uiText(28, 560), opacity: opacity * prog(f, HITS.target + 10, HITS.target + 20, EASE_MODAL) }}>
+        Machina
+      </div>
+    </>
   );
 };
 
 /** ── the app: the feed, read down; then Find ─────────────────────────── */
 
 /** the feed: the newest card where the iris opens; held, read down a card, held… */
-const FEED_CAM: Cam = { cx: SHOT.w / 2, cy: 355, z: 2.1, fx: 540, fy: 944, rx: 0, ry: 0, rz: 0 };
+// (round 7) higher and larger: the card's top at 478 (the caption fade now
+// ends at 470), its tags clear of Meta's bottom 35% (1248)
+const FEED_CAM: Cam = { cx: SHOT.w / 2, cy: 355, z: 2.35, fx: 540, fy: 908, rx: 0, ry: 0, rz: 0 };
 /** (round 3) one read down the feed, past all three cards, to rest on the
  *  camera card (the capture's scroll: 764 points in 255 steps), so every
  *  screenshot is seen as a card before the line names what was done to it */
@@ -253,12 +280,13 @@ const unite = (a: Rect, b: Rect, pad = 0): Rect => {
   const y0 = Math.min(a[1], b[1]) - pad;
   return [x0, y0, Math.max(a[0] + a[2], b[0] + b[2]) + pad - x0, Math.max(a[1] + a[3], b[1] + b[3]) + pad - y0];
 };
-/** the iris opens out of the mark's point (its place in screen points) */
-const IRIS_AT = { x: FEED_CAM.cx + (MARK.x - FEED_CAM.fx) / FEED_CAM.z, y: FEED_CAM.cy + (MARK.y - FEED_CAM.fy) / FEED_CAM.z };
+/** the iris opens out of the icon (its centre, in screen points) */
+const IRIS_AT = { x: FEED_CAM.cx + (ICON.x - FEED_CAM.fx) / FEED_CAM.z, y: FEED_CAM.cy + (ICON.y - FEED_CAM.fy) / FEED_CAM.z };
 
 /** Find: the field focuses (the app's 8 frames), the query typed two
  *  characters a frame, then the app's own arrival of the one card */
-const FIND_CAM: Cam = { cx: SHOT.w / 2, cy: 330, z: 2.3, fx: 540, fy: 1028, rx: 0, ry: 0, rz: 0 };
+// (round 7) the field at 500, larger
+const FIND_CAM: Cam = { cx: SHOT.w / 2, cy: 330, z: 2.35, fx: 540, fy: 937, rx: 0, ry: 0, rz: 0 };
 const T = TAKES_JSON[TAKE as keyof typeof TAKES_JSON] as unknown as { marks: Record<string, number>; count: number; frames: { r: Record<string, Rect> }[] };
 /** the typed frames shown, two characters a frame: from "quo" (the first
  *  character's frame flashes a card the app matched on "q"), skipping the
@@ -348,8 +376,8 @@ export const Shots: React.FC<{ withAudio?: boolean; withCaptions?: boolean; endi
   const rv = (ry - rollY(f - 1)) * rp.z; // px a frame
   const rollBlur = Math.min(60, 0.12 * Math.abs(rv)) / rp.z;
   const back = prog(f, HITS.tap, HITS.tap + 12, EASE_MODAL);
-  const gone = prog(f, HITS.row, HITS.row + 12, EASE_IN_OUT);
-  const showRoll = f < HITS.row + 12;
+  const gone = prog(f, HITS.target, HITS.target + 12, EASE_IN_OUT);
+  const showRoll = f < HITS.target + 12;
 
   // the hook's right screen slides away as the roll takes the frame
   const away = prog(f, HITS.grow, HITS.grow + 14, EASE_IN_OUT);
@@ -358,15 +386,6 @@ export const Shots: React.FC<{ withAudio?: boolean; withCaptions?: boolean; endi
   const sw = (swiped(f) - swiped(f - 1)) * (VIEW.w + VIEW_GAP);
   const viewerOn = f >= HITS.tap && f < HITS.land3;
   const hideTiles = f >= HITS.tap ? [0, 1, 2] : [];
-
-  // the mark under the row, then its point opens into the app
-  const close = EASE_SPRING(prog(f, HITS.row + 4, HITS.row + 18, (t) => t));
-  const landed = SHARE.filter((s) => f >= s.land).length;
-  const lastLand = SHARE.map((s) => s.land).filter((l) => l <= f).pop() ?? -99;
-  const pulse = 1 + 0.16 * Math.exp(-(f - lastLand) / 4) * (f >= lastLand ? 1 : 0);
-  const dot = (0.35 + 0.65 * (landed / 3)) * prog(f, HITS.row + 10, HITS.row + 20, EASE_SPRING) * pulse;
-  const markOut = prog(f, HITS.iris, HITS.iris + 7, EASE_IN_OUT);
-  const showMark = f >= HITS.row && f < HITS.iris + 8;
 
   // the app
   // (the radius ends where the circle has just cleared the screen's visible
@@ -404,39 +423,34 @@ export const Shots: React.FC<{ withAudio?: boolean; withCaptions?: boolean; endi
         >
           <Roll y={ry} blur={rollBlur} id="roll" hide={hideTiles} />
           <Tap {...(() => {
-            const [x, y, w] = tileRect(heroIndex(0), MAX_Y);
+            // (round 7) the newest, the last tile: Photos opens on it
+            const [x, y, w] = tileRect(heroIndex(OPEN_ORDER[0]), MAX_Y);
             return { x: x + w / 2, y: y + w / 2 };
           })()} t={(f - (HITS.tap - TAP_LEAD)) / 12} />
         </Slab>
       )}
 
-      {/* the three screenshots: opened, swiped, lined up, shared */}
+      {/* the three screenshots: opened, swiped back through, shared */}
       {viewerOn &&
         HEROES.map((id, k) => {
           const box = heroBox(k, f);
           if (!box || box.x > 1300 || box.x + box.w < -200) return null;
-          return <Opened key={id} id={id} box={box} fid={`sw${k}`} blurX={f < HITS.row ? Math.min(28, 0.12 * Math.abs(sw)) : 0} />;
+          return <Opened key={id} id={id} box={box} fid={`sw${k}`} blurX={f < HITS.target ? Math.min(28, 0.12 * Math.abs(sw)) : 0} />;
         })}
-      {f >= HITS.row && f < HITS.land3 && HEROES.map((id, k) => <ShareButton key={id} k={k} f={f} />)}
-      {f >= HITS.row &&
-        f < HITS.land3 + 2 &&
-        SHARE.map((s, k) => (
-          <Tap key={k} x={ROW.xs[k]} y={ROW.y + ROW.h - 6} t={(f - (s.tap - TAP_LEAD)) / 12} size={60} />
-        ))}
 
-      {/* the mark: each share lands in its point */}
-      {showMark && (
-        <div style={{ position: 'absolute', left: MARK.x - MARK.w / 2, top: MARK.y - MARK.w * 0.39, opacity: 1 - markOut, transform: `scale(${(1 + 0.25 * markOut).toFixed(3)})` }}>
-          <MarkAssembly close={close} dot={Math.min(1.2, dot)} width={MARK.w} color={TOKENS.ink} />
-        </div>
-      )}
-      {SHARE.map((s, k) => (
-        <Ping key={k} rect={[MARK.x - 60, MARK.y - 40, 120, 80]} t={(f - s.land) / 16} radius={40} reach={70} width={2.4} alpha={0.42} />
+      {/* (round 7) the share target: Machina's app icon; each share is a tap
+          on it, and each screenshot lands in it with a ring */}
+      {f >= HITS.target && f < HITS.iris + 10 && <AppIcon f={f} />}
+      {SHARES.map((x, k) => (
+        <Ping key={`ring${k}`} rect={[ICON.x - ICON.size / 2, ICON.y - ICON.size / 2, ICON.size, ICON.size]} t={(f - x.land) / 16} radius={ICON.size * 0.225} reach={26} width={2.2} alpha={0.42} />
       ))}
+      {f >= HITS.target &&
+        f < HITS.land3 + 4 &&
+        SHARES.map((x, k) => <Tap key={`tap${k}`} x={ICON.x} y={ICON.y} t={(f - (x.tap - TAP_LEAD)) / 12} size={72} tone="light" />)}
 
-      {/* the app: the feed, out of the mark's point */}
+      {/* the app: the feed, out of the icon */}
       {inFeed && (
-        <AppShot take={TAKE} i={feedFrame(f)} cam={feedCam(f)} iris={iris < 1 ? { x: IRIS_AT.x, y: IRIS_AT.y, r: 500 * iris } : null} motion={{ x: 0, y: ds }}>
+        <AppShot take={TAKE} i={feedFrame(f)} cam={feedCam(f)} iris={iris < 1 ? { x: IRIS_AT.x, y: IRIS_AT.y, r: 540 * iris } : null} motion={{ x: 0, y: ds }}>
           {/* the parts: each Lift mounted on the frame its own ring starts
               (a frame that changes anyway; round 5: mounted earlier, even at
               rest its hairline shadow outlined every part before it was
@@ -481,7 +495,7 @@ export const Shots: React.FC<{ withAudio?: boolean; withCaptions?: boolean; endi
         </>
       )}
 
-      {scrim > 0 && f < SIGNATURE_AT + 14 && <BandScrim opacity={scrim} tone={TOKENS.paper} band={HOUSE_BAND} />}
+      {scrim > 0 && f < SIGNATURE_AT + 14 && <BandScrim opacity={scrim} tone={TOKENS.paper} band={BAND} />}
       {withCaptions && <Lines f={f} />}
       <Lens vignette={0.35} grain={0.035} />
       <Signature from={SIGNATURE_AT} footer={ENDINGS[ending]} />

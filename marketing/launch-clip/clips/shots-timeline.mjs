@@ -91,20 +91,27 @@ export const HITS = {
   hook: 0, // the cover: BEFORE (the roll, scrolling) | AFTER (Machina, still)
   grow: 88, // the roll's screen takes the frame; Machina's slides away; the flick begins
   land: 158, // the flick comes to rest on the last row: the three, and "2,847 Screenshots"
-  tap: 189, // the first of them tapped open (no idea why)
-  swipe1: 213, // swiped to the next
+  tap: 189, // the newest of them tapped open (no idea why); Photos opens on it…
+  swipe1: 213, // …and a swipe to the right goes back in time, to the one before
   swipe2: 236, // and the next
-  row: 248, // the three line up; the mark assembles under them
-  share1: 268, // each one's Share tapped…
-  share2: 283,
-  share3: 298,
-  land1: 280, // …and pulled into the mark, a beat apart; the last on "Machina"
-  land2: 295,
-  land3: 310,
-  iris: 314, // the mark's point opens into the app: the newest card
-  cards: 331, // the feed reads down past all three, to rest on the camera card
+  // (round 7, owner: the share was abrupt and unclear) the gesture everyone
+  // knows: the screenshot in the viewer shrinks, Machina's app icon rises
+  // under it, a finger taps the icon and the screenshot flies in; once
+  // slowly, then twice quickly, the next ones arriving from the right where
+  // the viewer left them; the third lands on "Machina"
+  target: 252, // the screenshot shrinks to share size; the icon rises
+  share1: 278, // the taps on the icon (the pad lands)…
+  share2: 302,
+  share3: 316,
+  land1: 292, // …and each screenshot in the icon, the next one entering only
+  land2: 310, // once the one before has landed; the second on "Machina", the
+  land3: 324, // third just after the line
+  iris: 326, // the icon opens into the app, as a tapped icon does: the newest card
+  cards: 341, // the feed reads down past all three, to rest on the camera card (moving
+  // already on the frame the iris completes, where the slab's edge appears: a still
+  // frame there showed it pop)
   // …whose parts ring as the line names them, each 2 frames ahead of its
-  // word (the eye leads the ear): the screenshot "analyzed", the category
+  // word (the eye leads the ear): the title "analyzed", the category
   // "categorized", the summary "summarized", the tags "tagged" (word starts
   // from the measured take, src/reels/clips/shots/shots-vo.json; verify
   // holds them to it)

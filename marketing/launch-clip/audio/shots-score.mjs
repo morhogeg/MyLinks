@@ -133,7 +133,7 @@ for (const f of [H.swipe1, H.swipe2]) whoosh(t(f), 0.45, 0.016, f === H.swipe1 ?
 
 // ── the drop, on "After:"
 impact(t(AFTER), 0.1);
-whoosh(t(H.row - 1), 0.7, 0.02, 0);
+whoosh(t(H.target - 1), 0.7, 0.02, 0); // (round 7) the share stage: the icon rises
 
 // ── the drums
 for (let f = AFTER; f < SIGNATURE_AT; f += EIGHTH) {
@@ -147,9 +147,11 @@ for (let f = AFTER; f < SIGNATURE_AT; f += EIGHTH) {
   if (f >= H.iris && k % 4 === 2) clap(t(f), 0.045 + 0.035 * d);
 }
 
-// ── the shares: a tick on each Share, a rising bell as each one lands in the
-// mark; the third lands on "Machina", so it gets a low impact on the frame
-// and its bell after the word, ringing into the iris
+// ── the shares: a tick on each tap on the icon, a rising bell as each
+// screenshot lands in it; a landing on the spoken "Machina" gets a low,
+// non-melodic hit instead (nothing melodic on a word the narrator lands)
+const nameStart = CAPTIONS[3].at + Math.round(JSON.parse(fs.readFileSync(path.join(root, 'src/reels/clips/shots/shots-vo.json'), 'utf8')).find((x) => x.frame === CAPTIONS[3].at).words.at(-1) * FPS);
+const nameEnds = SPEECH[3][1];
 const shares = [
   [H.share1, H.land1, 76],
   [H.share2, H.land2, 79],
@@ -158,11 +160,9 @@ const shares = [
 shares.forEach(([tap, land, note], k) => {
   tick(t(tap), 0.045, 1.2);
   keys(t(tap), 76, 0.022, 0, 0.6);
-  if (k < 2) bell(t(land), note, 0.05, k ? 0.2 : -0.2, 1.8);
-  else impact(t(land), 0.08);
+  if (land >= nameStart - 2 && land <= nameEnds) impact(t(land), 0.08);
+  else bell(t(land), note, 0.05, k % 2 ? 0.2 : -0.2, 1.8);
 });
-const nameEnds = SPEECH[3][1];
-bell(t(Math.max(H.land3 + 6, nameEnds + 1)), 83, 0.06, 0, 2.4);
 whoosh(t(H.iris), 0.7, 0.02, 0);
 
 // ── the feed: air as it reads down past the three; then a soft, high tick

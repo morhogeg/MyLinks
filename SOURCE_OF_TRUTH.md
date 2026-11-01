@@ -2712,7 +2712,14 @@ exact-match, capped.
   a clock and two buttons); "When I need one, I just describe it." with the
   query typing on those words; a new close, "Now every screenshot makes
   sense.", over the cover's BEFORE | AFTER again (the roll's last row, the
-  same three screenshots, beside the card it found). 25.0s.
+  same three screenshots, beside the card it found). 25.0s. **Round 7
+  (owner: the share was abrupt and unclear; too much height to captions):**
+  the share is now a tap on Machina's real app icon (the screenshot flies
+  in; once slowly, then the other two, one at a time), and the icon opens
+  into the app; the viewer opens on the newest and swipes back, as Photos
+  does, so the share order matches the feed. The caption scrim clears by 470
+  instead of 550 (local to this reel, proposed for the house band) and the
+  app is framed ~12% larger and higher.
 - **2026-10-31 — INSTAGRAM REEL "LATER NEVER COMES", BUILT BUT FOR ITS
   PICTURE (branch `claude/instagram-reel-app-store-012mo2`, on the App Store
   preview's a35f6c1e; off `main` until the owner reviews the cut).** A 24.0s

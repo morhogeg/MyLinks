@@ -93,11 +93,12 @@ const last = CAPTIONS.at(-1);
 if (last.to > T.SIGNATURE_AT + 24) fail(`the last line runs into the Signature's voice`);
 const spoken = manifest.reduce((s, m) => s + m.spoken, 0);
 ok(`timing: ${CAPTIONS.length} lines in ${spoken.toFixed(1)}s of speech over ${T.TOTAL_SEC.toFixed(1)}s, every one inside its window; never two in the band`);
-// the third share lands on "Machina": the picture and the word together
+// a share lands in the icon on the spoken "Machina" (round 7: the second)
 const name = CAPTIONS[3];
 const nameAt = name.at + Math.round(vo.find((x) => x.frame === name.at).words.at(-1) * FPS);
-if (Math.abs(nameAt - HITS.land3) > 3) fail(`the last share lands at ${HITS.land3}, "Machina" is said at ${nameAt}`);
-else ok(`the third share lands on "Machina" (frame ${HITS.land3}, said at ${nameAt})`);
+const onName = [HITS.land1, HITS.land2, HITS.land3].map((l) => l - nameAt);
+if (!onName.some((d) => Math.abs(d) <= 3)) fail(`no share lands on "Machina" (said at ${nameAt}; landings ${HITS.land1}, ${HITS.land2}, ${HITS.land3})`);
+else ok(`a share lands in the icon on "Machina" (said at ${nameAt}; landings ${HITS.land1}, ${HITS.land2}, ${HITS.land3})`);
 
 // each part of the card rings on its word (round 3): 2 frames ahead, ±3
 const cardLine = CAPTIONS[4];
