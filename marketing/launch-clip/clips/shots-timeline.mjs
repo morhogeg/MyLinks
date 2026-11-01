@@ -68,25 +68,19 @@ export const SIGNATURE_AT = TOTAL_FRAMES - SIGNATURE.frames;
 export const CAPTIONS_ALT = [
   {
     at: 3,
-    to: 91,
-    text: 'Same screenshots.\nTwo very different places.',
-    style: 'Casual and quick, like a friend nudging you to look: "Same screenshots." light and matter-of-fact, then straight on into "Two very different places." with a small smile. No dramatic pause.',
-    pace: 'Quick, about 195 words a minute, almost no gap between the two sentences.',
+    to: 95,
+    text: 'Same screenshots.\nCamera roll vs Machina.',
+    say: 'Same screenshots, two places: your camera roll, and Machina.',
+    style: 'Natural and conversational, like a friend showing you something on two phones: relaxed and warm, one easy sentence, a light lift on "Machina". Not performed, no word stressed or drawn out.',
+    pace: 'Everyday conversational speed, about 180 words a minute; short natural beats at the commas.',
   },
   {
-    at: 253,
-    to: 328,
-    text: 'After: share each screenshot\nto Machina.',
-    style: 'Bright and easy, like the good news after owning up to something: one flowing line, a natural lift on "each screenshot", "to Machina" landing warmly.',
+    at: 3,
+    to: 95,
+    text: 'Same screenshots.\nCamera roll vs Machina.',
+    say: 'Same screenshots. Camera roll, or Machina?',
+    style: 'Playful and conversational, like a friend asking you to pick: "Same screenshots" light and quick, running into the question, "Camera roll, or Machina?" a genuine, easy question with a little smile. No dramatic pause, nothing drawn out.',
     pace: 'Brisk everyday conversational speed, about 185 words a minute.',
-  },
-  {
-    at: 342,
-    to: 443,
-    text: 'Analyzed, categorized,\nsummarized and tagged.',
-    say: 'Each one is analyzed, categorized, summarized and tagged.',
-    style: 'Warm and a little impressed, like telling a friend what the app just did for you: "Each one is" easy and quick, then the four words with a gentle, satisfying rhythm, a small smile on "and tagged". Conversational, never a sales pitch.',
-    pace: 'Brisk everyday conversational speed, about 185 words a minute; only the briefest beats at the commas.',
   },
 ];
 
@@ -192,13 +186,17 @@ export const CAPTIONS = [
     at: 3,
     to: 95,
     place: 'hook',
+    // round 4 (owner: "two very different places" was not clear, and "Same
+    // screenshots." sounded robotic). The screen names the two screens in
+    // the order they sit, left to right: the kicker is the premise, the big
+    // line the comparison. The voice says it as one flowing sentence: the
+    // bare two-word fragment with a full stop is what came out robotic
     cues: [0, 2],
-    text: 'Same screenshots.\nTwo very different places.',
-    style: 'Natural and conversational, like showing a friend something on your phone: easy, light, a little intrigued. Both sentences in one easy breath, only the shortest natural beat after "screenshots"; nothing drawn out, no word stressed.',
-    pace: 'Brisk everyday conversational speed, about 190 words a minute.',
-    maxPause: 0.2,
-    // the take dwelt (3.2 syllables a second): eased in assembly (Rubber Band,
-    // formants preserved), LATER NEVER COMES' to-do line precedent
+    text: 'Same screenshots.\nCamera roll vs Machina.',
+    say: 'Same screenshots: your camera roll, versus Machina.',
+    style: 'Natural and conversational, like holding up two phones side by side to show a friend: easy and light, one flowing sentence. "Same screenshots" as a casual lead-in that runs straight on, "your camera roll" plain, then "versus Machina" with a small, knowing smile. Never announced, no word drawn out.',
+    pace: 'Everyday conversational speed, about 180 words a minute; only a comma-length beat after "screenshots".',
+    maxPause: 0.22,
   },
   {
     at: 99,
