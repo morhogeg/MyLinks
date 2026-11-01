@@ -68,18 +68,18 @@ export const SIGNATURE_AT = TOTAL_FRAMES - SIGNATURE.frames;
  */
 export const CAPTIONS_ALT = [
   {
-    at: 266,
-    to: 338,
-    text: 'So I started sharing them\nto Machina.',
-    style: 'Warm and playful, like admitting a small life hack to a friend: a little lift on "started", a smile on "to Machina". Conversational and light.',
+    at: 481,
+    to: 562,
+    text: 'When I need one,\nI just describe it.',
+    style: 'Bright and playful, like sharing a neat trick with a friend: a lift on "need one", a smile on "describe it". Conversational and light.',
     pace: 'Everyday conversational speed, about 180 words a minute.',
   },
   {
-    at: 462,
-    to: 513,
-    text: 'Now I find any of them\nin my own words.',
-    style: 'Delighted and warm, the happy ending of a story told to a friend: a lift on "any of them", a smile on "in my own words". Light, never performed.',
-    pace: 'Everyday conversational speed, about 180 words a minute.',
+    at: 570,
+    to: 640,
+    text: 'Now every screenshot\nmakes sense.',
+    style: 'Bright and warm, like the punchline of a good story: "Now every screenshot" with a lift, "makes sense" with a satisfied smile. Natural, never performed.',
+    pace: 'Everyday conversational speed, about 175 words a minute.',
   },
 ];
 
@@ -268,13 +268,26 @@ export const CAPTIONS = [
   {
     at: 481,
     to: 562,
-    cues: [0, 6],
-    text: 'Now I find any of them\nin my own words.',
-    // re-directed (run 86): "quietly satisfied" read flat (33); this reading
-    // is calmer than LATER's lines but livelier than round 4's accepted "Find
-    // it again in your own words." (21.9 against 14.5, smoothed), 2.47s
-    style: 'Natural and conversational, with warmth and a little wonder, like pointing out something clever to a friend: "Now I find any of them" bright and light, "in my own words" landing with a smile, leaving space before the logo.',
-    pace: 'Everyday conversational speed, about 175 words a minute; easy, never drawn out.',
+    // round 6 (owner: revise the payoff): the mechanism said plainly; the
+    // query types itself as she says "describe it"
+    cues: [0, 4],
+    text: 'When I need one,\nI just describe it.',
+    style: 'Natural and conversational, with a little warmth and a smile, like telling a friend the easy part: "When I need one" light, "I just describe it" with a small, satisfied smile. Not an announcer, no word drawn out.',
+    pace: PACE,
     maxPause: 0.2,
+  },
+  {
+    at: 570,
+    to: 640,
+    // round 6 (owner: a stronger closing statement, two seconds more): it
+    // answers the opening's "No idea why I took most of them", over the
+    // cover's BEFORE | AFTER again (Shots.tsx). Set a touch heavier: the
+    // statement. Never the tagline (the Signature says "finally useful")
+    cues: [0, 3],
+    statement: true,
+    text: 'Now every screenshot\nmakes sense.',
+    style: 'Warm and sincere, the happy ending of a story told to a friend: a little wonder in it, "makes sense" landing with a smile and a sense of relief. Never announced, no word drawn out.',
+    pace: 'Everyday conversational speed, about 165 words a minute; unhurried, a natural beat after "screenshot".',
+    maxPause: 0.25,
   },
 ];
