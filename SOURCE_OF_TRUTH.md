@@ -2678,6 +2678,14 @@ exact-match, capped.
   after their last word, not 0.3s: documented). Voice: Gemini Sulafat, run
   81, four lines sped up 1.08–1.22× in assembly. Nobody has listened on
   speakers. Detail: `marketing/launch-clip/README.md` "SAME SCREENSHOTS".
+  **Round 2 (same day, owner: "voice sounds metallic"; "share from any app"
+  is off-topic):** no time-stretch; the 24kHz takes now go through
+  `vo-to-44k.py` + `vo-deess.py` before the mix (the mix's linear resample
+  had mirrored a sizzle band only 10.5dB under the voice; REVISIT's
+  2026-10-21 "metallic" had the same cause, so any new reel must run that
+  chain); the line is "After: share each screenshot to Machina." ("each":
+  several at once make ONE card); larger hook screens and share row, a
+  readable hook scroll. Natural takes need 14.6s, so the cut is 21.5s.
 - **2026-10-31 — INSTAGRAM REEL "LATER NEVER COMES", BUILT BUT FOR ITS
   PICTURE (branch `claude/instagram-reel-app-store-012mo2`, on the App Store
   preview's a35f6c1e; off `main` until the owner reviews the cut).** A 24.0s

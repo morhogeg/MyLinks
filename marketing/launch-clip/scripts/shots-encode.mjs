@@ -5,12 +5,12 @@
  * posting file (scripts/frame-jumps.mjs).
  *
  *   HS=…/chrome-headless-shell
- *   for r in a:0-159 b:160-319 c:320-469 d:470-614; do
+ *   for r in a:0-164 b:165-329 c:330-494 d:495-644; do
  *     npx remotion render out/shots/bundle MachinaShotsSilent out/shots/seg-${r%%:*}.mp4 \
  *       --frames=${r#*:} --concurrency=1 --muted --crf=14 --browser-executable=$HS &
  *   done; wait
  *   # launch day: only the Signature's frames, with the store footer
- *   npx remotion render out/shots/bundle MachinaShotsStore out/shots/tail-store.mp4 --frames=465-614 --concurrency=1 --muted --crf=14 --browser-executable=$HS
+ *   npx remotion render out/shots/bundle MachinaShotsStore out/shots/tail-store.mp4 --frames=495-644 --concurrency=1 --muted --crf=14 --browser-executable=$HS
  *   node scripts/shots-encode.mjs
  *     → out/shots/Machina-Same-Screenshots-Reel.mp4         today's footer ("Coming soon")
  *     → out/shots/Machina-Same-Screenshots-Reel-store.mp4   launch day's, if tail-store.mp4 exists
@@ -59,7 +59,7 @@ const made = [];
 for (const [tailName, name] of [[null, 'Machina-Same-Screenshots-Reel.mp4'], ['tail-store.mp4', 'Machina-Same-Screenshots-Reel-store.mp4']]) {
   const tail = tailName ? path.join(out, tailName) : null;
   if (tail && !fs.existsSync(tail)) {
-    console.log(`(no ${path.relative(root, tail)}: render MachinaShotsStore --frames=${SIGNATURE_AT}-614 for launch day)`);
+    console.log(`(no ${path.relative(root, tail)}: render MachinaShotsStore --frames=${SIGNATURE_AT}-${SIGNATURE_AT + 149} for launch day)`);
     continue;
   }
   const dest = path.join(out, name);

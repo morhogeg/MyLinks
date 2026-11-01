@@ -11,7 +11,8 @@
  *    −14 LUFS ±0.5, true peak ≤ −1 dBTP.
  *
  * One deliberate difference from LATER NEVER COMES' gate: a line may leave
- * 0.15s after its last word (the house dwell rule says 0.3s). Six lines in a
+ * 0.15s after its last word (the house dwell rule says 0.3s; round 2's
+ * lines leave 0.2s after). Six lines in a
  * 15–20s brief left no room for the full 0.3s at every boundary without
  * running to 21s; each caption is still on screen for its whole line plus
  * ~0.25s, and the next one takes over at once.

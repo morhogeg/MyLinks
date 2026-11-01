@@ -1818,7 +1818,7 @@ and Signature over paper, and catches a single frame swapped in.
 ## SAME SCREENSHOTS (the before-and-after Reel, 2026-11-01)
 
 `MachinaShots` is the owner's F04 idea ("before and after: your
-screenshots"), refined: 20.5s, 1080 × 1920, narrated, music-led, on the
+screenshots"), refined: 21.5s, 1080 × 1920, narrated, music-led, on the
 house rules (branch `claude/reel-screenshots`, on LATER NEVER COMES'
 c8fdeb85; video work merges only after the owner reviews the cut).
 `MachinaShotsStore` is the launch-day footer, `MachinaShotsSilent` the
@@ -1830,13 +1830,13 @@ it again in your own words.
 
 | Time | Picture | Caption = voice |
 |---|---|---|
-| 0:00 | The cover: two screens side by side, the camera roll (left) already flicking into a blur, Machina's feed (right) still, the three cards on it | **Same screenshots. / Two very different places.** (the house hook: kicker over big type) |
-| 0:03 | The roll's screen takes the frame, Machina's slides away; the one long flick lands on the last row: the three, and "2,847 Screenshots" | Before: 2,847 screenshots. |
-| 0:06 | The first is tapped open (the roll pushed back) and swiped through: a used film camera, a Seneca quote, a pin on a map | No idea why / I took most of them. |
-| 0:08 | The three line up, the mark assembles under them; each one's Share is tapped and it is pulled into the mark (one share, one card), the third landing on "Machina" | After: share from any app / to Machina. |
-| 0:10 | The mark's point irises open into the real app: the feed reads down the three cards (banner = the same screenshot, title, summary, tags) | Every screenshot becomes / a card that says what it is. |
-| 0:14 | CUT to Find: "quote about overthinking" typed under a rack focus; the one card it means lands (no word shared), its ink ring | Find it again / in your own words. |
-| 0:15.5 | The kit's Signature, footer "Coming soon · mymachina.app" (launch day: "Now on the App Store · mymachina.app") | (the Signature's take) |
+| 0:00 | The cover: two screens side by side, the camera roll (left, "2,847 items") scrolling steadily, Machina's feed (right) still, the three cards on it | **Same screenshots. / Two very different places.** (the house hook: kicker over big type) |
+| 0:03 | The roll's screen takes the frame, Machina's slides away; one long flick lands on the last row: the three, and "2,847 Screenshots" | Before: 2,847 screenshots. |
+| 0:06.5 | The first is tapped open (the roll pushed back) and swiped through: a used film camera, a Seneca quote, a pin on a map | No idea why / I took most of them. |
+| 0:09 | The three line up, the mark assembles under them; each one's Share is tapped and it is pulled into the mark (one share, one card), the third landing on "Machina" | After: share each screenshot / to Machina. |
+| 0:11 | The mark's point irises open into the real app: the feed reads down the three cards (banner = the same screenshot, title, summary, tags) | Every screenshot becomes / a card that says what it is. |
+| 0:14.7 | CUT to Find: "quote about overthinking" typed under a rack focus; the one card it means lands (no word shared), its ink ring | Find it again / in your own words. |
+| 0:16.5 | The kit's Signature, footer "Coming soon · mymachina.app" (launch day: "Now on the App Store · mymachina.app") | (the Signature's take) |
 
 **What changed from the brief, and why.**
 - **No recipe** (owner, 2026-10-02: no recipe or cooking content): the
@@ -1872,30 +1872,47 @@ tiles POV's screenshots. While the query types, the app shows its own
 focus, and the two typed frames where live "Close matches" flash cards are
 skipped. The result card wears the app's small "Meaning" badge.
 
-**The voice.** Gemini TTS, Sulafat (narration-tts run 81), LATER's
-direction (a person telling a friend, ~175 wpm). The takes came back slow
-(the hook at 3.2 syllables a second), so four lines are sped up in assembly
-(`tempo`, Rubber Band, formants preserved: 1.22, 1.1, 1.08, 1.1); every line
-now runs 4.0–5.2 syllables a second except the last (6.0, untouched). Nobody
-has listened to it on speakers yet.
+**The voice.** Gemini TTS, Sulafat, LATER's direction (a person telling a
+friend, ~175 wpm). Round 1 (run 81) sped four slow takes up in assembly
+(Rubber Band, 1.08–1.22×) to fit 20.5s, and mixed the 24kHz takes through
+`mix-vo.mjs`'s linear resample. **The owner heard it as metallic (round 2),
+and both were to blame:** the stretch, and the resample, which mirrored the
+voice's top octave into a band above 12kHz only 10.5dB under its body (the
+REVISIT clip's "metallic" note, 2026-10-21, same cause). Round 2: no stretch
+anywhere; the hook and the new After line re-voiced (run 82) in two
+directions each (`CAPTIONS_ALT`, `synth-vo.py shots-alt`) and cast by
+measured pace (direction A for both: the hook 2.86s, was 3.43s; After 2.17s);
+then FIND THE BOOK's chain, `vo-to-44k.py` (soxr: that band at −63.6dB) and
+`vo-deess.py` (at most 3.9dB off one "s"). The natural takes need 14.6s, so
+the cut is 21.5s, a second longer than round 1. Nobody has listened to it on
+speakers yet.
 
-**Measured.** `node audio/shots-verify.mjs`: bans clean on 26 strings and on
-all 106 distinct texts of the 320 captured frames; Find shares no word with
-its card; every line inside its window; the third share lands on the spoken
-"Machina" (frame 308 both); every line 8.4–18.4dB over the music in the
-speech band; the mix −14.01 LUFS, −1.25 dBTP. `node audio/house-verify.mjs
-shots` passes (the Signature take in the mix at 0.81). The posting file:
-615 frames, 20.500s, H.264 High yuv420p BT.709 video range, AAC 48kHz 320k,
-10.3MB. `scripts/frame-jumps.mjs` flags two frames, both meant: 424 (the
-hard cut to Find, on the beat) and 432 (the app swapping the feed for search
-as typing starts, under the rack focus). Its first pass also caught the
-iris finishing in two frames (its radius was larger than the screen in view),
-the result card popping in one frame (the capture waited in real time and
-missed the app's card-enter: the search now runs on the stepped clock) and
-the ring's Lift re-rastering on a still frame; all three fixed. **One deliberate
-difference:** lines leave 0.15s after their last word, not the house 0.3s;
-six lines in a 15–20s brief had no room for 0.3s at every boundary without
-running to 21s (the gate says so in its header).
+**Round 2 (owner: "the voice sounds metallic"; "share from any app" is off
+the subject, it should be about screenshots).** The line is now "After:
+share each screenshot to Machina." ("each", not "all": several shared at
+once make ONE card, G3, and the picture shows one share per screenshot).
+And a picture pass: the two hook screens are larger (1.2px a point, the
+frame's lower fifth no longer empty); the roll scrolls steadily and readably
+under the hook (it was a grey smear for three seconds) and only flicks when
+it takes the frame (`ROLL`/`rollAt` in the timeline, shared with the score's
+ratchet); the share row is larger (0.62px a point); the feed holds a little
+longer on each card.
+
+**Measured (round 2).** `node audio/shots-verify.mjs`: bans clean on 26
+strings and on all 106 distinct texts of the 329 captured frames; Find
+shares no word with its card; every line inside its window; the third share
+lands on the spoken "Machina" (frame 319 both); every line 8.5–20.2dB over
+the music in the speech band; the mix −14.00 LUFS, −1.20 dBTP. `node
+audio/house-verify.mjs shots` passes (the Signature take in the mix at 0.81).
+`scripts/frame-jumps.mjs` flags only frames that are meant: the hard cut to
+Find, on the beat, and the app swapping the feed for search as typing
+starts, under the rack focus. (Round 1's pass also caught the iris finishing
+in two frames, the result card popping in one frame because the capture
+waited in real time and missed the app's card-enter, and the ring's Lift
+re-rastering on a still frame; all three fixed.) **One deliberate
+difference:** lines leave 0.2s after their last word, not the house 0.3s;
+six lines in a 15–20s brief had no room for 0.3s at every boundary (the
+gate says so in its header).
 
 ```bash
 # the screenshots, once (and again if Screens.tsx changes; then re-capture)
@@ -1905,6 +1922,7 @@ git worktree add --detach <dir> origin/main && (cd <dir>/web && npm ci)
 CAPTURE_WEB=<dir>/web node capture/build-app.mjs
 CAPTURE_ONLY=shotsClip node capture/shoot.mjs && git checkout src/reels/data/takes.json
 GEMINI_VOICE=Sulafat python3 audio/synth-vo.py shots     # from the committed takes
+python3 audio/vo-to-44k.py out/vo/shots && python3 audio/vo-deess.py out/vo/shots   # never skip: the mix's own resample sizzles
 node audio/shots-score.mjs && node audio/mix-vo.mjs shots
 node audio/shots-verify.mjs && node audio/house-verify.mjs shots
 npx remotion bundle src/index.ts --out-dir=out/shots/bundle

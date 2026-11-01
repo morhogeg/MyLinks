@@ -49,9 +49,10 @@ export const BEAT = BEAT_FRAMES / FPS;
 /** Beat (quarter note, may be fractional) → frame. */
 export const beat = (n) => Math.round(n * BEAT_FRAMES);
 
-/** 41 beats, 20.5s: 31 beats of story, then the shared ending (20.0s left
- *  the Find beat under a second on screen; the voice runs 14.0s) */
-export const TOTAL_FRAMES = beat(41);
+/** 43 beats, 21.5s: 33 beats of story, then the shared ending. (Round 2:
+ *  the voice is no longer sped up in assembly, the owner heard the stretch
+ *  as metallic; its natural takes need 14.6s, a second more than round 1's) */
+export const TOTAL_FRAMES = beat(43);
 export const TOTAL_SEC = TOTAL_FRAMES / FPS;
 /** the kit's Signature is the last SIGNATURE.frames frames (house rule) */
 export const SIGNATURE_AT = TOTAL_FRAMES - SIGNATURE.frames;
@@ -86,27 +87,61 @@ export const CAPTIONS_ALT = [
  * voice lines sit between them (CAPTIONS `at`).
  */
 export const HITS = {
-  hook: 0, // two screens: the roll on the left already moving, Machina still on the right
-  flick: 6, // the roll's one long flick, top to bottom (it lands at `land`)
-  grow: 88, // the roll's screen takes the frame; Machina's slides away
-  land: 150, // the flick comes to rest on the last row: the three, and "2,847 Screenshots"
-  tap: 181, // the first of them tapped open (no idea why)
-  swipe1: 204, // swiped to the next
-  swipe2: 227, // and the next
-  row: 250, // the three line up; the mark assembles under them
-  share1: 266, // each one's Share tapped…
-  share2: 281,
-  share3: 296,
-  land1: 278, // …and pulled into the mark (8th notes; the last on "Machina")
-  land2: 293,
-  land3: 308,
-  iris: 312, // the mark's point opens into the app: the three cards
-  card2: 350, // the feed reads down to the next card…
-  card3: 388, // …and the next
-  find: 424, // CUT: Find: the field focuses (8 frames), the query typed under a rack focus
-  result: 444, // the one card it means
-  ring: 456, // its ink ring, once it has settled
+  hook: 0, // two screens: the roll on the left scrolling, Machina still on the right
+  grow: 95, // the roll's screen takes the frame; Machina's slides away; the flick begins
+  land: 165, // the flick comes to rest on the last row: the three, and "2,847 Screenshots"
+  tap: 196, // the first of them tapped open (no idea why)
+  swipe1: 220, // swiped to the next
+  swipe2: 243, // and the next
+  row: 264, // the three line up; the mark assembles under them
+  share1: 277, // each one's Share tapped…
+  share2: 292,
+  share3: 307,
+  land1: 289, // …and pulled into the mark (8th notes; the last on "Machina")
+  land2: 304,
+  land3: 319,
+  iris: 323, // the mark's point opens into the app: the three cards
+  card2: 368, // the feed reads down to the next card…
+  card3: 404, // …and the next
+  find: 442, // CUT: Find: the field focuses (8 frames), the query typed under a rack focus
+  result: 462, // the one card it means (the app's own card-enter)
+  ring: 474, // its ink ring, once it has settled
   signature: SIGNATURE_AT,
+};
+
+/**
+ * The roll's scroll, as a fraction of the way to its last row at frame f:
+ * a steady, readable scroll under the hook (`hookPt` points a frame), then
+ * from `grow` one long flick that lands at `land`: the steady speed eases
+ * out while a smooth hump of speed carries it the rest of the way. Picture
+ * (Roll.tsx's scroll) and score (the flick's ratchet) read the same curve.
+ */
+export const ROLL = { hookPt: 14 };
+const rollTable = (maxY) => {
+  const pos = new Float64Array(TOTAL_FRAMES + 2);
+  const n = HITS.land - HITS.grow;
+  const ease = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+  const base = (f) => (f < HITS.grow ? ROLL.hookPt : f < HITS.land ? ROLL.hookPt * (1 - ease((f - HITS.grow) / n)) : 0);
+  const hump = (f) => (f < HITS.grow || f >= HITS.land ? 0 : Math.sin((Math.PI * (f - HITS.grow)) / n) ** 2);
+  let b = 0;
+  let h = 0;
+  for (let f = 0; f < HITS.land; f++) {
+    b += base(f);
+    h += hump(f);
+  }
+  const k = (maxY - b) / h;
+  for (let f = 1; f < pos.length; f++) pos[f] = Math.min(maxY, pos[f - 1] + base(f - 1) + k * hump(f - 1));
+  return pos;
+};
+const ROLL_CACHE = new Map();
+/** the roll's scroll in points at frame f (fractional frames interpolate) */
+export const rollAt = (f, maxY) => {
+  if (!ROLL_CACHE.has(maxY)) ROLL_CACHE.set(maxY, rollTable(maxY));
+  const pos = ROLL_CACHE.get(maxY);
+  if (f <= 0) return 0;
+  if (f >= pos.length - 1) return maxY;
+  const i = Math.floor(f);
+  return pos[i] + (pos[i + 1] - pos[i]) * (f - i);
 };
 
 /** the footer under the signature: today, and on launch day (a render prop) */
@@ -141,7 +176,7 @@ const PACE = 'Everyday conversational speed, about 175 words a minute; short nat
 export const CAPTIONS = [
   {
     at: 3,
-    to: 91,
+    to: 95,
     place: 'hook',
     cues: [0, 2],
     text: 'Same screenshots.\nTwo very different places.',
@@ -152,8 +187,8 @@ export const CAPTIONS = [
     // formants preserved), LATER NEVER COMES' to-do line precedent
   },
   {
-    at: 95,
-    to: 181,
+    at: 99,
+    to: 193,
     cues: [0],
     text: 'Before: 2,847 screenshots.',
     style: 'Natural and conversational, wry and light, like owning up to a habit everyone has: "Before:" a light set-up, then the number read out plainly and a little ruefully, "screenshots" landing softly. Never dramatic.',
@@ -161,8 +196,8 @@ export const CAPTIONS = [
     maxPause: 0.22,
   },
   {
-    at: 185,
-    to: 249,
+    at: 197,
+    to: 262,
     cues: [0, 3],
     text: 'No idea why\nI took most of them.',
     style: 'Natural and conversational, amused at yourself, a small self-aware laugh in the voice without actually laughing; easy and light, no word stressed.',
@@ -170,8 +205,8 @@ export const CAPTIONS = [
     maxPause: 0.2,
   },
   {
-    at: 253,
-    to: 328,
+    at: 266,
+    to: 338,
     // round 2 (owner): "from any app" is off-topic in a reel about
     // screenshots. "each", not "all": sharing several at once makes ONE card
     // (G3), and the picture shows one share per screenshot
@@ -182,8 +217,8 @@ export const CAPTIONS = [
     maxPause: 0.25,
   },
   {
-    at: 332,
-    to: 423,
+    at: 342,
+    to: 443,
     cues: [0, 3],
     text: 'Every screenshot becomes\na card that says what it is.',
     style: 'Natural and conversational, quietly pleased, like pointing out something clever a friend did; light and unforced, a gentle natural stress on "says what it is".',
@@ -191,8 +226,8 @@ export const CAPTIONS = [
     maxPause: 0.2,
   },
   {
-    at: 427,
-    to: 480,
+    at: 447,
+    to: 498,
     cues: [0, 3],
     text: 'Find it again\nin your own words.',
     style: `${TALK} Easy and warm; "in your own words" landing softly, leaving space before the logo.`,

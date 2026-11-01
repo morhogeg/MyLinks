@@ -1,7 +1,7 @@
 import React from 'react';
 import { AbsoluteFill, Audio, staticFile, useCurrentFrame } from 'remotion';
 import { Share } from 'lucide-react';
-import { CAPTIONS, ENDINGS, FPS, HITS, SIGNATURE_AT } from '../../../../clips/shots-timeline.mjs';
+import { CAPTIONS, ENDINGS, FPS, HITS, SIGNATURE_AT, rollAt } from '../../../../clips/shots-timeline.mjs';
 import { AppShot, Lift, Ping, SCREEN_RADIUS, Tap } from '../../kit/AppShot';
 import { MarkAssembly } from '../../kit/Brand';
 import type { Cam } from '../../kit/camera';
@@ -81,14 +81,18 @@ const Slab: React.FC<{ place: Place; children: React.ReactNode; opacity?: number
 
 /** ── the roll: its place, its flick ───────────────────────────────────── */
 
-const HOOK_LEFT: Place = { z: 1.1, fx: 290, fy: 1059 };
-const HOOK_RIGHT: Place = { z: 1.1, fx: 790, fy: 1059 };
+// (round 2) larger: the two screens fill the frame under the hook instead of
+// leaving its lower fifth empty; their text still 19px inside Meta's margins
+const HOOK_LEFT: Place = { z: 1.2, fx: 286, fy: 1094 };
+const HOOK_RIGHT: Place = { z: 1.2, fx: 794, fy: 1094 };
 /** BEFORE: the roll's screen fills the frame's width, its last row in the safe area */
 const ROLL_FULL: Place = { z: 2.5, fx: 540, fy: 330 };
 
 const rollPlace = (f: number) => lerpPlace(HOOK_LEFT, ROLL_FULL, prog(f, HITS.grow, HITS.grow + 14, EASE_IN_OUT));
-/** one long flick, top to bottom: from rest, fast through the middle, to rest on the last row */
-const rollY = (f: number) => MAX_Y * prog(f, HITS.flick, HITS.land, EASE_IN_OUT);
+/** (round 2) a steady, readable scroll under the hook (the left screen was a
+ *  grey smear for three seconds), then one long flick to rest on the last
+ *  row: the timeline's curve, which the score's ratchet also follows */
+const rollY = (f: number) => rollAt(f, MAX_Y);
 
 /** ── the opened screenshot: a viewer, swiped through ─────────────────── */
 
@@ -97,10 +101,10 @@ const VIEW_Z = 1.75;
 const VIEW = { w: SHOT.w * VIEW_Z, h: SHOT.h * VIEW_Z, x: 540 - (SHOT.w * VIEW_Z) / 2, y: 598 };
 const VIEW_GAP = 240; // the next one wholly out of frame until it is swiped in
 /** the row the three line up in for the share */
-const ROW_Z = 0.55;
-const ROW = { w: SHOT.w * ROW_Z, h: SHOT.h * ROW_Z, y: 590, xs: [250, 540, 830] };
+const ROW_Z = 0.62; // (round 2) larger: each screenshot still reads as itself in the row
+const ROW = { w: SHOT.w * ROW_Z, h: SHOT.h * ROW_Z, y: 568, xs: [236, 540, 844] };
 /** where the mark sits under the row: the point every share is pulled into */
-const MARK = { x: 540, y: 1192, w: 150 };
+const MARK = { x: 540, y: 1196, w: 160 };
 
 type Box = { x: number; y: number; w: number; h: number; r: number };
 const lerpBox = (a: Box, b: Box, t: number): Box => ({ x: mix(a.x, b.x, t), y: mix(a.y, b.y, t), w: mix(a.w, b.w, t), h: mix(a.h, b.h, t), r: mix(a.r, b.r, t) });

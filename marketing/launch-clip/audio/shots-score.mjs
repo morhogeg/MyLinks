@@ -29,7 +29,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BEAT, BEAT_FRAMES, CAPTIONS, FPS, HITS, SIGNATURE_AT, TOTAL_FRAMES, TOTAL_SEC } from '../clips/shots-timeline.mjs';
+import { BEAT, BEAT_FRAMES, CAPTIONS, FPS, HITS, SIGNATURE_AT, TOTAL_FRAMES, TOTAL_SEC, rollAt } from '../clips/shots-timeline.mjs';
 import { SIGNATURE, signatureWordAt } from '../src/reels/kit/signature.mjs';
 import { createSynth } from './synth.mjs';
 
@@ -101,18 +101,20 @@ for (let f = 0; f < SIGNATURE_AT; f += EIGHTH) {
   pulse(t(f), chordAt(f).upper[k % 4] + 12, level, ((k % 4) - 1.5) * 0.3);
 }
 
-// ── the flick: a ratchet of soft ticks at the scroll's own speed (the same
-// curve the picture uses: EASE_IN_OUT over flick → land), capped at one a frame
+// ── the scroll and the flick: a ratchet of soft ticks at the roll's own
+// speed (the timeline's curve, the picture's), capped at one a frame: a slow
+// tick under the hook's steady scroll, a blur of them in the flick, slowing
+// to rest where it lands
 {
-  const ease = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
-  const pos = (f) => ease(Math.min(1, Math.max(0, (f - H.flick) / (H.land - H.flick))));
+  const M = 69686; // the roll's furthest scroll, points (Roll.tsx MAX_Y)
   let phase = 0;
-  for (let f = H.flick; f < H.land; f += 0.25) {
-    const v = (pos(f + 0.25) - pos(f)) * 4 * (H.land - H.flick); // 0 → ~2 → 0
-    phase += Math.min(1, 0.12 + 0.55 * v) * 0.25;
+  for (let f = 0; f < H.land; f += 0.25) {
+    const v = (rollAt(f + 0.25, M) - rollAt(f, M)) * 4; // points a frame
+    phase += Math.min(1, 0.07 + v / 260) * 0.25;
     if (phase >= 1) {
       phase -= 1;
-      tick(t(f), 0.014 + 0.01 * Math.min(1, v), 1.4 + 0.5 * Math.min(1, v));
+      const k = Math.min(1, v / 600);
+      tick(t(f), 0.012 + 0.012 * k, 1.4 + 0.5 * k);
     }
   }
   whoosh(t(H.grow - 1), 0.8, 0.018, -0.2);
