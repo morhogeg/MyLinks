@@ -1830,7 +1830,7 @@ it again in your own words.
 
 | Time | Picture | Caption = voice |
 |---|---|---|
-| 0:00 | The cover: two screens side by side, the camera roll (left, "2,847 items") scrolling steadily, Machina's feed (right) still, the three cards on it | **Same screenshots. / Two very different places.** (the house hook: kicker over big type) |
+| 0:00 | The cover: two screens side by side, the camera roll (left, "2,847 items") scrolling steadily, Machina's feed (right) still, the three cards on it | **SAME SCREENSHOTS / Camera roll vs Machina.** (the house hook: kicker over big type; voice: "Same screenshots: your camera roll, versus Machina.") |
 | 0:03 | The roll's screen takes the frame, Machina's slides away; one long flick lands on the last row: the three, and "2,847 Screenshots" | Before: 2,847 screenshots. |
 | 0:06.5 | The first is tapped open (the roll pushed back) and swiped through: a used film camera, a Seneca quote, a pin on a map | No idea why / I took most of them. |
 | 0:09 | The three line up, the mark assembles under them; each one's Share is tapped and it is pulled into the mark (one share, one card), the third landing on "Machina" | After: share each screenshot / to Machina. |
@@ -1914,6 +1914,22 @@ the product screenshot, never shown large before, is the one that gets the
 proof. Cast from two directions (run 83): B, 3.66s (A ran 3.96s). The gate
 holds each ring to its word (within 1 frame). 22.0s now.
 
+**Round 4 (owner: "Same screenshots" sounded robotic; "two very different
+places" was not clear).** "Places" pointed at nothing a stranger knows at
+second zero, and the line described a contrast without naming either side.
+The hook now names the two screens in the order they sit: kicker "SAME
+SCREENSHOTS", big "Camera roll / vs Machina." (the "X vs Y" format, and the
+TikTok caption's own words); the difference is left to the picture and the
+lines after it. The robotic read came from opening on a bare two-word
+fragment with a full stop (that take drew "screenshots" out over a second);
+the voice now says one flowing sentence, cast from three readings (run 84)
+by a pitch-movement measure that separates the robotic take from LATER's
+approved hook (`natural.py`-style: semitone range and frame-to-frame
+movement): "Same screenshots: your camera roll, versus Machina." Its opening
+moves 59.5 (range 11.3 semitones) where the robotic one moved 36.1 (8.5);
+2.93s. The other two: "…two places: your camera roll, and Machina." ran
+3.83s; "…Camera roll, or Machina?" was as flat as before.
+
 **Measured (round 3).** `node audio/shots-verify.mjs`: bans clean on 26
 strings and on all 106 distinct texts of the 329 captured frames; Find
 shares no word with its card; every line inside its window; the third share
@@ -1954,10 +1970,10 @@ to Remotion and `CAPTURE_CHROMIUM=/opt/pw-browsers/chromium-1243/chrome-linux64/
 **Captions for posting** (the owner's, tightened; the link stays a
 placeholder until the listing is live):
 
-- Instagram: "Same screenshots, two places. In the camera roll they're a
-  pile. In Machina, each one becomes a card that says what it is and what
-  to do with it. Download on the App Store: [App Store link]
-  #screenshots #iphone #productivity"
+- Instagram: "Same screenshots: camera roll vs Machina. In the camera roll
+  they're a pile. In Machina, each one is analyzed, categorized, summarized
+  and tagged, and you can find it again in your own words. Download on the
+  App Store: [App Store link] #screenshots #iphone #productivity"
 - TikTok: "Camera roll vs Machina. Same screenshots. Download on the App
   Store: [App Store link] #screenshots #iphone #productivity"
 

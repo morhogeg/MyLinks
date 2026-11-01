@@ -14,33 +14,35 @@
  },
  {
   "frame": 105,
-  "text": "Share it to Makeena, and it reads it for you.",
+  "text": "Instead, share it to Makeena, and it reads it for you.",
   "words": [
    0.03,
-   0.309,
-   0.449,
-   0.588,
-   1.007,
-   1.193,
-   1.333,
-   1.612,
-   1.751,
-   1.937
+   0.467,
+   0.928,
+   1.074,
+   1.219,
+   1.656,
+   1.851,
+   1.996,
+   2.287,
+   2.433,
+   2.627
   ]
  },
  {
   "frame": 195,
-  "text": "It even tells you what to do with it.",
+  "text": "Turn what you save into what you need to do.",
   "words": [
-   0.07,
-   0.208,
-   0.438,
-   0.715,
-   0.899,
-   1.129,
-   1.267,
-   1.406,
-   1.636
+   0.02,
+   0.304,
+   0.589,
+   0.816,
+   1.101,
+   1.385,
+   1.67,
+   1.897,
+   2.182,
+   2.352
   ]
  },
  {

@@ -2691,7 +2691,12 @@ exact-match, capped.
   one is analyzed, categorized, summarized and tagged."), each verb ringing
   its part of a real card as it is said (screenshot, category pill, summary,
   tags; gate: within a frame of the word); the feed reads past all three
-  cards to the camera card for it. 22.0s.
+  cards to the camera card for it. 22.0s. **Round 4 (owner: "Same
+  screenshots" robotic; "two very different places" unclear):** the hook is
+  "SAME SCREENSHOTS / Camera roll vs Machina.", voiced as one flowing
+  sentence ("Same screenshots: your camera roll, versus Machina."), cast
+  from three readings by measured pitch movement (the bare fragment with a
+  full stop was what read robotic).
 - **2026-10-31 — INSTAGRAM REEL "LATER NEVER COMES", BUILT BUT FOR ITS
   PICTURE (branch `claude/instagram-reel-app-store-012mo2`, on the App Store
   preview's a35f6c1e; off `main` until the owner reviews the cut).** A 24.0s

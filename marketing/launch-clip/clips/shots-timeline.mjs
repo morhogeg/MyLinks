@@ -59,11 +59,12 @@ export const TOTAL_SEC = TOTAL_FRAMES / FPS;
 export const SIGNATURE_AT = TOTAL_FRAMES - SIGNATURE.frames;
 
 /**
- * Round 2: a second direction for each re-voiced line, voiced in the same
- * run (synth-vo.py `shots-alt`), so the line can be cast from two natural
- * takes by its measured pace instead of being sped up in assembly (round 1's
- * Rubber Band stretch read as metallic). The chosen one's style and pace
- * move into CAPTIONS (the take key is text + style + pace).
+ * Alternate readings, voiced in the same run as CAPTIONS (synth-vo.py
+ * `shots-alt`), so a line is cast from natural takes by measurement instead
+ * of being sped up in assembly (round 1's Rubber Band stretch read as
+ * metallic). The chosen one's words, style and pace move into CAPTIONS (the
+ * take key is text + style + pace). Round 4's two other hook readings: B
+ * ran 3.83s (too long for a hook), C was as flat as round 3's.
  */
 export const CAPTIONS_ALT = [
   {
@@ -184,7 +185,7 @@ const PACE = 'Everyday conversational speed, about 175 words a minute; short nat
 export const CAPTIONS = [
   {
     at: 3,
-    to: 95,
+    to: 96,
     place: 'hook',
     // round 4 (owner: "two very different places" was not clear, and "Same
     // screenshots." sounded robotic). The screen names the two screens in
@@ -196,6 +197,10 @@ export const CAPTIONS = [
     say: 'Same screenshots: your camera roll, versus Machina.',
     style: 'Natural and conversational, like holding up two phones side by side to show a friend: easy and light, one flowing sentence. "Same screenshots" as a casual lead-in that runs straight on, "your camera roll" plain, then "versus Machina" with a small, knowing smile. Never announced, no word drawn out.',
     pace: 'Everyday conversational speed, about 180 words a minute; only a comma-length beat after "screenshots".',
+    // cast from three readings (round 4, narration-tts run 84) by measured
+    // pitch movement: this one's "Same screenshots" moves 59.5 (range 11.3
+    // semitones) where round 3's robotic take moved 36.1 (8.5); the line's
+    // range 12.9 semitones, LATER's approved hook 13.1. 2.93s
     maxPause: 0.22,
   },
   {
