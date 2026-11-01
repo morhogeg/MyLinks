@@ -1818,7 +1818,7 @@ and Signature over paper, and catches a single frame swapped in.
 ## SAME SCREENSHOTS (the before-and-after Reel, 2026-11-01)
 
 `MachinaShots` is the owner's F04 idea ("before and after: your
-screenshots"), refined: 21.5s, 1080 × 1920, narrated, music-led, on the
+screenshots"), refined: 22.0s, 1080 × 1920, narrated, music-led, on the
 house rules (branch `claude/reel-screenshots`, on LATER NEVER COMES'
 c8fdeb85; video work merges only after the owner reviews the cut).
 `MachinaShotsStore` is the launch-day footer, `MachinaShotsSilent` the
@@ -1834,9 +1834,9 @@ it again in your own words.
 | 0:03 | The roll's screen takes the frame, Machina's slides away; one long flick lands on the last row: the three, and "2,847 Screenshots" | Before: 2,847 screenshots. |
 | 0:06.5 | The first is tapped open (the roll pushed back) and swiped through: a used film camera, a Seneca quote, a pin on a map | No idea why / I took most of them. |
 | 0:09 | The three line up, the mark assembles under them; each one's Share is tapped and it is pulled into the mark (one share, one card), the third landing on "Machina" | After: share each screenshot / to Machina. |
-| 0:11 | The mark's point irises open into the real app: the feed reads down the three cards (banner = the same screenshot, title, summary, tags) | Every screenshot becomes / a card that says what it is. |
-| 0:14.7 | CUT to Find: "quote about overthinking" typed under a rack focus; the one card it means lands (no word shared), its ink ring | Find it again / in your own words. |
-| 0:16.5 | The kit's Signature, footer "Coming soon · mymachina.app" (launch day: "Now on the App Store · mymachina.app") | (the Signature's take) |
+| 0:11 | The mark's point irises open into the real app on the newest card; the feed reads down past all three and rests on the camera card, whose parts ring one by one as they are named: its screenshot, its category, its summary, its tags | Analyzed, categorized, / summarized and tagged. (voice: "Each one is analyzed, categorized, summarized and tagged.") |
+| 0:15.2 | CUT to Find: "quote about overthinking" typed under a rack focus; the one card it means lands (no word shared), its ink ring | Find it again / in your own words. |
+| 0:17 | The kit's Signature, footer "Coming soon · mymachina.app" (launch day: "Now on the App Store · mymachina.app") | (the Signature's take) |
 
 **What changed from the brief, and why.**
 - **No recipe** (owner, 2026-10-02: no recipe or cooking content): the
@@ -1898,11 +1898,28 @@ it takes the frame (`ROLL`/`rollAt` in the timeline, shared with the score's
 ratchet); the share row is larger (0.62px a point); the feed holds a little
 longer on each card.
 
-**Measured (round 2).** `node audio/shots-verify.mjs`: bans clean on 26
+**Round 3 (owner: say more than "a card that says what it is": that each
+screenshot is analyzed, summarized, categorized).** The line names what the
+app does, in the app's own terms (its image steps are Scanning image /
+Reading text / Understanding content / Organizing & tagging,
+`web/lib/scanPhases.ts`), and the picture proves each word on a real card:
+the verbs run top to bottom as their parts sit on the card, and each part
+rings (the kit's Lift and Ping) as it is said, 2 frames ahead of its word:
+the screenshot ("analyzed"), the category pill ("categorized"), the summary
+("summarized"), the tags ("tagged"). The screen drops "Each one is" (the
+picture carries it). The parts are measured in the capture inside the camera
+card only (`data-capture-card`: the account has other Travel and Shopping
+cards), and the feed now reads down past all three cards to rest on it, so
+the product screenshot, never shown large before, is the one that gets the
+proof. Cast from two directions (run 83): B, 3.66s (A ran 3.96s). The gate
+holds each ring to its word (within 1 frame). 22.0s now.
+
+**Measured (round 3).** `node audio/shots-verify.mjs`: bans clean on 26
 strings and on all 106 distinct texts of the 329 captured frames; Find
 shares no word with its card; every line inside its window; the third share
-lands on the spoken "Machina" (frame 319 both); every line 8.5–20.2dB over
-the music in the speech band; the mix −14.00 LUFS, −1.20 dBTP. `node
+lands on the spoken "Machina" (frame 319 both); the card's four parts ring
+on their words (within 1 frame); every line 8.6–20.2dB over the music in the
+speech band; the mix −14.03 LUFS, −1.26 dBTP. `node
 audio/house-verify.mjs shots` passes (the Signature take in the mix at 0.81).
 `scripts/frame-jumps.mjs` flags only frames that are meant: the hard cut to
 Find, on the beat, and the app swapping the feed for search as typing

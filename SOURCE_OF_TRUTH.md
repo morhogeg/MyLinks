@@ -2686,6 +2686,12 @@ exact-match, capped.
   chain); the line is "After: share each screenshot to Machina." ("each":
   several at once make ONE card); larger hook screens and share row, a
   readable hook scroll. Natural takes need 14.6s, so the cut is 21.5s.
+  **Round 3 (owner: name what Machina does to each screenshot):** the card
+  line is now "Analyzed, categorized, / summarized and tagged." (voice: "Each
+  one is analyzed, categorized, summarized and tagged."), each verb ringing
+  its part of a real card as it is said (screenshot, category pill, summary,
+  tags; gate: within a frame of the word); the feed reads past all three
+  cards to the camera card for it. 22.0s.
 - **2026-10-31 — INSTAGRAM REEL "LATER NEVER COMES", BUILT BUT FOR ITS
   PICTURE (branch `claude/instagram-reel-app-store-012mo2`, on the App Store
   preview's a35f6c1e; off `main` until the owner reviews the cut).** A 24.0s

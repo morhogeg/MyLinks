@@ -49,10 +49,11 @@ export const BEAT = BEAT_FRAMES / FPS;
 /** Beat (quarter note, may be fractional) → frame. */
 export const beat = (n) => Math.round(n * BEAT_FRAMES);
 
-/** 43 beats, 21.5s: 33 beats of story, then the shared ending. (Round 2:
+/** 44 beats, 22.0s: 34 beats of story, then the shared ending. (Round 2:
  *  the voice is no longer sped up in assembly, the owner heard the stretch
- *  as metallic; its natural takes need 14.6s, a second more than round 1's) */
-export const TOTAL_FRAMES = beat(43);
+ *  as metallic; round 3's card line names what Machina does, half a second
+ *  longer. The natural takes need 15.1s) */
+export const TOTAL_FRAMES = beat(44);
 export const TOTAL_SEC = TOTAL_FRAMES / FPS;
 /** the kit's Signature is the last SIGNATURE.frames frames (house rule) */
 export const SIGNATURE_AT = TOTAL_FRAMES - SIGNATURE.frames;
@@ -108,12 +109,17 @@ export const HITS = {
   land1: 289, // …and pulled into the mark (8th notes; the last on "Machina")
   land2: 304,
   land3: 319,
-  iris: 323, // the mark's point opens into the app: the three cards
-  card2: 368, // the feed reads down to the next card…
-  card3: 404, // …and the next
-  find: 442, // CUT: Find: the field focuses (8 frames), the query typed under a rack focus
-  result: 462, // the one card it means (the app's own card-enter)
-  ring: 474, // its ink ring, once it has settled
+  iris: 323, // the mark's point opens into the app: the newest card
+  cards: 340, // (round 3) the feed reads down past all three, to rest on the camera card
+  // …whose parts ring as the line names them, each 2 frames ahead of its
+  // word (the eye leads the ear): the screenshot "analyzed", the category
+  // "categorized", the summary "summarized", the tags "tagged" (word starts
+  // from the measured take, src/reels/clips/shots/shots-vo.json; verify
+  // holds them to it)
+  parts: [364, 383, 407, 435],
+  find: 457, // CUT: Find: the field focuses (8 frames), the query typed under a rack focus
+  result: 477, // the one card it means (the app's own card-enter)
+  ring: 489, // its ink ring, once it has settled
   signature: SIGNATURE_AT,
 };
 
@@ -226,7 +232,7 @@ export const CAPTIONS = [
   },
   {
     at: 342,
-    to: 443,
+    to: 458,
     // round 3 (owner): say what Machina does to each one, not just "a card
     // that says what it is". The app's own steps for a screenshot are
     // Scanning image / Reading text / Understanding content / Organizing &
@@ -238,13 +244,14 @@ export const CAPTIONS = [
     cues: [3, 5],
     text: 'Analyzed, categorized,\nsummarized and tagged.',
     say: 'Each one is analyzed, categorized, summarized and tagged.',
-    style: 'Natural and conversational, quietly pleased, like showing a friend something clever: an easy, even rhythm through the four words, each one light and clear, "and tagged" landing softly. Not a list read off a page, not an announcer.',
-    pace: 'Everyday conversational speed, about 175 words a minute; short natural beats at the commas, the whole line in one easy breath.',
+    // cast from two takes (round 3): direction B, 3.66s and even (A ran 3.96s)
+    style: 'Warm and a little impressed, like telling a friend what the app just did for you: "Each one is" easy and quick, then the four words with a gentle, satisfying rhythm, a small smile on "and tagged". Conversational, never a sales pitch.',
+    pace: 'Brisk everyday conversational speed, about 185 words a minute; only the briefest beats at the commas.',
     maxPause: 0.2,
   },
   {
-    at: 447,
-    to: 498,
+    at: 462,
+    to: 513,
     cues: [0, 3],
     text: 'Find it again\nin your own words.',
     style: `${TALK} Easy and warm; "in your own words" landing softly, leaving space before the logo.`,

@@ -1339,7 +1339,21 @@ const takes = {
       camera: card('shot-camera'),
       seneca: card('shot-seneca'),
       viewpoint: card('shot-viewpoint'),
+      // (round 3) the oldest share's card (the camera, where the feed comes
+      // to rest), its parts each rung as the line names it: its screenshot,
+      // its category, its summary (two paragraphs), its tags. Measured inside
+      // that card only (the account has other cards with the same words)
+      camShot: ['[data-capture-card=cam] img'],
+      camCategory: ['[data-capture-card=cam] *', 'Shopping'],
+      camSum1: ['[data-capture-card=cam] *', 'A used Olympus'],
+      camSum2: ['[data-capture-card=cam] *', 'Listed in excellent'],
+      camTag1: ['[data-capture-card=cam] *', 'film-photography'],
+      camTag2: ['[data-capture-card=cam] *', 'cameras'],
     };
+    await page.evaluate((title) => {
+      const art = [...document.querySelectorAll('main article.surface-card')].find((a) => a.querySelector('h3')?.textContent.trim() === title);
+      art.setAttribute('data-capture-card', 'cam');
+    }, SHOTS.cards[0].title);
     t.mark('top');
     await t.snap({ rects: RS });
     // where the newest card sits at the top of the feed

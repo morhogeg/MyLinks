@@ -221,14 +221,23 @@ const ShareButton: React.FC<{ k: number; f: number }> = ({ k, f }) => {
 /** ── the app: the feed, read down; then Find ─────────────────────────── */
 
 /** the feed: the newest card where the iris opens; held, read down a card, held… */
-const FEED_CAM: Cam = { cx: SHOT.w / 2, cy: 355, z: 2.3, fx: 540, fy: 996, rx: 0, ry: 0, rz: 0 };
-/** the scroll between two cards, in points (the capture's: 764 points in 255 steps) */
-const CARD_GAP = 382;
+const FEED_CAM: Cam = { cx: SHOT.w / 2, cy: 355, z: 2.1, fx: 540, fy: 944, rx: 0, ry: 0, rz: 0 };
+/** (round 3) one read down the feed, past all three cards, to rest on the
+ *  camera card (the capture's scroll: 764 points in 255 steps), so every
+ *  screenshot is seen as a card before the line names what was done to it */
 const STEP = 764 / 255;
-const feedScroll = (f: number) => CARD_GAP * (prog(f, HITS.card2, HITS.card2 + 14, EASE_IN_OUT) + prog(f, HITS.card3, HITS.card3 + 14, EASE_IN_OUT));
+const feedScroll = (f: number) => 764 * prog(f, HITS.cards, HITS.cards + 22, EASE_IN_OUT);
 const feedFrame = (f: number) => Math.min(256, Math.round(feedScroll(f) / STEP));
-/** a slow push under the holds (linear: the one job linear has) */
-const feedCam = (f: number): Cam => ({ ...FEED_CAM, z: FEED_CAM.z + 0.035 * prog(f, HITS.iris, HITS.find, (t) => t) });
+/** a slow push under the hold (linear: the one job linear has) */
+const feedCam = (f: number): Cam => ({ ...FEED_CAM, z: FEED_CAM.z + 0.03 * prog(f, HITS.cards + 22, HITS.find, (t) => t) });
+/** the camera card's parts, where the feed comes to rest, each rung as the
+ *  line names it: [box, corner radius]. The summary is two paragraphs and
+ *  the tags two chips: each pair rung as one, a little room around it */
+const unite = (a: Rect, b: Rect, pad = 0): Rect => {
+  const x0 = Math.min(a[0], b[0]) - pad;
+  const y0 = Math.min(a[1], b[1]) - pad;
+  return [x0, y0, Math.max(a[0] + a[2], b[0] + b[2]) + pad - x0, Math.max(a[1] + a[3], b[1] + b[3]) + pad - y0];
+};
 /** the iris opens out of the mark's point (its place in screen points) */
 const IRIS_AT = { x: FEED_CAM.cx + (MARK.x - FEED_CAM.fx) / FEED_CAM.z, y: FEED_CAM.cy + (MARK.y - FEED_CAM.fy) / FEED_CAM.z };
 
@@ -247,6 +256,19 @@ const findFrame = (f: number) => {
   return Math.min(T.count - 1, m.result + (f - HITS.result));
 };
 const SENECA_RECT = T.frames[T.marks.result].r.seneca;
+const REST = T.frames[T.marks.read].r;
+const PARTS: [Rect, number][] = [
+  [REST.camShot, 19],
+  [REST.camCategory, 7],
+  [unite(REST.camSum1, REST.camSum2, 5), 10],
+  [unite(REST.camTag1, REST.camTag2, 3), 9],
+];
+/** how strongly part k is rung at frame f: in on its word, out as the next arrives */
+const partRing = (k: number, f: number) => {
+  const at = HITS.parts[k];
+  const next = HITS.parts[k + 1];
+  return prog(f, at, at + 8, EASE_MODAL) * (next === undefined ? 1 : 1 - prog(f, next, next + 8, EASE_IN_OUT));
+};
 
 /** ── the narration on screen ──────────────────────────────────────────── */
 const Lines: React.FC<{ f: number }> = ({ f }) => (
@@ -370,7 +392,21 @@ export const Shots: React.FC<{ withAudio?: boolean; withCaptions?: boolean; endi
 
       {/* the app: the feed, out of the mark's point */}
       {inFeed && (
-        <AppShot take={TAKE} i={feedFrame(f)} cam={feedCam(f)} iris={iris < 1 ? { x: IRIS_AT.x, y: IRIS_AT.y, r: 500 * iris } : null} motion={{ x: 0, y: ds }} />
+        <AppShot take={TAKE} i={feedFrame(f)} cam={feedCam(f)} iris={iris < 1 ? { x: IRIS_AT.x, y: IRIS_AT.y, r: 500 * iris } : null} motion={{ x: 0, y: ds }}>
+          {/* the parts: each Lift mounted from the frame the feed comes to
+              rest (a frame that changes anyway) until the cut, never on a
+              still one; the ring and a small rise in on its word */}
+          {f >= HITS.cards + 22 &&
+            PARTS.map(([rect, radius], k) => {
+              const r = partRing(k, f);
+              return (
+                <React.Fragment key={k}>
+                  <Ping rect={rect} t={(f - HITS.parts[k]) / 16} radius={radius} reach={10} width={1.4} alpha={0.4} />
+                  <Lift take={TAKE} i={feedFrame(f)} rect={rect} radius={radius} lift={Math.max(0.002, 0.55 * r)} ring={r} rise={3} grow={k === 0 ? 0.012 : 0.03} />
+                </React.Fragment>
+              );
+            })}
+        </AppShot>
       )}
       {inFind && (
         <AppShot take={TAKE} i={fi} cam={FIND_CAM} blur={rack > 0.2 ? rack : 0} dim={rack > 0.2 ? 0.08 * (rack / 14) : 0} focus={rack > 0.2 ? { y0: 110, y1: 176, blur: rack } : undefined}>

@@ -99,6 +99,18 @@ const nameAt = name.at + Math.round(vo.find((x) => x.frame === name.at).words.at
 if (Math.abs(nameAt - HITS.land3) > 3) fail(`the last share lands at ${HITS.land3}, "Machina" is said at ${nameAt}`);
 else ok(`the third share lands on "Machina" (frame ${HITS.land3}, said at ${nameAt})`);
 
+// each part of the card rings on its word (round 3): 2 frames ahead, ±3
+const cardLine = CAPTIONS[4];
+const cardVo = vo.find((x) => x.frame === cardLine.at);
+const VERBS = ['analyzed,', 'categorized,', 'summarized', 'tagged.'];
+const sayWords = cardLine.say.split(/\s+/);
+const off = VERBS.map((w, k) => {
+  const i = sayWords.indexOf(w);
+  return HITS.parts[k] + 2 - (cardLine.at + Math.round(cardVo.words[i] * FPS));
+});
+if (off.some((d) => Math.abs(d) > 3)) fail(`the card's parts ring off their words by ${off.join(', ')} frames`);
+else ok(`the card's four parts ring on "analyzed", "categorized", "summarized", "tagged" (within ${Math.max(...off.map(Math.abs))} frames)`);
+
 // ── the mix ──────────────────────────────────────────────────────────────
 const wav = (rel) => {
   const b = fs.readFileSync(path.join(root, rel));

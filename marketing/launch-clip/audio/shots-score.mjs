@@ -56,7 +56,7 @@ const CHORDS = [
   [H.tap, 'Am7'],
   [AFTER, 'Cmaj7'],
   [H.iris, 'Fmaj7'],
-  [H.card3, 'G6'],
+  [H.parts[2], 'G6'],
   [H.find, 'Am7'],
   [H.result, 'Fmaj7'],
   [SIGNATURE_AT, 'Cmaj7'],
@@ -161,8 +161,10 @@ const nameEnds = SPEECH[3][1];
 bell(t(Math.max(H.land3 + 6, nameEnds + 1)), 83, 0.06, 0, 2.4);
 whoosh(t(H.iris), 0.7, 0.02, 0);
 
-// ── the feed: air as it reads down to each card
-for (const f of [H.card2, H.card3]) whoosh(t(f), 0.55, 0.014, f === H.card2 ? -0.2 : 0.2);
+// ── the feed: air as it reads down past the three; then a soft, high tick
+// as each part of the card rings (non-melodic: the words land on their own)
+whoosh(t(H.cards), 0.75, 0.018, 0.15);
+H.parts.forEach((f, k) => tick(t(f + 3), 0.026, 1.7 + 0.08 * k));
 
 // ── Find: the cut, the drums out; a key tick per typed frame; the card, its ring
 impact(t(H.find), 0.06);
