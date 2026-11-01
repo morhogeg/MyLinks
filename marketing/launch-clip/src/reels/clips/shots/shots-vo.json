@@ -64,18 +64,27 @@
  },
  {
   "frame": 481,
-  "text": "Now I find any of them in my own words.",
+  "text": "When I need one, I just describe it.",
   "words": [
    0.03,
-   0.274,
-   0.396,
-   0.701,
-   0.945,
-   1.128,
+   0.242,
+   0.326,
+   0.538,
+   0.9,
+   0.991,
+   1.219,
+   1.628
+  ]
+ },
+ {
+  "frame": 548,
+  "text": "Now every screenshot makes sense.",
+  "words": [
+   0.03,
+   0.263,
+   0.792,
    1.433,
-   1.616,
-   1.799,
-   2.043
+   1.782
   ]
  }
 ]

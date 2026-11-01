@@ -1344,6 +1344,11 @@ const takes = {
       // its category, its summary (two paragraphs), its tags. Measured inside
       // that card only (the account has other cards with the same words)
       camShot: ['[data-capture-card=cam] img'],
+      // (round 6) its title: what "analyzed" rings (the strip of screenshot
+      // in the banner, a clock and two buttons, showed nothing about it)
+      // (the text itself, not its full-width box: a ring around the box sat
+      // in empty space)
+      camTitle: ['::phrase', '[data-capture-card=cam] h3', SHOTS.cards[0].title],
       camCategory: ['[data-capture-card=cam] *', 'Shopping'],
       camSum1: ['[data-capture-card=cam] *', 'A used Olympus'],
       camSum2: ['[data-capture-card=cam] *', 'Listed in excellent'],

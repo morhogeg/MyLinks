@@ -1818,7 +1818,7 @@ and Signature over paper, and catches a single frame swapped in.
 ## SAME SCREENSHOTS (the before-and-after Reel, 2026-11-01)
 
 `MachinaShots` is the owner's F04 idea ("before and after: your
-screenshots"), refined: 23.0s, 1080 × 1920, narrated, music-led, on the
+screenshots"), refined: 25.0s, 1080 × 1920, narrated, music-led, on the
 house rules (branch `claude/reel-screenshots`, on LATER NEVER COMES'
 c8fdeb85; video work merges only after the owner reviews the cut).
 `MachinaShotsStore` is the launch-day footer, `MachinaShotsSilent` the
@@ -1834,9 +1834,10 @@ it again in your own words.
 | 0:03 | The roll's screen takes the frame, Machina's slides away; one long flick lands on the last row: the three, and "2,847 Screenshots" | Before: 2,847 screenshots. | same |
 | 0:06.3 | The first tapped open, the roll pushed back; swiped through: a used film camera, a Seneca quote, a pin on a map | No idea why / I took most of them. | same |
 | 0:08.3 | The three line up, the mark assembles under them; each one's Share tapped and pulled into the mark (one share, one card), the third landing on "Machina" | So I started sharing them / to Machina. | same |
-| 0:10.5 | The mark's point irises open into the real app; the feed reads down past all three and rests on the camera card, whose parts ring as they are named: its screenshot, its category, its summary, its tags | After: analyzed, categorized, / summarized and tagged. | "After: each one is analyzed, categorized, summarized and tagged." |
-| 0:15.9 | CUT to Find: "quote about overthinking" typed under a rack focus; the one card it means lands (no word shared), its ink ring | Now I find any of them / in my own words. | same |
-| 0:18 | The kit's Signature, footer "Coming soon · mymachina.app" (launch day: "Now on the App Store · mymachina.app") | (the Signature's) | (the Signature's take) |
+| 0:10.5 | The mark's point irises open into the real app; the feed reads down past all three and rests on the camera card, whose parts ring as they are named: its title (round 6: was the strip of screenshot in its banner), its category, its summary, its tags | After: analyzed, categorized, / summarized and tagged. | "After: each one is analyzed, categorized, summarized and tagged." |
+| 0:15.9 | CUT to Find: the field focuses and waits under a rack focus; "quote about overthinking" types itself on "I just describe it"; the one card it means lands (no word shared), its ink ring | When I need one, / I just describe it. | same |
+| 0:18.3 | On "Now", the view pulls back into the cover's pair: BEFORE, the camera roll at its last row (the same three screenshots, "2,847 Screenshots"); AFTER, the card it found | **Now every screenshot / makes sense.** (a touch heavier: the statement) | same |
+| 0:20 | The kit's Signature, footer "Coming soon · mymachina.app" (launch day: "Now on the App Store · mymachina.app") | (the Signature's) | (the Signature's take) |
 
 **What changed from the brief, and why.**
 - **No recipe** (owner, 2026-10-02: no recipe or cooking content): the
@@ -1960,13 +1961,33 @@ short (a 1028px row as 893px); `shots-verify.mjs` now embeds the font and
 gates every row at 950px. `later-verify.mjs` loads it the old way, so its
 width check may be measuring the fallback too.
 
-**Measured (round 5).** `node audio/shots-verify.mjs`: bans clean on 26
+**Round 6 (owner: the ring on "analyzed" made no sense; two seconds more
+for a stronger close, and revise the find line).** "Analyzed" rang the
+banner's strip of screenshot: a clock and two buttons, nothing about
+analysis. It rings the card's title now, "Olympus mju II film camera, €189",
+the clearest proof the screenshot was read (measured as the text's own
+extent, `::phrase`, not the h3's full-width box). The find line says the
+mechanism, "When I need one, I just describe it.", and the query types
+itself on "I just describe it" (the focused field waits under the rack
+focus until then). The close is new: "Now every screenshot makes sense.",
+which answers the opening's "No idea why I took most of them" and never
+says the tagline (the Signature's "finally useful" follows it), set a touch
+heavier, over a callback to the cover: on "Now" the Find screen pulls back to
+AFTER while the camera roll returns to BEFORE at its last row, so the same
+three screenshots sit on the left as tiles while the one found sits on the
+right as a card. Both lines cast from two readings (run 87) by pitch
+movement: 47.8 and 61.7 (the close's other reading came back flat, 33.3).
+25.0s; gates hold the typing to "describe" and the pull-back to "Now".
+
+**Measured (round 6).** `node audio/shots-verify.mjs`: bans clean on 28
 strings and on all 106 distinct texts of the 329 captured frames; Find
 shares no word with its card; every line inside its window; every row inside
-Meta's margins (the widest 780px of 950); the third share lands on the
-spoken "Machina" (frame 310 both); the card's four parts ring on their words
-(within a frame); every line 13.6–23.7dB over the music in the speech band;
-the mix −14.02 LUFS, −1.26 dBTP. `node
+Meta's margins (the widest 780px of 950, the statement measured at its
+heavier weight); the third share lands on the spoken "Machina" (frame 310
+both); the card's four parts ring on their words (within a frame); the
+query types on "describe" and the close pulls back on "Now"; every line
+14.4–24.6dB over the music in the speech band; the mix −14.01 LUFS,
+−1.22 dBTP. `node
 audio/house-verify.mjs shots` passes (the Signature take in the mix at 0.81).
 `scripts/frame-jumps.mjs` flags only frames that are meant: the hard cut to
 Find, on the beat, and the app swapping the feed for search as typing
@@ -2007,7 +2028,9 @@ no emoji; the link stays a placeholder until the listing is live):
   > My screenshots, before and after Machina.
   >
   > Before: 2,847 of them, and no idea why I took most.
-  > After: each one analyzed, categorized, summarized and tagged. Now I find any of them in my own words.
+  > After: each one analyzed, categorized, summarized and tagged. When I need one, I just describe it.
+  >
+  > Now every screenshot makes sense.
   >
   > How many screenshots are in your camera roll right now?
   >

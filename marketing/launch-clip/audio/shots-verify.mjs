@@ -111,6 +111,21 @@ const off = VERBS.map((w, k) => {
 if (off.some((d) => Math.abs(d) > 3)) fail(`the card's parts ring off their words by ${off.join(', ')} frames`);
 else ok(`the card's four parts ring on "analyzed", "categorized", "summarized", "tagged" (within ${Math.max(...off.map(Math.abs))} frames)`);
 
+// (round 6) the query types itself on "describe", and the close pulls back on "Now"
+{
+  const find = CAPTIONS[5];
+  const fv = vo.find((x) => x.frame === find.at);
+  const fw = (find.say ?? find.text.replace(/\n/g, ' ')).split(/\s+/);
+  const describeAt = find.at + Math.round(fv.words[fw.indexOf('describe')] * FPS);
+  const close = CAPTIONS[6];
+  const nowAt = close.at + Math.round(vo.find((x) => x.frame === close.at).words[0] * FPS);
+  const typingOff = HITS.typing - describeAt;
+  const closeOff = HITS.close - nowAt;
+  if (typingOff < -8 || typingOff > 2) fail(`the query starts typing ${typingOff} frames from "describe" (it should be just ahead of it)`);
+  else if (Math.abs(closeOff) > 3) fail(`the close pulls back ${closeOff} frames from "Now"`);
+  else ok(`the query types on "describe" (${typingOff} frames), the close pulls back on "Now" (${closeOff})`);
+}
+
 // ── every row inside Meta's side margins (round 5) ─────────────────────
 // measured in the house face at the house sizes, the font EMBEDDED in the
 // page: loaded by file:// it silently fell back to another face and measured
@@ -121,12 +136,12 @@ else ok(`the card's four parts ring on "analyzed", "categorized", "summarized", 
   else {
     const { chromium } = await import('playwright-core');
     const b64 = fs.readFileSync(path.join(root, 'node_modules/geist/dist/fonts/geist-sans/Geist-Variable.woff2')).toString('base64');
-    const rows = CAPTIONS.flatMap((c) => c.text.split('\n').map((r) => ({ r, hook: c.place === 'hook' })));
+    const rows = CAPTIONS.flatMap((c) => c.text.split('\n').map((r) => ({ r, hook: c.place === 'hook', statement: !!c.statement })));
     const b = await chromium.launch({ executablePath: exe });
     const page = await b.newPage();
     await page.setContent(
       `<style>@font-face{font-family:G;src:url(data:font/woff2;base64,${b64}) format('woff2');font-weight:100 900}span{font-family:G;white-space:nowrap}</style>` +
-        rows.map(({ r, hook }, i) => `<div><span id=r${i} style="font-size:${hook ? 96 : 60}px;font-weight:${hook ? 720 : 650};letter-spacing:${hook ? '-0.042em' : '-0.028em'}">${r}</span></div>`).join(''),
+        rows.map(({ r, hook, statement }, i) => `<div><span id=r${i} style="font-size:${hook ? 96 : 60}px;font-weight:${hook ? 720 : statement ? 760 : 650};letter-spacing:${hook ? '-0.042em' : '-0.028em'}">${r}</span></div>`).join(''),
     );
     await page.evaluate(() => document.fonts.ready);
     const loaded = await page.evaluate(() => document.fonts.check('650 60px G'));

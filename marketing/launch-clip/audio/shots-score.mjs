@@ -61,6 +61,8 @@ const CHORDS = [
   [H.parts[2], 'G6'],
   [H.find, 'Am7'],
   [H.result, 'Fmaj7'],
+  // (round 6) the close lifts on V into the logo's I
+  [H.close, 'G6'],
   [SIGNATURE_AT, 'Cmaj7'],
 ];
 const chordAt = (frame) => VOICINGS[CHORDS.filter(([f]) => f <= frame).at(-1)[1]];
@@ -170,11 +172,14 @@ H.parts.forEach((f, k) => tick(t(f + 3), 0.026, 1.7 + 0.08 * k));
 
 // ── Find: the cut, the drums out; a key tick per typed frame; the card, its ring
 impact(t(H.find), 0.06);
-for (let f = H.find + 8; f < H.result - 2; f++) tick(t(f), 0.022, 1.8);
+for (let f = H.typing; f < H.typing + 9; f++) tick(t(f), 0.022, 1.8);
 pad(t(H.find + 8), t(H.result - H.find - 8) + 0.3, 72, 0.02, 0);
 riser(t(H.result - 14), t(14), 0.03);
 bell(t(H.result), 79, 0.055, 0.1, 2.4);
 bell(t(H.ring), 84, 0.045, -0.1, 2.2);
+
+// ── (round 6) the close: air as the view pulls back into BEFORE | AFTER
+whoosh(t(H.close), 0.8, 0.018, 0);
 
 // ── fills: a plucked figure answering the voice in the gaps between lines
 const FILL = [0, 2, 3, 1];

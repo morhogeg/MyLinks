@@ -267,13 +267,28 @@ const TYPED = [2, 4, 6, 8, 10, 16, 18, 20, 22];
 const findFrame = (f: number) => {
   const m = T.marks;
   if (f < HITS.find + 8) return m.focus + (f - HITS.find);
-  if (f < HITS.result) return m.typing + TYPED[Math.min(TYPED.length - 1, f - HITS.find - 8)];
+  // (round 6) the focused field waits for the words, then types on them
+  if (f < HITS.typing) return m.focus + 7;
+  if (f < HITS.result) return m.typing + TYPED[Math.min(TYPED.length - 1, f - HITS.typing)];
   return Math.min(T.count - 1, m.result + (f - HITS.result));
 };
+/** (round 6) the close: on "Now", the Find screen pulls back to the cover's
+ *  AFTER place while the camera roll returns to BEFORE beside it (its last
+ *  row: the same three screenshots, and "2,847 Screenshots") */
+const closeT = (f: number) => prog(f, HITS.close, HITS.close + 18, EASE_IN_OUT);
+const findCam = (f: number): Cam => {
+  const t = closeT(f);
+  if (t <= 0) return FIND_CAM;
+  const z = Math.exp(mix(Math.log(FIND_CAM.z), Math.log(HOOK_RIGHT.z), t));
+  return { ...FIND_CAM, cx: mix(FIND_CAM.cx, SHOT.w / 2, t), cy: mix(FIND_CAM.cy, SHOT.h / 2, t), z, fx: mix(FIND_CAM.fx, HOOK_RIGHT.fx, t), fy: mix(FIND_CAM.fy, HOOK_RIGHT.fy, t) };
+};
+const ROLL_BACK_FROM: Place = { z: HOOK_LEFT.z, fx: -330, fy: HOOK_LEFT.fy };
 const SENECA_RECT = T.frames[T.marks.result].r.seneca;
 const REST = T.frames[T.marks.read].r;
 const PARTS: [Rect, number][] = [
-  [REST.camShot, 19],
+  // (round 6) "analyzed" rings the title, the clearest proof the screenshot
+  // was read (the banner's strip, a clock and two buttons, showed nothing)
+  [unite(REST['camTitle#0'], REST['camTitle#0'], 5), 8],
   [REST.camCategory, 7],
   [unite(REST.camSum1, REST.camSum2, 5), 10],
   [unite(REST.camTag1, REST.camTag2, 3), 9],
@@ -303,7 +318,19 @@ const Lines: React.FC<{ f: number }> = ({ f }) => (
       }
       return (
         <div key={c.at} style={{ position: 'absolute', left: 0, right: 0, top: HOUSE_BAND.top, display: 'flex', justifyContent: 'center' }}>
-          <KineticLine text={c.text} frame={f} from={c.at} to={c.to} starts={starts} size={HOUSE_BAND.size} weight={HOUSE_BAND.weight} width={HOUSE_BAND.width} />
+          <KineticLine
+            text={c.text}
+            frame={f}
+            from={c.at}
+            to={c.to}
+            starts={starts}
+            size={HOUSE_BAND.size}
+            weight={HOUSE_BAND.weight}
+            // (round 6) the closing statement, a touch heavier (emphasis by
+            // weight, never colour: POV's punchline precedent)
+            weights={c.statement ? lines.map(() => HOUSE_BAND.weight + 110) : undefined}
+            width={HOUSE_BAND.width}
+          />
         </div>
       );
     })}
@@ -429,7 +456,7 @@ export const Shots: React.FC<{ withAudio?: boolean; withCaptions?: boolean; endi
         </AppShot>
       )}
       {inFind && (
-        <AppShot take={TAKE} i={fi} cam={FIND_CAM} blur={rack > 0.2 ? rack : 0} dim={rack > 0.2 ? 0.08 * (rack / 14) : 0} focus={rack > 0.2 ? { y0: 110, y1: 176, blur: rack } : undefined}>
+        <AppShot take={TAKE} i={fi} cam={findCam(f)} blur={rack > 0.2 ? rack : 0} dim={rack > 0.2 ? 0.08 * (rack / 14) : 0} focus={rack > 0.2 ? { y0: 110, y1: 176, blur: rack } : undefined}>
           {/* the Lift is its own raster: mounted on the frame the card
               arrives (a frame that changes anyway), never on a still one */}
           {f >= HITS.result && (
@@ -439,6 +466,19 @@ export const Shots: React.FC<{ withAudio?: boolean; withCaptions?: boolean; endi
             </>
           )}
         </AppShot>
+      )}
+
+      {/* (round 6) the close: the camera roll back at BEFORE, at its last row */}
+      {f >= HITS.close && f < SIGNATURE_AT + 14 && (
+        <Slab place={lerpPlace(ROLL_BACK_FROM, HOOK_LEFT, closeT(f))}>
+          <Roll y={MAX_Y} id="rollback" />
+        </Slab>
+      )}
+      {f >= HITS.close && f < SIGNATURE_AT + 14 && (
+        <>
+          <ScreenLabel text="Before" place={HOOK_LEFT} dx={0} opacity={prog(f, HITS.close + 8, HITS.close + 18, EASE_MODAL)} />
+          <ScreenLabel text="After" place={HOOK_RIGHT} dx={0} opacity={prog(f, HITS.close + 8, HITS.close + 18, EASE_MODAL)} />
+        </>
       )}
 
       {scrim > 0 && f < SIGNATURE_AT + 14 && <BandScrim opacity={scrim} tone={TOKENS.paper} band={HOUSE_BAND} />}

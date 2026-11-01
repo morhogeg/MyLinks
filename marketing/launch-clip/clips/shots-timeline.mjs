@@ -49,11 +49,10 @@ export const BEAT = BEAT_FRAMES / FPS;
 /** Beat (quarter note, may be fractional) → frame. */
 export const beat = (n) => Math.round(n * BEAT_FRAMES);
 
-/** 46 beats, 23.0s: 36 beats of story, then the shared ending. (Round 2:
+/** 50 beats, 25.0s: 40 beats of story, then the shared ending. (Round 2:
  *  the voice is no longer sped up in assembly, the owner heard the stretch
- *  as metallic; round 5's before-and-after script, cast for natural reads,
- *  needs 16.2s of voice) */
-export const TOTAL_FRAMES = beat(46);
+ *  as metallic; round 6, owner: two seconds more for a stronger close) */
+export const TOTAL_FRAMES = beat(50);
 export const TOTAL_SEC = TOTAL_FRAMES / FPS;
 /** the kit's Signature is the last SIGNATURE.frames frames (house rule) */
 export const SIGNATURE_AT = TOTAL_FRAMES - SIGNATURE.frames;
@@ -110,9 +109,11 @@ export const HITS = {
   // from the measured take, src/reels/clips/shots/shots-vo.json; verify
   // holds them to it)
   parts: [371, 390, 422, 448],
-  find: 477, // CUT: Find: the field focuses (8 frames), the query typed under a rack focus
-  result: 497, // the one card it means (the app's own card-enter)
-  ring: 509, // its ink ring, once it has settled
+  find: 477, // CUT: Find: the field focuses (8 frames) and waits under a rack focus…
+  typing: 514, // …and the query types itself as she says "I just describe it"
+  result: 526, // the one card it means (the app's own card-enter)
+  ring: 535, // its ink ring, once it has settled
+  close: 548, // (round 6) on "Now": the view pulls back into the cover's BEFORE | AFTER
   signature: SIGNATURE_AT,
 };
 
@@ -267,18 +268,20 @@ export const CAPTIONS = [
   },
   {
     at: 481,
-    to: 562,
+    to: 544,
     // round 6 (owner: revise the payoff): the mechanism said plainly; the
     // query types itself as she says "describe it"
     cues: [0, 4],
     text: 'When I need one,\nI just describe it.',
-    style: 'Natural and conversational, with a little warmth and a smile, like telling a friend the easy part: "When I need one" light, "I just describe it" with a small, satisfied smile. Not an announcer, no word drawn out.',
-    pace: PACE,
+    // cast (run 87) from two readings by pitch movement: 47.8 (range 10.1
+    // semitones), 1.88s; the other 43.8
+    style: 'Bright and playful, like sharing a neat trick with a friend: a lift on "need one", a smile on "describe it". Conversational and light.',
+    pace: 'Everyday conversational speed, about 180 words a minute.',
     maxPause: 0.2,
   },
   {
-    at: 570,
-    to: 640,
+    at: 548,
+    to: 620,
     // round 6 (owner: a stronger closing statement, two seconds more): it
     // answers the opening's "No idea why I took most of them", over the
     // cover's BEFORE | AFTER again (Shots.tsx). Set a touch heavier: the
@@ -286,8 +289,10 @@ export const CAPTIONS = [
     cues: [0, 3],
     statement: true,
     text: 'Now every screenshot\nmakes sense.',
-    style: 'Warm and sincere, the happy ending of a story told to a friend: a little wonder in it, "makes sense" landing with a smile and a sense of relief. Never announced, no word drawn out.',
-    pace: 'Everyday conversational speed, about 165 words a minute; unhurried, a natural beat after "screenshot".',
+    // cast (run 87): 61.7 (range 11.6 semitones; LATER's approved hook 60.5),
+    // 2.20s; the other came back flat (33.3)
+    style: 'Bright and warm, like the punchline of a good story: "Now every screenshot" with a lift, "makes sense" with a satisfied smile. Natural, never performed.',
+    pace: 'Everyday conversational speed, about 175 words a minute.',
     maxPause: 0.25,
   },
 ];

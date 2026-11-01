@@ -5,12 +5,12 @@
  * posting file (scripts/frame-jumps.mjs).
  *
  *   HS=…/chrome-headless-shell
- *   for r in a:0-172 b:173-345 c:346-517 d:518-689; do
+ *   for r in a:0-187 b:188-375 c:376-562 d:563-749; do
  *     npx remotion render out/shots/bundle MachinaShotsSilent out/shots/seg-${r%%:*}.mp4 \
  *       --frames=${r#*:} --concurrency=1 --muted --crf=14 --browser-executable=$HS &
  *   done; wait
  *   # launch day: only the Signature's frames, with the store footer
- *   npx remotion render out/shots/bundle MachinaShotsStore out/shots/tail-store.mp4 --frames=540-689 --concurrency=1 --muted --crf=14 --browser-executable=$HS
+ *   npx remotion render out/shots/bundle MachinaShotsStore out/shots/tail-store.mp4 --frames=600-749 --concurrency=1 --muted --crf=14 --browser-executable=$HS
  *   node scripts/shots-encode.mjs
  *     → out/shots/Machina-Same-Screenshots-Reel.mp4         today's footer ("Coming soon")
  *     → out/shots/Machina-Same-Screenshots-Reel-store.mp4   launch day's, if tail-store.mp4 exists

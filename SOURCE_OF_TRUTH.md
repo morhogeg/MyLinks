@@ -2706,7 +2706,13 @@ exact-match, capped.
   approved lines, never sped up; posting captions rewritten to match. 23.0s.
   Found on the way: the row-width check loaded Geist by file://, which fell
   back to another face (a 1028px row measured 893px); `shots-verify.mjs` now
-  embeds it, `later-verify.mjs` still loads it the old way.
+  embeds it, `later-verify.mjs` still loads it the old way. **Round 6
+  (owner: the "analyzed" ring made no sense; +2s for a stronger close; revise
+  the find line):** "analyzed" rings the card's title (was the banner's strip:
+  a clock and two buttons); "When I need one, I just describe it." with the
+  query typing on those words; a new close, "Now every screenshot makes
+  sense.", over the cover's BEFORE | AFTER again (the roll's last row, the
+  same three screenshots, beside the card it found). 25.0s.
 - **2026-10-31 — INSTAGRAM REEL "LATER NEVER COMES", BUILT BUT FOR ITS
   PICTURE (branch `claude/instagram-reel-app-store-012mo2`, on the App Store
   preview's a35f6c1e; off `main` until the owner reviews the cut).** A 24.0s
