@@ -57,6 +57,30 @@ export const TOTAL_SEC = TOTAL_FRAMES / FPS;
 export const SIGNATURE_AT = TOTAL_FRAMES - SIGNATURE.frames;
 
 /**
+ * Round 2: a second direction for each re-voiced line, voiced in the same
+ * run (synth-vo.py `shots-alt`), so the line can be cast from two natural
+ * takes by its measured pace instead of being sped up in assembly (round 1's
+ * Rubber Band stretch read as metallic). The chosen one's style and pace
+ * move into CAPTIONS (the take key is text + style + pace).
+ */
+export const CAPTIONS_ALT = [
+  {
+    at: 3,
+    to: 91,
+    text: 'Same screenshots.\nTwo very different places.',
+    style: 'Casual and quick, like a friend nudging you to look: "Same screenshots." light and matter-of-fact, then straight on into "Two very different places." with a small smile. No dramatic pause.',
+    pace: 'Quick, about 195 words a minute, almost no gap between the two sentences.',
+  },
+  {
+    at: 253,
+    to: 328,
+    text: 'After: share each screenshot\nto Machina.',
+    style: 'Bright and easy, like the good news after owning up to something: one flowing line, a natural lift on "each screenshot", "to Machina" landing warmly.',
+    pace: 'Brisk everyday conversational speed, about 185 words a minute.',
+  },
+];
+
+/**
  * Picture events, in output frames. Each one is a named frame the score also
  * keys to (audio/shots-score.mjs), so picture and sound move together. The
  * voice lines sit between them (CAPTIONS `at`).
@@ -121,12 +145,11 @@ export const CAPTIONS = [
     place: 'hook',
     cues: [0, 2],
     text: 'Same screenshots.\nTwo very different places.',
-    style: 'Natural and conversational, like showing a friend something on your phone: easy and a little intrigued. "Same screenshots." plain and light, a brief natural beat, then "Two very different places." with a small, knowing smile; no word drawn out or stressed.',
-    pace: 'Everyday conversational speed, about 180 words a minute; only a brief natural beat after "screenshots".',
+    style: 'Natural and conversational, like showing a friend something on your phone: easy, light, a little intrigued. Both sentences in one easy breath, only the shortest natural beat after "screenshots"; nothing drawn out, no word stressed.',
+    pace: 'Brisk everyday conversational speed, about 190 words a minute.',
     maxPause: 0.2,
     // the take dwelt (3.2 syllables a second): eased in assembly (Rubber Band,
     // formants preserved), LATER NEVER COMES' to-do line precedent
-    tempo: 1.22,
   },
   {
     at: 95,
@@ -136,7 +159,6 @@ export const CAPTIONS = [
     style: 'Natural and conversational, wry and light, like owning up to a habit everyone has: "Before:" a light set-up, then the number read out plainly and a little ruefully, "screenshots" landing softly. Never dramatic.',
     pace: 'Quick everyday conversational speed, about 185 words a minute; the number in one easy run, no pauses inside it.',
     maxPause: 0.22,
-    tempo: 1.1,
   },
   {
     at: 185,
@@ -150,12 +172,14 @@ export const CAPTIONS = [
   {
     at: 253,
     to: 328,
-    cues: [0, 6],
-    text: 'After: share from any app\nto Machina.',
-    style: `${TALK} "After:" a light, natural turn, brighter than the line before; "to Machina" easy and warm.`,
+    // round 2 (owner): "from any app" is off-topic in a reel about
+    // screenshots. "each", not "all": sharing several at once makes ONE card
+    // (G3), and the picture shows one share per screenshot
+    cues: [0, 5],
+    text: 'After: share each screenshot\nto Machina.',
+    style: `${TALK} "After:" a light, natural turn, brighter than the line before; "each screenshot" easy and clear; "to Machina" warm.`,
     pace: PACE,
     maxPause: 0.25,
-    tempo: 1.08,
   },
   {
     at: 332,
@@ -165,7 +189,6 @@ export const CAPTIONS = [
     style: 'Natural and conversational, quietly pleased, like pointing out something clever a friend did; light and unforced, a gentle natural stress on "says what it is".',
     pace: 'Everyday conversational speed, about 175 words a minute; the whole line in one easy breath.',
     maxPause: 0.2,
-    tempo: 1.1,
   },
   {
     at: 427,
