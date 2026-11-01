@@ -345,12 +345,15 @@ export const CAPTIONS = [
   {
     at: beat(7),
     to: 186,
-    cues: [0, 4],
+    // round 8 (owner): "Instead," voiced, for the contrast with "Later
+    // never comes."; the caption keeps the approved words (no "Instead"),
+    // its rows arriving on "share" and on "and"
+    cues: [1, 5],
     text: 'Share it to Machina,\nand it reads it for you.',
-    say: 'Share it to Machina, and it reads it for you.',
-    style: `${TALK} "and it reads it for you" an easy aside.`,
+    say: 'Instead, share it to Machina, and it reads it for you.',
+    style: `${TALK} "Instead," a light, natural turn into the line, never a stressed contrast; "and it reads it for you" an easy aside.`,
     pace: PACE,
-    maxPause: 0.2,
+    maxPause: 0.25,
   },
   {
     at: HITS.revisit,
