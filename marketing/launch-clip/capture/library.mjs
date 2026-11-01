@@ -868,6 +868,59 @@ export const REVISIT = {
   },
 };
 
+/**
+ * SAME SCREENSHOTS (2026-11-01, clips/shots-timeline.mjs): the three
+ * screenshots, saved by sharing each one to Machina (one share, one card:
+ * several screenshots shared at once make ONE card, G3). Their images are the
+ * reel's own renders (public/clips/shots/<id>.png, `MachinaShotsStill`),
+ * served by the capture server at /shots/, so the card banners are the same
+ * pixels the reel's camera roll shows. What the backend would write, written
+ * as the app files a screenshot (sourceType image, its url the image). Real
+ * facts only. No cooking content (owner, 2026-10-02). The search shares no
+ * word with the card it finds: nothing here says "quote" or "overthinking".
+ */
+export const SHOTS = {
+  /** no cooking content; Piranesi is a screenshot card with no image (its url
+   *  is not http), which would sit right under the three as a blank one */
+  without: ['marcella', 'chicken', 'piranesi', 'tailend'],
+  withoutCollections: ['cook'],
+  /** shared in this order, so the feed shows them newest first */
+  cards: [
+    {
+      id: 'shot-camera',
+      image: 'camera',
+      title: 'Olympus mju II film camera, €189',
+      summary: 'A used Olympus mju II, the 1997 pocket 35mm with a sharp f/2.8 lens and a splash-proof body. Listed in excellent condition and tested with film.',
+      category: 'Shopping',
+      tags: ['film-photography', 'cameras'],
+      concepts: ['photography', 'shopping'],
+      minutes: 9,
+    },
+    {
+      id: 'shot-seneca',
+      image: 'seneca',
+      title: 'Seneca: we suffer more in imagination',
+      summary: 'From Seneca’s Letters to Lucilius: we suffer more often in imagination than in reality. Most of what we dread never actually happens.',
+      category: 'Philosophy',
+      tags: ['stoicism', 'seneca', 'worry'],
+      concepts: ['stoicism', 'anxiety'],
+      minutes: 6,
+    },
+    {
+      id: 'shot-viewpoint',
+      image: 'viewpoint',
+      title: 'Miradouro da Senhora do Monte, Lisbon',
+      summary: 'Lisbon’s highest viewpoint, up in Graça, with the castle, the old town and the river below. Best at sunset; tram 28 stops a short walk away.',
+      category: 'Travel',
+      tags: ['lisbon', 'viewpoints'],
+      concepts: ['travel', 'cities'],
+      minutes: 3,
+    },
+  ],
+  /** the search that finds one again, in your own words */
+  search: { query: 'quote about overthinking', hits: ['shot-seneca'] },
+};
+
 /** The card the Save beat captures (it is also the first Ask source). */
 export const SAVE = {
   id: 'tailend',

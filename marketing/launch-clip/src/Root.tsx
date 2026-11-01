@@ -21,6 +21,9 @@ import { AppPreview, AppPreviewShutter, SHUTTER_COUNTS, SHUTTER_TOTAL } from './
 import { SIGNATURE } from './reels/kit/signature.mjs';
 import * as LATER from '../clips/later-timeline.mjs';
 import { LATER_SHUTTER, Later, LaterShutter } from './reels/clips/later/Later';
+import { ShotsStill } from './reels/clips/shots/Screens';
+import { Shots } from './reels/clips/shots/Shots';
+import * as SHOTS from '../clips/shots-timeline.mjs';
 
 /**
  * Compositions:
@@ -352,6 +355,45 @@ export const RemotionRoot: React.FC = () => (
       width={LATER.WIDTH}
       height={LATER.HEIGHT}
       defaultProps={{ ending: 'soon' as const, counts: LATER_SHUTTER.counts }}
+    />
+    {/* SAME SCREENSHOTS (src/reels/clips/shots, clips/shots-timeline.mjs):
+        the three screenshots, rendered once (public/clips/shots/<id>.png) */}
+    <Composition
+      id="MachinaShotsStill"
+      component={ShotsStill}
+      durationInFrames={1}
+      fps={30}
+      width={1179}
+      height={2556}
+      defaultProps={{ id: 'camera' as const }}
+    />
+    {/* SAME SCREENSHOTS: the deliverable, Silent for stills, the launch-day ending */}
+    <Composition
+      id="MachinaShots"
+      component={Shots}
+      durationInFrames={SHOTS.TOTAL_FRAMES}
+      fps={SHOTS.FPS}
+      width={SHOTS.WIDTH}
+      height={SHOTS.HEIGHT}
+      defaultProps={{ withAudio: true, withCaptions: true, ending: 'soon' as const }}
+    />
+    <Composition
+      id="MachinaShotsSilent"
+      component={Shots}
+      durationInFrames={SHOTS.TOTAL_FRAMES}
+      fps={SHOTS.FPS}
+      width={SHOTS.WIDTH}
+      height={SHOTS.HEIGHT}
+      defaultProps={{ withAudio: false, withCaptions: true, ending: 'soon' as const }}
+    />
+    <Composition
+      id="MachinaShotsStore"
+      component={Shots}
+      durationInFrames={SHOTS.TOTAL_FRAMES}
+      fps={SHOTS.FPS}
+      width={SHOTS.WIDTH}
+      height={SHOTS.HEIGHT}
+      defaultProps={{ withAudio: true, withCaptions: true, ending: 'store' as const }}
     />
   </>
 );

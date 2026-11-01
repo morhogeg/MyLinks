@@ -36,7 +36,7 @@ import { fileURLToPath } from 'node:url';
 import { startServer } from './server.mjs';
 import { openDevice } from './device.mjs';
 import { Take } from './recorder.mjs';
-import { ASK, CAPTURE_USER, CARDS, NEEDLE, NEEDLE_VIDEO, REVISIT, SAVE, SAVETHIS, SEARCH, SYNTHESIS } from './library.mjs';
+import { ASK, CAPTURE_USER, CARDS, NEEDLE, NEEDLE_VIDEO, REVISIT, SAVE, SAVETHIS, SEARCH, SHOTS, SYNTHESIS } from './library.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.join(here, '..', 'public', 'reel', 'app');
@@ -125,6 +125,57 @@ const isoWeekId = (d) => {
   const week = Math.ceil(((t.getTime() - jan1) / 86_400_000 + 1) / 7);
   return `${t.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
 };
+
+/**
+ * SAME SCREENSHOTS' account (library.mjs `SHOTS`): the demo account without
+ * its cooking saves, Piranesi (a screenshot card with no image) and the Save
+ * beat's card, plus the three screenshots, each written as the backend files
+ * a shared screenshot (sourceType image, its url the image), saved a minute
+ * apart (shared one after another), newest first in the feed.
+ */
+async function prepareShots(S = SHOTS) {
+  await page.evaluate(
+    ([uid, sh, base]) => {
+      const C = window.__capture;
+      const now = Date.now();
+      for (const id of sh.without) C.remove(`users/${uid}/links/${id}`);
+      for (const id of sh.withoutCollections) C.remove(`users/${uid}/collections/${id}`);
+      for (const p of C.list(`users/${uid}/links/`)) {
+        const d = C.get(p);
+        if (d?.collectionIds?.some((c) => sh.withoutCollections.includes(c))) {
+          C.set(p, { ...d, collectionIds: d.collectionIds.filter((c) => !sh.withoutCollections.includes(c)) });
+        }
+      }
+      sh.cards.forEach((c, k) => {
+        const createdAt = now - (c.minutes ?? 1) * 60_000;
+        C.set(`users/${uid}/links/${c.id}`, {
+          url: `${base}/shots/${c.image}.png`,
+          title: c.title,
+          summary: c.summary,
+          detailedSummary: c.summary,
+          tags: c.tags,
+          category: c.category,
+          status: 'unread',
+          createdAt,
+          sourceType: 'image',
+          sourceName: 'Screenshot',
+          language: 'en',
+          concepts: c.concepts,
+          relatedLinks: [],
+          collectionIds: [],
+          reminderStatus: 'none',
+          metadata: { originalTitle: c.title, estimatedReadTime: 1 },
+        });
+        void k;
+      });
+    },
+    [UID, S, server.url],
+  );
+}
+
+/** wait (in real time) until every image on the page has loaded */
+const imagesLoaded = () =>
+  page.waitForFunction(() => [...document.images].every((im) => im.complete && im.naturalWidth > 0), null, { timeout: 15000 });
 
 /**
  * FIND THE BOOK's account (library.mjs `NEEDLE`): the 24 saves without the
@@ -1267,6 +1318,73 @@ const takes = {
     await page.waitForTimeout(400);
     t.mark('weekRead');
     await t.snap({ rects: RV });
+    return t.save();
+  },
+
+  // ─────────────────────────────────────────────────── SAME SCREENSHOTS
+  // The three screenshots as cards in the feed (each its own share), the
+  // feed read down over them in small steps, then Find: "quote about
+  // overthinking" typed a character a frame, and the one card it means
+  // landing (it shares no word with it). → public/reel/app/clips/shots/app/
+  // and src/reels/clips/shots/takes.json
+  async shotsClip() {
+    await fresh(() => prepareShots());
+    await page.evaluate(() => document.scrollingElement.scrollTo({ top: 0, behavior: 'instant' }));
+    await imagesLoaded();
+    await page.waitForTimeout(600);
+    const t = new Take(dev, OUT, 'clips/shots/app');
+    const card = (id) => ['main article.surface-card', SHOTS.cards.find((c) => c.id === id).title];
+    const RS = {
+      search: R.search,
+      camera: card('shot-camera'),
+      seneca: card('shot-seneca'),
+      viewpoint: card('shot-viewpoint'),
+    };
+    t.mark('top');
+    await t.snap({ rects: RS });
+    // where the newest card sits at the top of the feed
+    const RS_TOP = await page.evaluate((title) => [...document.querySelectorAll('main article.surface-card')].find((a) => a.querySelector('h3')?.textContent.trim() === title).getBoundingClientRect().top, SHOTS.cards[2].title);
+    // the feed read down until the third card (the oldest share) sits where
+    // the first one did, 3 points a frame (small steps: the header stays in
+    // frame, and the reel plays the scroll on its own curve)
+    await t.freeze();
+    await tagScroller(SHOTS.cards[0].title);
+    t.mark('scroll');
+    const firstTop = RS_TOP;
+    const to = await page.evaluate(([title, y]) => {
+      const sc = document.querySelector('[data-capture-scroller]');
+      const art = [...document.querySelectorAll('main article.surface-card')].find((a) => a.querySelector('h3')?.textContent.trim() === title);
+      return Math.max(0, Math.min(sc.scrollTop + art.getBoundingClientRect().top - y, sc.scrollHeight - sc.clientHeight));
+    }, [SHOTS.cards[0].title, firstTop]);
+    await rollScroll(t, to, 3, RS);
+    t.mark('read');
+    await t.snap({ rects: RS });
+    await t.thaw();
+
+    // back to the top, then Find
+    await page.evaluate(() => document.querySelector('[data-capture-scroller]').scrollTo({ top: 0, behavior: 'instant' }));
+    await page.waitForTimeout(400);
+    t.mark('home');
+    await t.snap({ rects: RS });
+    await t.freeze();
+    await visible(page.getByPlaceholder('Search your saves')).click();
+    t.mark('focus');
+    await t.roll(8, { rects: RS });
+    t.mark('typing');
+    for (const ch of SHOTS.search.query) {
+      await page.keyboard.type(ch);
+      await t.advance();
+      await t.snap({ rects: RS });
+    }
+    t.mark('typed');
+    await t.thaw();
+    await until(SHOTS.cards[1].title);
+    await page.waitForTimeout(700);
+    await imagesLoaded();
+    await t.freeze();
+    t.mark('result');
+    await t.roll(30, { rects: RS });
+    await t.thaw();
     return t.save();
   },
 

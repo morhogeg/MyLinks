@@ -49,11 +49,41 @@ export const BEAT = BEAT_FRAMES / FPS;
 /** Beat (quarter note, may be fractional) → frame. */
 export const beat = (n) => Math.round(n * BEAT_FRAMES);
 
-/** 40 beats, 20.0s: 30 beats of story, then the shared ending */
-export const TOTAL_FRAMES = beat(40);
+/** 41 beats, 20.5s: 31 beats of story, then the shared ending (20.0s left
+ *  the Find beat under a second on screen; the voice runs 14.0s) */
+export const TOTAL_FRAMES = beat(41);
 export const TOTAL_SEC = TOTAL_FRAMES / FPS;
 /** the kit's Signature is the last SIGNATURE.frames frames (house rule) */
 export const SIGNATURE_AT = TOTAL_FRAMES - SIGNATURE.frames;
+
+/**
+ * Picture events, in output frames. Each one is a named frame the score also
+ * keys to (audio/shots-score.mjs), so picture and sound move together. The
+ * voice lines sit between them (CAPTIONS `at`).
+ */
+export const HITS = {
+  hook: 0, // two screens: the roll on the left already moving, Machina still on the right
+  flick: 6, // the roll's one long flick, top to bottom (it lands at `land`)
+  grow: 88, // the roll's screen takes the frame; Machina's slides away
+  land: 150, // the flick comes to rest on the last row: the three, and "2,847 Screenshots"
+  tap: 181, // the first of them tapped open (no idea why)
+  swipe1: 204, // swiped to the next
+  swipe2: 227, // and the next
+  row: 250, // the three line up; the mark assembles under them
+  share1: 266, // each one's Share tapped…
+  share2: 281,
+  share3: 296,
+  land1: 278, // …and pulled into the mark (8th notes; the last on "Machina")
+  land2: 293,
+  land3: 308,
+  iris: 312, // the mark's point opens into the app: the three cards
+  card2: 350, // the feed reads down to the next card…
+  card3: 388, // …and the next
+  find: 424, // CUT: Find: the field focuses (8 frames), the query typed under a rack focus
+  result: 444, // the one card it means
+  ring: 456, // its ink ring, once it has settled
+  signature: SIGNATURE_AT,
+};
 
 /** the footer under the signature: today, and on launch day (a render prop) */
 export const ENDINGS = {
@@ -65,7 +95,7 @@ export const ENDINGS = {
  *  wall says the same number, so the two reels agree) */
 export const ROLL_COUNT = '2,847';
 
-/** the three screenshots (src/reels/clips/shots/Shots3.tsx draws them; the
+/** the three screenshots (src/reels/clips/shots/Screens.tsx draws them; the
  *  app's cards are capture/library.mjs `SHOTS`) */
 export const HEROES = ['camera', 'seneca', 'viewpoint'];
 
@@ -86,27 +116,31 @@ const PACE = 'Everyday conversational speed, about 175 words a minute; short nat
 
 export const CAPTIONS = [
   {
-    at: 4,
-    to: 74,
+    at: 3,
+    to: 91,
     place: 'hook',
     cues: [0, 2],
     text: 'Same screenshots.\nTwo very different places.',
     style: 'Natural and conversational, like showing a friend something on your phone: easy and a little intrigued. "Same screenshots." plain and light, a brief natural beat, then "Two very different places." with a small, knowing smile; no word drawn out or stressed.',
     pace: 'Everyday conversational speed, about 180 words a minute; only a brief natural beat after "screenshots".',
-    maxPause: 0.28,
+    maxPause: 0.2,
+    // the take dwelt (3.2 syllables a second): eased in assembly (Rubber Band,
+    // formants preserved), LATER NEVER COMES' to-do line precedent
+    tempo: 1.22,
   },
   {
-    at: 80,
-    to: 150,
+    at: 95,
+    to: 181,
     cues: [0],
     text: 'Before: 2,847 screenshots.',
     style: 'Natural and conversational, wry and light, like owning up to a habit everyone has: "Before:" a light set-up, then the number read out plainly and a little ruefully, "screenshots" landing softly. Never dramatic.',
     pace: 'Quick everyday conversational speed, about 185 words a minute; the number in one easy run, no pauses inside it.',
     maxPause: 0.22,
+    tempo: 1.1,
   },
   {
-    at: 156,
-    to: 216,
+    at: 185,
+    to: 249,
     cues: [0, 3],
     text: 'No idea why\nI took most of them.',
     style: 'Natural and conversational, amused at yourself, a small self-aware laugh in the voice without actually laughing; easy and light, no word stressed.',
@@ -114,26 +148,28 @@ export const CAPTIONS = [
     maxPause: 0.2,
   },
   {
-    at: 222,
-    to: 292,
+    at: 253,
+    to: 328,
     cues: [0, 6],
     text: 'After: share from any app\nto Machina.',
     style: `${TALK} "After:" a light, natural turn, brighter than the line before; "to Machina" easy and warm.`,
     pace: PACE,
     maxPause: 0.25,
+    tempo: 1.08,
   },
   {
-    at: 300,
-    to: 384,
+    at: 332,
+    to: 423,
     cues: [0, 3],
     text: 'Every screenshot becomes\na card that says what it is.',
     style: 'Natural and conversational, quietly pleased, like pointing out something clever a friend did; light and unforced, a gentle natural stress on "says what it is".',
     pace: 'Everyday conversational speed, about 175 words a minute; the whole line in one easy breath.',
     maxPause: 0.2,
+    tempo: 1.1,
   },
   {
-    at: 392,
-    to: 446,
+    at: 427,
+    to: 480,
     cues: [0, 3],
     text: 'Find it again\nin your own words.',
     style: `${TALK} Easy and warm; "in your own words" landing softly, leaving space before the logo.`,

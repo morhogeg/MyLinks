@@ -2659,6 +2659,25 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-11-01 — INSTAGRAM REEL "SAME SCREENSHOTS" (the owner's F04,
+  "before and after: your screenshots"), FIRST CUT RENDERED (branch
+  `claude/reel-screenshots`, on LATER NEVER COMES' c8fdeb85; off `main`
+  until the owner reviews the cut).** 20.5s, 1080 × 1920, house rules: the
+  hook splits the camera roll (flicking into a blur) against Machina's three
+  cards; BEFORE lands the roll on "2,847 Screenshots" and swipes through
+  three opened with no context (a used Olympus mju II, a Seneca line, a
+  Lisbon viewpoint); AFTER shares each one into the mark (one share each:
+  several at once make ONE card, G3), the mark irises into the real feed
+  (captured from `main` 7bcbbe4, demo account `library.mjs SHOTS`), Find
+  lands the Seneca card from "quote about overthinking" (no shared word),
+  then the Signature. Brief changes: no recipe (owner 2026-10-02), the
+  tagline left to the Signature, "[fill]" = 2,847, a line added for the find,
+  store link still a placeholder. The same three PNGs are the roll's tiles
+  and the cards' images. Gates: `audio/shots-verify.mjs` and
+  `house-verify.mjs shots` pass (−14.01 LUFS, −1.25 dBTP; lines leave 0.15s
+  after their last word, not 0.3s: documented). Voice: Gemini Sulafat, run
+  81, four lines sped up 1.08–1.22× in assembly. Nobody has listened on
+  speakers. Detail: `marketing/launch-clip/README.md` "SAME SCREENSHOTS".
 - **2026-10-31 — INSTAGRAM REEL "LATER NEVER COMES", BUILT BUT FOR ITS
   PICTURE (branch `claude/instagram-reel-app-store-012mo2`, on the App Store
   preview's a35f6c1e; off `main` until the owner reviews the cut).** A 24.0s

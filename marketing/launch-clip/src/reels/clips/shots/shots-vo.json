@@ -1,0 +1,79 @@
+[
+ {
+  "frame": 3,
+  "text": "Same screenshots. Two very different places.",
+  "words": [
+   0.04,
+   0.371,
+   1.41,
+   1.609,
+   1.857,
+   2.353
+  ]
+ },
+ {
+  "frame": 95,
+  "text": "Before: 2,847 screenshots.",
+  "words": [
+   0.03,
+   0.809,
+   1.394
+  ]
+ },
+ {
+  "frame": 185,
+  "text": "No idea why I took most of them.",
+  "words": [
+   0.05,
+   0.221,
+   0.506,
+   0.734,
+   0.848,
+   1.132,
+   1.417,
+   1.588
+  ]
+ },
+ {
+  "frame": 253,
+  "text": "After: share from any app to Makeena.",
+  "words": [
+   0.03,
+   0.376,
+   0.793,
+   1.041,
+   1.368,
+   1.566,
+   1.845
+  ]
+ },
+ {
+  "frame": 332,
+  "text": "Every screenshot becomes a card that says what it is.",
+  "words": [
+   0.07,
+   0.38,
+   0.948,
+   1.362,
+   1.465,
+   1.723,
+   1.982,
+   2.24,
+   2.498,
+   2.653
+  ]
+ },
+ {
+  "frame": 427,
+  "text": "Find it again in your own words.",
+  "words": [
+   0.02,
+   0.244,
+   0.379,
+   0.648,
+   0.782,
+   1.007,
+   1.186
+  ]
+ }
+]

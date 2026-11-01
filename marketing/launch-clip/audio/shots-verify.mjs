@@ -1,0 +1,148 @@
+/**
+ * SAME SCREENSHOTS: the reel's gates (`node audio/shots-verify.mjs`), beside
+ * the house gate (`node audio/house-verify.mjs shots`):
+ *  - the brand bans (no em dash, no literal "AI", no "second brain", no
+ *    "library", no price, no "free", no recipe or cooking) on every caption,
+ *    every demo string, and every text on every captured frame the edit uses;
+ *  - Find in your own words: the query shares no word with the card it lands;
+ *  - every line spoken inside its caption window, and still on screen a
+ *    moment after its last word; never two captions in the band at once;
+ *  - the mix: every line 3dB or more over the music in the speech band;
+ *    −14 LUFS ±0.5, true peak ≤ −1 dBTP.
+ *
+ * One deliberate difference from LATER NEVER COMES' gate: a line may leave
+ * 0.15s after its last word (the house dwell rule says 0.3s). Six lines in a
+ * 15–20s brief left no room for the full 0.3s at every boundary without
+ * running to 21s; each caption is still on screen for its whole line plus
+ * ~0.25s, and the next one takes over at once.
+ */
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import * as T from '../clips/shots-timeline.mjs';
+import { SHOTS } from '../capture/library.mjs';
+import { lufs, powerDb, speechBand, truePeak } from './loudness.mjs';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const root = path.join(here, '..');
+const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
+let failed = 0;
+const fail = (m) => {
+  failed++;
+  console.log(`✗ ${m}`);
+};
+const ok = (m) => console.log(`✓ ${m}`);
+const { FPS, CAPTIONS, HITS } = T;
+
+// ── words ────────────────────────────────────────────────────────────────
+const BANNED = [
+  [/—/, 'an em dash'],
+  [/\bAI\b/, 'a literal "AI"'],
+  [/second brain/i, '"second brain"'],
+  [/\blibrary\b/i, '"library"'],
+  [/\$|\bfree\b/i, 'a price in dollars or "free"'],
+  [/recipe|\bcook/i, 'recipe or cooking content'],
+];
+const demo = SHOTS.cards.flatMap((c) => [c.title, c.summary, ...c.tags]);
+const strings = [...CAPTIONS.flatMap((c) => [c.text, c.say ?? c.text]), ...demo, SHOTS.search.query];
+const hits = strings.flatMap((s) => BANNED.filter(([re]) => re.test(s)).map(([, what]) => `${what}: "${s}"`));
+if (hits.length) hits.forEach(fail);
+else ok(`brand bans: ${strings.length} strings clean (captions, the three cards, the query)`);
+
+// every text on every captured frame the edit can show (the whole take: the
+// feed, its scroll, and Find)
+const take = JSON.parse(read('src/reels/clips/shots/takes.json'))['clips/shots/app'];
+const frameHits = new Set();
+take.frames.forEach((fr) => fr.t.forEach((k) => BANNED.forEach(([re, what]) => re.test(take.texts[k]) && frameHits.add(`${what} on a captured frame: "${take.texts[k]}"`))));
+if (frameHits.size) [...frameHits].forEach(fail);
+else ok(`captured frames: ${take.count} frames, ${take.texts.length} distinct texts, all clean`);
+
+// ── Find, in your own words ──────────────────────────────────────────────
+const words = (s) => s.toLowerCase().normalize('NFKD').replace(/\p{M}+/gu, '').match(/[a-z0-9]+/g) ?? [];
+const FRAMING = new Set(['a', 'an', 'the', 'about', 'of', 'to', 'in', 'on', 'for', 'and', 'or', 'that', 'this']);
+const card = SHOTS.cards.find((c) => c.id === SHOTS.search.hits[0]);
+const shared = words(SHOTS.search.query).filter((w) => !FRAMING.has(w) && words([card.title, card.summary, ...card.tags].join(' ')).some((x) => x.startsWith(w) || w.startsWith(x)));
+if (shared.length) fail(`"${SHOTS.search.query}" shares ${shared.join(', ')} with the card it finds (it must be in your own words)`);
+else ok(`Find: "${SHOTS.search.query}" shares no word with "${card.title}"`);
+
+// ── timing ───────────────────────────────────────────────────────────────
+const manifest = JSON.parse(read('out/vo/shots/manifest.json'));
+const vo = JSON.parse(read('src/reels/clips/shots/shots-vo.json'));
+const DWELL = { min: 0.15, max: 1.2 };
+for (const c of CAPTIONS) {
+  const say = c.say ?? c.text.replace(/\n/g, ' ');
+  const m = manifest.find((x) => x.frame === c.at);
+  const t = vo.find((x) => x.frame === c.at);
+  if (!m || !t) {
+    fail(`"${say}" has no take at frame ${c.at}: run audio/synth-vo.py shots`);
+    continue;
+  }
+  const end = c.at + m.spoken * FPS;
+  const dwell = (c.to - end) / FPS;
+  if (dwell < 0) fail(`"${say}" is still being said when its caption leaves (${(-dwell).toFixed(2)}s over)`);
+  else if (dwell < DWELL.min || dwell > DWELL.max) fail(`"${say}" leaves ${dwell.toFixed(2)}s after its last word (${DWELL.min}–${DWELL.max}s)`);
+  if (c.cues.length !== c.text.split('\n').length) fail(`"${say}": ${c.cues.length} cues for ${c.text.split('\n').length} rows`);
+}
+for (let i = 1; i < CAPTIONS.length; i++) {
+  const [a, b] = [CAPTIONS[i - 1], CAPTIONS[i]];
+  const firstRow = b.at + Math.round(vo.find((x) => x.frame === b.at)?.words[0] * FPS) - 3;
+  if (firstRow <= a.to) fail(`two captions in the band at once: "${a.text}" until ${a.to}, "${b.text}" from ${firstRow}`);
+}
+const last = CAPTIONS.at(-1);
+if (last.to > T.SIGNATURE_AT + 24) fail(`the last line runs into the Signature's voice`);
+const spoken = manifest.reduce((s, m) => s + m.spoken, 0);
+ok(`timing: ${CAPTIONS.length} lines in ${spoken.toFixed(1)}s of speech over ${T.TOTAL_SEC.toFixed(1)}s, every one inside its window; never two in the band`);
+// the third share lands on "Machina": the picture and the word together
+const name = CAPTIONS[3];
+const nameAt = name.at + Math.round(vo.find((x) => x.frame === name.at).words.at(-1) * FPS);
+if (Math.abs(nameAt - HITS.land3) > 3) fail(`the last share lands at ${HITS.land3}, "Machina" is said at ${nameAt}`);
+else ok(`the third share lands on "Machina" (frame ${HITS.land3}, said at ${nameAt})`);
+
+// ── the mix ──────────────────────────────────────────────────────────────
+const wav = (rel) => {
+  const b = fs.readFileSync(path.join(root, rel));
+  let off = 12;
+  let fmt = null;
+  let data = null;
+  while (off + 8 <= b.length) {
+    const id = b.toString('ascii', off, off + 4);
+    const len = b.readUInt32LE(off + 4);
+    if (id === 'fmt ') fmt = { ch: b.readUInt16LE(off + 10), sr: b.readUInt32LE(off + 12) };
+    if (id === 'data') data = { off: off + 8, len };
+    off += 8 + len + (len % 2);
+  }
+  const n = data.len / (fmt.ch * 2);
+  const L = new Float64Array(n);
+  const R = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    L[i] = b.readInt16LE(data.off + i * fmt.ch * 2) / 32768;
+    R[i] = b.readInt16LE(data.off + i * fmt.ch * 2 + (fmt.ch > 1 ? 2 : 0)) / 32768;
+  }
+  return { SR: fmt.sr, n, L, R };
+};
+const score = wav('public/clips/shots/score.wav');
+const mix = wav('public/clips/shots/score-vo.wav');
+const gain = JSON.parse(read('out/vo/shots/mix.json')).gain;
+const lines = manifest.map((line) => {
+  const s0 = Math.round(line.start * mix.SR);
+  const e = Math.min(mix.n, s0 + Math.round(line.spoken * mix.SR));
+  const voice = new Float64Array(e - s0);
+  const music = new Float64Array(e - s0);
+  for (let i = s0; i < e; i++) {
+    const m = (mix.L[i] + mix.R[i]) / 2 / gain;
+    const bed = ((score.L[i] + score.R[i]) / 2) * 0.55;
+    voice[i - s0] = m - bed;
+    music[i - s0] = bed;
+  }
+  return { text: line.text, db: powerDb(speechBand(voice, mix.SR)) - powerDb(speechBand(music, mix.SR)) };
+});
+for (const l of lines) console.log(`  ${l.db.toFixed(1).padStart(5)}dB  ${l.text}`);
+const masked = lines.filter((l) => l.db < 3);
+if (masked.length) masked.forEach((l) => fail(`the music masks "${l.text}" (${l.db.toFixed(1)}dB, min 3)`));
+else ok('every line sits 3dB or more over the music in the speech band');
+const I = lufs(mix.L, mix.R, mix.SR);
+const tp = truePeak(mix.L, mix.R);
+(Math.abs(I + 14) <= 0.5 && tp <= -1 ? ok : fail)(`mix: ${I.toFixed(2)} LUFS integrated, ${tp.toFixed(2)} dBTP (spec −14 ±0.5, ≤ −1)`);
+
+console.log(failed ? `\n${failed} gate(s) failed` : '\nall gates pass');
+process.exit(failed ? 1 : 0);

@@ -269,7 +269,7 @@ const Bubble: React.FC<{ text: string; mine: boolean }> = ({ text, mine }) => (
 );
 
 /** one screenshot, of one of the things people screenshot */
-const Shot: React.FC<{ i: number }> = ({ i }) => {
+export const Shot: React.FC<{ i: number }> = ({ i }) => {
   const kind = ['chat', 'map', 'list', 'post', 'ticket'][i % 5];
   let body: React.ReactNode;
   if (kind === 'chat') {

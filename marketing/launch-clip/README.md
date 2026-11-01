@@ -1815,6 +1815,109 @@ render: a frame that changes more than three times both frames beside it
 changing by more than 24 levels at once (STEP). It passes the reel's type
 and Signature over paper, and catches a single frame swapped in.
 
+## SAME SCREENSHOTS (the before-and-after Reel, 2026-11-01)
+
+`MachinaShots` is the owner's F04 idea ("before and after: your
+screenshots"), refined: 20.5s, 1080 × 1920, narrated, music-led, on the
+house rules (branch `claude/reel-screenshots`, on LATER NEVER COMES'
+c8fdeb85; video work merges only after the owner reviews the cut).
+`MachinaShotsStore` is the launch-day footer, `MachinaShotsSilent` the
+picture alone, `MachinaShotsStill` renders the three screenshots.
+**The idea:** the same three screenshots in two places. In the camera roll
+they are a pile you scroll past and open with no idea why you took them;
+shared to Machina, each becomes a card that says what it is, and you find
+it again in your own words.
+
+| Time | Picture | Caption = voice |
+|---|---|---|
+| 0:00 | The cover: two screens side by side, the camera roll (left) already flicking into a blur, Machina's feed (right) still, the three cards on it | **Same screenshots. / Two very different places.** (the house hook: kicker over big type) |
+| 0:03 | The roll's screen takes the frame, Machina's slides away; the one long flick lands on the last row: the three, and "2,847 Screenshots" | Before: 2,847 screenshots. |
+| 0:06 | The first is tapped open (the roll pushed back) and swiped through: a used film camera, a Seneca quote, a pin on a map | No idea why / I took most of them. |
+| 0:08 | The three line up, the mark assembles under them; each one's Share is tapped and it is pulled into the mark (one share, one card), the third landing on "Machina" | After: share from any app / to Machina. |
+| 0:10 | The mark's point irises open into the real app: the feed reads down the three cards (banner = the same screenshot, title, summary, tags) | Every screenshot becomes / a card that says what it is. |
+| 0:14 | CUT to Find: "quote about overthinking" typed under a rack focus; the one card it means lands (no word shared), its ink ring | Find it again / in your own words. |
+| 0:15.5 | The kit's Signature, footer "Coming soon · mymachina.app" (launch day: "Now on the App Store · mymachina.app") | (the Signature's take) |
+
+**What changed from the brief, and why.**
+- **No recipe** (owner, 2026-10-02: no recipe or cooking content): the
+  third screenshot is a Lisbon viewpoint pinned on a map.
+- **Three shares, not one.** Sharing several screenshots at once makes ONE
+  card (G3, build 1325), so "share those 3 → 3 cards" would be false; each
+  is shared on its own, in rhythm. The share is the kit's gesture (a Share
+  button tapped, the screenshot pulled into the mark: ShareBeat's
+  precedent), not a rebuilt iOS share sheet.
+- **The tagline is the Signature's**, never a caption (house rule), so the
+  brief's last line "Everything you save, finally useful." is the logo's.
+- **"[fill] screenshots" is 2,847**, the number POV's wall already shows,
+  and 2,847 = 711 rows of four + 3: the roll's last row is exactly the three.
+- **Shot 5 got a line** ("Find it again in your own words."), so the find
+  reads with the sound off; the query shares no word with the card (gate).
+- **The App Store link** is not live: the footer says "Coming soon", the
+  store edition is one render away, and the captions below keep the
+  owner's placeholder.
+
+**What is real.** Every pixel of Machina is the shipped app (main at
+7bcbbe4), captured by `capture/shoot.mjs shotsClip` on the demo account
+(`library.mjs SHOTS`: the cooking saves and Piranesi out, the three
+screenshots in, written as the backend files a shared screenshot). The
+three screenshots are drawn once (`src/reels/clips/shots/Screens.tsx`,
+type, line icons and paper tints; real facts: the Olympus mju II is a 1997
+35mm compact with an f/2.8 lens; the line is Seneca, Letters to Lucilius 13;
+Senhora do Monte is Lisbon's highest viewpoint, in Graça), rendered to
+`public/clips/shots/<id>.png`, and the SAME PNGs are both the roll's tiles
+and the images the app's cards show (the capture server serves them at
+/shots/). The roll (`Roll.tsx`) is schematic and un-branded, its other 2,844
+tiles POV's screenshots. While the query types, the app shows its own
+"Searching by meaning…" line under the field: the rack focus keeps it out of
+focus, and the two typed frames where live "Close matches" flash cards are
+skipped. The result card wears the app's small "Meaning" badge.
+
+**The voice.** Gemini TTS, Sulafat (narration-tts run 81), LATER's
+direction (a person telling a friend, ~175 wpm). The takes came back slow
+(the hook at 3.2 syllables a second), so four lines are sped up in assembly
+(`tempo`, Rubber Band, formants preserved: 1.22, 1.1, 1.08, 1.1); every line
+now runs 4.0–5.2 syllables a second except the last (6.0, untouched). Nobody
+has listened to it on speakers yet.
+
+**Measured.** `node audio/shots-verify.mjs`: bans clean on 26 strings and on
+all 106 distinct texts of the 320 captured frames; Find shares no word with
+its card; every line inside its window; the third share lands on the spoken
+"Machina" (frame 308 both); every line 8.4–18.4dB over the music in the
+speech band; the mix −14.01 LUFS, −1.25 dBTP. `node audio/house-verify.mjs
+shots` passes (the Signature take in the mix at 0.81). **One deliberate
+difference:** lines leave 0.15s after their last word, not the house 0.3s;
+six lines in a 15–20s brief had no room for 0.3s at every boundary without
+running to 21s (the gate says so in its header).
+
+```bash
+# the screenshots, once (and again if Screens.tsx changes; then re-capture)
+for id in camera seneca viewpoint; do npx remotion still src/index.ts MachinaShotsStill public/clips/shots/$id.png --props="{\"id\":\"$id\"}" --image-format=png; done
+# today's app
+git worktree add --detach <dir> origin/main && (cd <dir>/web && npm ci)
+CAPTURE_WEB=<dir>/web node capture/build-app.mjs
+CAPTURE_ONLY=shotsClip node capture/shoot.mjs && git checkout src/reels/data/takes.json
+GEMINI_VOICE=Sulafat python3 audio/synth-vo.py shots     # from the committed takes
+node audio/shots-score.mjs && node audio/mix-vo.mjs shots
+node audio/shots-verify.mjs && node audio/house-verify.mjs shots
+npx remotion bundle src/index.ts --out-dir=out/shots/bundle
+# render + encode: the recipe is in scripts/shots-encode.mjs's header
+node scripts/shots-encode.mjs     # posting files, review copy, frame-by-frame check
+```
+
+In a cloud container the Chromium paths differ from the Mac's: pass
+`--browser-executable=/opt/pw-browsers/chromium_headless_shell-1243/chrome-headless-shell-linux64/chrome-headless-shell`
+to Remotion and `CAPTURE_CHROMIUM=/opt/pw-browsers/chromium-1243/chrome-linux64/chrome` to the capture.
+
+**Captions for posting** (the owner's, tightened; the link stays a
+placeholder until the listing is live):
+
+- Instagram: "Same screenshots, two places. In the camera roll they're a
+  pile. In Machina, each one becomes a card that says what it is and what
+  to do with it. Download on the App Store: [App Store link]
+  #screenshots #iphone #productivity"
+- TikTok: "Camera roll vs Machina. Same screenshots. Download on the App
+  Store: [App Store link] #screenshots #iphone #productivity"
+
 ## Motion language
 
 The rules every Machina video follows, and the kit component that implements

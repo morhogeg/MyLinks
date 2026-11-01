@@ -46,6 +46,8 @@ const SCRIPTS = {
   preview: { vo: path.join(root, 'out', 'vo', 'preview'), score: 'clips/preview/score.wav', out: 'clips/preview/score-vo.wav', duck: 0.55, timeline: '../clips/preview-timeline.mjs', signature: true },
   // LATER NEVER COMES, the Instagram Reel on the preview: the reel's balance, and the Signature's take
   later: { vo: path.join(root, 'out', 'vo', 'later'), score: 'clips/later/score.wav', out: 'clips/later/score-vo.wav', duck: 0.55, timeline: '../clips/later-timeline.mjs', signature: true },
+  // SAME SCREENSHOTS (clips/shots-timeline.mjs, audio/shots-score.mjs): LATER's balance
+  shots: { vo: path.join(root, 'out', 'vo', 'shots'), score: 'clips/shots/score.wav', out: 'clips/shots/score-vo.wav', duck: 0.55, timeline: '../clips/shots-timeline.mjs', signature: true },
 };
 const name = process.argv[2] ?? 'film';
 const script = SCRIPTS[name];
@@ -161,7 +163,7 @@ let g = peak > 0.98 ? 0.98 / peak : 1;
 // Shorts and YouTube expect a finished mix (the round-12 mix measured −15.8).
 // A global gain, then a look-ahead limiter on the few transients that would
 // pass the ceiling. The film's mix is untouched (it has no MASTER).
-const MASTER = { reel: { lufs: -14, truePeak: -1 }, find: { lufs: -14, truePeak: -1 }, savethis: { lufs: -14, truePeak: -1 }, needle: { lufs: -14, truePeak: -1 }, 'needle-video': { lufs: -14, truePeak: -1 }, revisit: { lufs: -14, truePeak: -1 }, pov: { lufs: -14, truePeak: -1 }, preview: { lufs: -14, truePeak: -1 }, later: { lufs: -14, truePeak: -1 } }[name];
+const MASTER = { reel: { lufs: -14, truePeak: -1 }, find: { lufs: -14, truePeak: -1 }, savethis: { lufs: -14, truePeak: -1 }, needle: { lufs: -14, truePeak: -1 }, 'needle-video': { lufs: -14, truePeak: -1 }, revisit: { lufs: -14, truePeak: -1 }, pov: { lufs: -14, truePeak: -1 }, preview: { lufs: -14, truePeak: -1 }, later: { lufs: -14, truePeak: -1 }, shots: { lufs: -14, truePeak: -1 } }[name];
 if (MASTER) {
   let gain = 10 ** ((MASTER.lufs - lufs(L, R, SR)) / 20);
   let ceiling = 10 ** ((MASTER.truePeak - 0.3) / 20);

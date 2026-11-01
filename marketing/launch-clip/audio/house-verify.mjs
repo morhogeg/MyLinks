@@ -37,6 +37,8 @@ export const HOUSE = {
   preview: { timeline: 'clips/preview-timeline.mjs', dir: 'src/reels/clips/preview', mix: 'public/clips/preview/score-vo.wav' },
   // LATER NEVER COMES, the Instagram Reel on the preview (2026-10-31)
   later: { timeline: 'clips/later-timeline.mjs', dir: 'src/reels/clips/later', mix: 'public/clips/later/score-vo.wav' },
+  // SAME SCREENSHOTS, the before-and-after Reel (2026-11-01)
+  shots: { timeline: 'clips/shots-timeline.mjs', dir: 'src/reels/clips/shots', mix: 'public/clips/shots/score-vo.wav' },
 };
 
 const TAGLINE = SIGNATURE.line;

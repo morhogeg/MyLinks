@@ -16,7 +16,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ASK, CAPTURE_USER, CARDS, NEEDLE, NEEDLE_VIDEO, SAVETHIS, SEARCH } from './library.mjs';
+import { ASK, CAPTURE_USER, CARDS, NEEDLE, NEEDLE_VIDEO, SAVETHIS, SEARCH, SHOTS } from './library.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(here, '..', 'out', 'capture', 'app', 'out');
@@ -92,7 +92,7 @@ export function startServer(port = 4600) {
         }
         const q = String(body.query ?? '').trim().toLowerCase();
         // the reel's query, and every clip query that names its hits
-        const answer = [SEARCH, ...Object.values(SEARCH.clip ?? {}), SAVETHIS].find((x) => x.hits && x.query.toLowerCase() === q);
+        const answer = [SEARCH, ...Object.values(SEARCH.clip ?? {}), SAVETHIS, SHOTS.search].find((x) => x.hits && x.query.toLowerCase() === q);
         const hits = answer ? answer.hits : [];
         return json(res, 200, { links: hits.map((id) => ({ id })), mode: 'judge' });
       }
@@ -122,6 +122,18 @@ export function startServer(port = 4600) {
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host}`);
     if (url.pathname.startsWith('/api/')) return api(req, res, url);
+
+    // SAME SCREENSHOTS: the reel's three screenshots, the images its cards show
+    if (url.pathname.startsWith('/shots/')) {
+      const name = path.basename(url.pathname);
+      const img = path.join(here, '..', 'public', 'clips', 'shots', name);
+      if (!/^[a-z]+\.png$/.test(name) || !fs.existsSync(img)) {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        return res.end('not found');
+      }
+      res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'max-age=3600' });
+      return fs.createReadStream(img).pipe(res);
+    }
 
     // static export: /x → x.html, /x/ → x/index.html, / → index.html
     let p = decodeURIComponent(url.pathname);
