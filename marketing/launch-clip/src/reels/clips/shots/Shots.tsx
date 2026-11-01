@@ -303,7 +303,9 @@ export const Shots: React.FC<{ withAudio?: boolean; withCaptions?: boolean; endi
   const showMark = f >= HITS.row && f < HITS.iris + 8;
 
   // the app
-  const iris = prog(f, HITS.iris, HITS.iris + 14, EASE_IN_OUT);
+  // (the radius ends where the circle has just cleared the screen's visible
+  // corners: a larger one finished the reveal in two frames of its middle)
+  const iris = prog(f, HITS.iris, HITS.iris + 16, EASE_IN_OUT);
   const inFeed = f >= HITS.iris && f < HITS.find;
   const ds = (feedScroll(f) - feedScroll(f - 1)) * FEED_CAM.z;
   const inFind = f >= HITS.find;
@@ -364,11 +366,13 @@ export const Shots: React.FC<{ withAudio?: boolean; withCaptions?: boolean; endi
 
       {/* the app: the feed, out of the mark's point */}
       {inFeed && (
-        <AppShot take={TAKE} i={feedFrame(f)} cam={feedCam(f)} iris={iris < 1 ? { x: IRIS_AT.x, y: IRIS_AT.y, r: 920 * iris } : null} motion={{ x: 0, y: ds }} />
+        <AppShot take={TAKE} i={feedFrame(f)} cam={feedCam(f)} iris={iris < 1 ? { x: IRIS_AT.x, y: IRIS_AT.y, r: 500 * iris } : null} motion={{ x: 0, y: ds }} />
       )}
       {inFind && (
         <AppShot take={TAKE} i={fi} cam={FIND_CAM} blur={rack > 0.2 ? rack : 0} dim={rack > 0.2 ? 0.08 * (rack / 14) : 0} focus={rack > 0.2 ? { y0: 110, y1: 176, blur: rack } : undefined}>
-          {f >= HITS.ring - 2 && (
+          {/* the Lift is its own raster: mounted on the frame the card
+              arrives (a frame that changes anyway), never on a still one */}
+          {f >= HITS.result && (
             <>
               <Ping rect={SENECA_RECT} t={(f - HITS.ring) / 18} radius={20} reach={16} />
               <Lift take={TAKE} i={fi} rect={SENECA_RECT} radius={20} lift={Math.max(0.002, 0.5 * ring)} ring={ring} rise={4} grow={0.02} />

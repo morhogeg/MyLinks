@@ -1884,7 +1884,15 @@ all 106 distinct texts of the 320 captured frames; Find shares no word with
 its card; every line inside its window; the third share lands on the spoken
 "Machina" (frame 308 both); every line 8.4–18.4dB over the music in the
 speech band; the mix −14.01 LUFS, −1.25 dBTP. `node audio/house-verify.mjs
-shots` passes (the Signature take in the mix at 0.81). **One deliberate
+shots` passes (the Signature take in the mix at 0.81). The posting file:
+615 frames, 20.500s, H.264 High yuv420p BT.709 video range, AAC 48kHz 320k,
+10.3MB. `scripts/frame-jumps.mjs` flags two frames, both meant: 424 (the
+hard cut to Find, on the beat) and 432 (the app swapping the feed for search
+as typing starts, under the rack focus). Its first pass also caught the
+iris finishing in two frames (its radius was larger than the screen in view),
+the result card popping in one frame (the capture waited in real time and
+missed the app's card-enter: the search now runs on the stepped clock) and
+the ring's Lift re-rastering on a still frame; all three fixed. **One deliberate
 difference:** lines leave 0.15s after their last word, not the house 0.3s;
 six lines in a 15–20s brief had no room for 0.3s at every boundary without
 running to 21s (the gate says so in its header).

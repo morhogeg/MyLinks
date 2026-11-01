@@ -1377,13 +1377,22 @@ const takes = {
       await t.snap({ rects: RS });
     }
     t.mark('typed');
-    await t.thaw();
-    await until(SHOTS.cards[1].title);
-    await page.waitForTimeout(700);
-    await imagesLoaded();
-    await t.freeze();
-    t.mark('result');
-    await t.roll(30, { rects: RS });
+    // the debounce and the search run on the stepped clock, so the card's own
+    // arrival (the app's card-enter) is recorded frame by frame, not missed
+    // in real time; the image is served from memory before it is needed
+    await page.evaluate((src) => new Promise((r) => { const im = new Image(); im.onload = r; im.onerror = r; im.src = src; }), `${server.url}/shots/${SHOTS.cards[1].image}.png`);
+    let seen = -1;
+    for (let k = 0; k < 180 && (seen < 0 || k - seen < 34); k++) {
+      await t.advance();
+      await page.waitForTimeout(40); // the request crosses the (real) network
+      const has = await page.evaluate((title) => [...document.querySelectorAll('main article.surface-card h3')].some((h) => h.textContent.trim() === title), SHOTS.cards[1].title);
+      if (has && seen < 0) {
+        seen = k;
+        t.mark('result');
+      }
+      await t.snap({ rects: RS, caret: 'hide' });
+    }
+    if (seen < 0) throw new Error('shotsClip: the search never landed');
     await t.thaw();
     return t.save();
   },
