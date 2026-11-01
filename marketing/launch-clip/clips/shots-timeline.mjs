@@ -79,6 +79,14 @@ export const CAPTIONS_ALT = [
     style: 'Bright and easy, like the good news after owning up to something: one flowing line, a natural lift on "each screenshot", "to Machina" landing warmly.',
     pace: 'Brisk everyday conversational speed, about 185 words a minute.',
   },
+  {
+    at: 342,
+    to: 443,
+    text: 'Analyzed, categorized,\nsummarized and tagged.',
+    say: 'Each one is analyzed, categorized, summarized and tagged.',
+    style: 'Warm and a little impressed, like telling a friend what the app just did for you: "Each one is" easy and quick, then the four words with a gentle, satisfying rhythm, a small smile on "and tagged". Conversational, never a sales pitch.',
+    pace: 'Brisk everyday conversational speed, about 185 words a minute; only the briefest beats at the commas.',
+  },
 ];
 
 /**
@@ -219,10 +227,19 @@ export const CAPTIONS = [
   {
     at: 342,
     to: 443,
-    cues: [0, 3],
-    text: 'Every screenshot becomes\na card that says what it is.',
-    style: 'Natural and conversational, quietly pleased, like pointing out something clever a friend did; light and unforced, a gentle natural stress on "says what it is".',
-    pace: 'Everyday conversational speed, about 175 words a minute; the whole line in one easy breath.',
+    // round 3 (owner): say what Machina does to each one, not just "a card
+    // that says what it is". The app's own steps for a screenshot are
+    // Scanning image / Reading text / Understanding content / Organizing &
+    // tagging (web/lib/scanPhases.ts). The verbs run top to bottom as their
+    // parts sit on the card, and each one rings its part as it is said: the
+    // screenshot, the category, the summary, the tags. The screen drops
+    // "Each one is" (the picture carries it); rows arrive on "analyzed"
+    // and "summarized"
+    cues: [3, 5],
+    text: 'Analyzed, categorized,\nsummarized and tagged.',
+    say: 'Each one is analyzed, categorized, summarized and tagged.',
+    style: 'Natural and conversational, quietly pleased, like showing a friend something clever: an easy, even rhythm through the four words, each one light and clear, "and tagged" landing softly. Not a list read off a page, not an announcer.',
+    pace: 'Everyday conversational speed, about 175 words a minute; short natural beats at the commas, the whole line in one easy breath.',
     maxPause: 0.2,
   },
   {
