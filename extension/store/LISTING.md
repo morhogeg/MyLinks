@@ -221,7 +221,7 @@ token to hand over.
    website. This is the only lever on the **Established Publisher** badge, which
    Google grants automatically after a few months of a clean record. The
    **Featured** badge is being retired (nominations closed 20 Aug 2026).
-3. **Upload** `extension/dist/machina-chrome-1.0.0.zip` (New item).
+3. **Upload** the zip `node extension/scripts/package.mjs` writes (`extension/dist/machina-chrome-<version>.zip`, 1.0.2 as of 2026-11-04) as a New item.
 4. Fill **Store listing** (§1), **Privacy practices** (§2), **Distribution**:
    Public, all regions. Paste the test instructions (§3).
 5. **Submit for review.** Typical reviews have taken from a day to a few days;
