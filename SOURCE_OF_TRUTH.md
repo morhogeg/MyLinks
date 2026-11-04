@@ -2807,7 +2807,9 @@ exact-match, capped.
   The Settings list row now says **Installed in this browser** when an
   extension answers (`MainView.tsx`, `detectExtension`), instead of "Coming soon
   to Chrome", which stays for everyone else until the store listing is live
-  (`CHROME_WEB_STORE_ITEM_ID` unset: an unpublished item's store page 404s). Undo: the popup's
+  (`CHROME_WEB_STORE_ITEM_ID` unset: an unpublished item's store page 404s).
+  Both wording changes **SHIPPED as merge `2f1d393` (PR #23)**; CI green on the PR
+  (journeys 71 passed / 4 skipped incl. all five desktop extension tests). Undo: the popup's
   one-click save waits `UNDO_HOLD_MS` (3 s) with an Undo button before it is
   sent; Undo = nothing sent ("Not saved", with Save this page); closing the
   popup still sends it. Right-click and shortcut saves stay immediate.
