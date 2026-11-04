@@ -2823,7 +2823,8 @@ exact-match, capped.
   stays the honest partial card. Tests: 11 new in `test_platform_walls.py`;
   full suite 1993 passed, 1 failed: `test_entitlement_summary_adds_the_trial_and_import_fields`,
   which fails on `main` too (a date time-bomb: its trial ends 60 days after
-  `PRO_LAUNCH_AT`, now past). **Not verified:** this sandbox can't reach
+  `PRO_LAUNCH_AT`, now past; fixed in this PR by freezing `_now_ms` in the
+  test, full suite 1994 passed). **Not verified:** this sandbox can't reach
   tiktok.com, so whether oEmbed answers Cloud Functions' addresses is checked
   only after deploy. Instagram: §4 26e (owner decision).
 - **2026-11-04 (later) — Extension 1.0.1: token field removed, Undo added (owner
