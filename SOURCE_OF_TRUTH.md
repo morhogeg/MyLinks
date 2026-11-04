@@ -2826,7 +2826,10 @@ exact-match, capped.
   `PRO_LAUNCH_AT`, now past; fixed in this PR by freezing `_now_ms` in the
   test, full suite 1994 passed). **Not verified:** this sandbox can't reach
   tiktok.com, so whether oEmbed answers Cloud Functions' addresses is checked
-  only after deploy. Instagram: §4 26e (owner decision).
+  only after deploy. **SHIPPED as merge `8b3fed1` (PR #24):** CI pytest
+  green; Deploy Cloud Functions run #145 green (all functions, pipeline
+  canary passed). Owner check: paste a TikTok video link on the website and
+  confirm caption, @handle and cover. Instagram: §4 26e (owner decision).
 - **2026-11-04 (later) — Extension 1.0.1: token field removed, Undo added (owner
   asks).** The extension's paste-a-token form and the popup's "Use a token
   instead" are gone (connecting is one click from mymachina.app only); the
