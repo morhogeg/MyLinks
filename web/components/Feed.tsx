@@ -2211,6 +2211,10 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         'h-9 inline-flex items-center justify-center gap-1.5 rounded-full text-[13px] font-semibold cursor-pointer select-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40';
     const ctrlIdle =
         'bg-card border border-border-subtle text-text-secondary hover:bg-card-hover hover:text-text hover:border-text-muted/40';
+    // Toggled-on toolbar control (a filter applied, the current view): lit
+    // graphite in dark, not the porcelain CTA fill — "on" shouldn't shout.
+    const ctrlActive =
+        'bg-selected text-selected-ink border border-selected-border shadow-[var(--selected-shadow)]';
     // Row A (mobile "Categories & Tags / Filters / Search") is secondary chrome —
     // a quieter, smaller variant of ctrlBase scoped to that row only (never mutate
     // the shared ctrlBase). Active/accent states reuse the filled style inline.
@@ -2922,13 +2926,13 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             aria-label="Filters: status, categories, tags"
                             title="Filters"
                             className={`${ctrlBase} px-3.5 border relative ${activeMobileFilters > 0
-                                ? 'bg-accent text-accent-ink border-accent shadow-sm'
+                                ? ctrlActive
                                 : ctrlIdle}`}
                         >
                             <Filter className="w-4 h-4" />
                             <span>Filter</span>
                             {activeMobileFilters > 0 && (
-                                <span className="flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold bg-accent-ink/15 text-accent-ink">
+                                <span className="flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold bg-selected-ink/15 text-selected-ink">
                                     {activeMobileFilters}
                                 </span>
                             )}
@@ -2940,7 +2944,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             aria-label="Sources"
                             title="Sources"
                             className={`${ctrlBase} px-3.5 border ${selectedSources.size > 0
-                                ? 'bg-accent text-accent-ink border-accent shadow-sm'
+                                ? ctrlActive
                                 : ctrlIdle}`}
                         >
                             <Globe className="w-4 h-4" />
@@ -2977,7 +2981,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                         aria-pressed={active}
                                         aria-label={vm.hint}
                                         className={`h-7 inline-flex items-center justify-center gap-1.5 rounded-full text-[13px] font-semibold cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${active
-                                            ? 'bg-accent text-accent-ink shadow-sm px-2 sm:px-3'
+                                            ? `${ctrlActive} px-2 sm:px-3`
                                             : 'w-7 text-text-muted hover:text-text hover:bg-card-hover'
                                             }`}
                                     >
@@ -3123,7 +3127,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             onClick={() => setIsTagExplorerOpen(!isTagExplorerOpen)}
                             title="Filter by tags"
                             className={`${ctrlBase} px-3.5 ${selectedTags.size > 0
-                                ? 'bg-accent text-accent-ink border border-accent shadow-sm'
+                                ? ctrlActive
                                 : ctrlIdle
                                 }`}
                         >
