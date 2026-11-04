@@ -1492,6 +1492,21 @@ The multi-user auth work described below **was** fully written but not live:
     the in-app link-out to web checkout is US-storefront only. Entitlements
     already flow through the RevenueCat webhook into `entitlements/{uid}`, so the
     app side is mostly config + a web paywall. Not started; post-launch.
+    **Provider pick (research 2026-11-04, from search results quoting the
+    providers' own pages; paddle.com and revenuecat.com are blocked from the
+    cloud container, so not opened directly): Paddle, through RevenueCat's
+    Paddle Billing integration.** Paddle takes software sellers anywhere except
+    a sanctions list (Israel is not on it); 5% + 50¢ per payment, no monthly fee
+    ($7.99 → $0.90, $49.99 → $3.00). Ruled out: RevenueCat's own Web Billing
+    (runs on the developer's Stripe account, so same Israel problem) and Lemon
+    Squeezy (no RevenueCat integration; Stripe is folding it into Stripe
+    Managed Payments). RevenueCat stays free to $2,500/month tracked revenue,
+    then 1%. Paddle reviews the website by hand before checkout works (can
+    take days), and wants: prices visible publicly on mymachina.app (today only
+    in the app), a refund policy with a 14–90 day window and refunds requested
+    through Paddle (today Terms §6a says Apple handles refunds), and Terms +
+    Privacy naming Paddle as merchant of record. Owner's Paddle signup is the
+    real test that Israel-based sellers are accepted.
 
 26e. **[~] Instagram saves from desktop — WORKING AS OF 2026-11-04, WATCH.**
     Owner pasted several never-saved Instagram posts on the website and got
@@ -2900,7 +2915,8 @@ exact-match, capped.
   popup still sends it. Right-click and shortcut saves stay immediate.
   Reviewer access stays self-serve Google sign-up (no token exists to give).
   Also answered: web payments for non-App-Store users → §4 26d (owner
-  decision pending). Verified: unit 60/60, extension Playwright 19/19 (two new
+  decision pending; provider research added the same day: Paddle through
+  RevenueCat). Verified: unit 60/60, extension Playwright 19/19 (two new
   Undo tests), web tsc 0, eslint and em-dash checks clean, package check
   (1.0.1); store images re-rendered. **SHIPPED as merge `24db146` (PR #22):** CI
   e2e-journeys green on the PR (unit 60/60, extension 19/19, journeys 71
