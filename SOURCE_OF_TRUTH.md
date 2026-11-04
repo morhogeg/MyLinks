@@ -2800,7 +2800,14 @@ exact-match, capped.
   asks).** The extension's paste-a-token form and the popup's "Use a token
   instead" are gone (connecting is one click from mymachina.app only); the
   website's Settings → Browser extension → Advanced now holds only **Reset
-  token** (the token is never shown; test 10 updated). Undo: the popup's
+  token** (the token is never shown; test 10 updated), relabelled the same day
+  in plain words as **Disconnect other browsers** (owner: "what is this?";
+  same `rotateShareToken`; the copy says this browser and the iPhone stay
+  connected, the iPhone once Machina is opened, per `syncShareConfigToNative`).
+  The Settings list row now says **Installed in this browser** when an
+  extension answers (`MainView.tsx`, `detectExtension`), instead of "Coming soon
+  to Chrome", which stays for everyone else until the store listing is live
+  (`CHROME_WEB_STORE_ITEM_ID` unset: an unpublished item's store page 404s). Undo: the popup's
   one-click save waits `UNDO_HOLD_MS` (3 s) with an Undo button before it is
   sent; Undo = nothing sent ("Not saved", with Save this page); closing the
   popup still sends it. Right-click and shortcut saves stay immediate.
