@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { AlertCircle, Check, ChevronRight, Clock, Copy, Eye, EyeOff, Loader2, RefreshCw, RotateCcw } from 'lucide-react';
+import { AlertCircle, Check, ChevronRight, Clock, Loader2, RotateCcw } from 'lucide-react';
 import { fetchShareConfig, rotateShareToken } from '@/lib/shareConfig';
 import ConfirmDialog from '@/components/ConfirmDialog';
-import { copyToClipboard, openExternal } from '@/lib/share';
+import { openExternal } from '@/lib/share';
 import { isNativeApp } from '@/lib/api';
 import {
     browserKind, chromeWebStoreUrl, connectExtension, connectFailureText, detectExtension, macAppStoreUrl,
@@ -19,8 +19,9 @@ import { LargeTitle, SectionHeader, Footnote } from './primitives';
  * For a normal person this is three steps on one screen: add the extension
  * from the Chrome Web Store, connect it with one click (this page hands the
  * extension the account's ingest token directly, see lib/extension.ts), then
- * save from any page. The token itself, Reset, and the paste fallback live
- * under Advanced.
+ * save from any page. Advanced holds only Reset token: the token itself is
+ * never shown, because the extension connects in one click and has no paste
+ * field (owner, 2026-11-04).
  *
  * Until the store listing exists (CHROME_WEB_STORE_ITEM_ID in lib/extension),
  * the install step says "Coming soon" instead of pretending; load-unpacked
@@ -35,7 +36,6 @@ import { LargeTitle, SectionHeader, Footnote } from './primitives';
  * NO EM DASHES in this copy (web/scripts/check-em-dash.mjs gates the build).
  */
 
-const MASK = '•'.repeat(32);
 const DETECT_EVERY_MS = 2500;
 
 type ConnectState = 'idle' | 'busy' | 'error';
@@ -118,7 +118,6 @@ export function ExtensionView({
     const [token, setToken] = useState<string | null>(null);
     const [myTag, setMyTag] = useState<string | null>(null);
     const [tokenState, setTokenState] = useState<'loading' | 'ready' | 'error'>('loading');
-    const [reload, setReload] = useState(0);
 
     useEffect(() => {
         if (!uid) return;
@@ -132,7 +131,7 @@ export function ExtensionView({
             })
             .catch(() => { if (!cancelled) setTokenState('error'); });
         return () => { cancelled = true; };
-    }, [uid, reload]);
+    }, [uid]);
 
     // ── The extension in this browser ───────────────────────────────────────
     // `undefined` = still looking (first answer pending), `null` = not found.
@@ -204,20 +203,10 @@ export function ExtensionView({
         return () => clearTimeout(t);
     }, [autoConnect, ext, token, myTag, connectedHere, doConnect]);
 
-    // ── Advanced: the token itself ──────────────────────────────────────────
-    const [revealed, setRevealed] = useState(false);
-    const [copied, setCopied] = useState(false);
+    // ── Advanced: reset the token ───────────────────────────────────────────
     const [confirmReset, setConfirmReset] = useState(false);
     const [resetState, setResetState] = useState<'idle' | 'busy' | 'done' | 'error'>('idle');
     const [resetPushed, setResetPushed] = useState(false);
-
-    const doCopy = useCallback(async () => {
-        if (!token) return;
-        if (await copyToClipboard(token)) {
-            setCopied(true);
-            setTimeout(() => setCopied(false), 1800);
-        }
-    }, [token]);
 
     const doReset = useCallback(async () => {
         setConfirmReset(false);
@@ -226,8 +215,6 @@ export function ExtensionView({
             const cfg = await rotateShareToken();
             setToken(cfg.token);
             setMyTag(await tokenTag(cfg.token));
-            setRevealed(false);
-            setCopied(false);
             // The extension in THIS browser gets the new token straight away.
             let pushed = false;
             if (ext) {
@@ -365,74 +352,35 @@ export function ExtensionView({
                 <Footnote>Pin Machina to the toolbar so the icon is always one click away.</Footnote>
 
                 <SectionHeader>Advanced</SectionHeader>
-                <details className="group rounded-[14px] border border-border-subtle bg-card">
-                    <summary className="flex items-center justify-between gap-2 px-[14px] min-h-[46px] cursor-pointer list-none text-[16px] text-text [&::-webkit-details-marker]:hidden">
-                        Connect with a token
-                        <ChevronRight className="w-[18px] h-[18px] text-text-muted transition-transform group-open:rotate-90" aria-hidden />
-                    </summary>
-                    <div className="px-[14px] pb-[14px]">
-                        <p className="text-[14px] text-text-secondary leading-snug">
-                            For a browser that can&apos;t connect in one click. In the extension, open Settings, choose Use a token
-                            instead, and paste this.
-                        </p>
-                        <div className="mt-3 rounded-xl border border-border-subtle bg-surface-inset px-3 py-2.5">
-                            {!uid ? (
-                                <div className="text-[14px] text-text-secondary">Sign in to see your token.</div>
-                            ) : tokenState === 'loading' ? (
-                                <div className="text-[14px] text-text-muted">Loading your token</div>
-                            ) : tokenState === 'error' ? (
-                                <div>
-                                    <div className="text-[14px] text-text">Could not load your token.</div>
-                                    <button type="button" onClick={() => { setTokenState('loading'); setReload((n) => n + 1); }} className={`mt-2 ${SMALL_BTN}`}>
-                                        <RefreshCw className="w-[14px] h-[14px]" aria-hidden />
-                                        Try again
-                                    </button>
-                                </div>
-                            ) : (
-                                <div
-                                    dir="ltr"
-                                    data-testid="extension-token"
-                                    aria-label={revealed ? 'Your token' : 'Your token, hidden'}
-                                    className={`font-mono text-[13px] leading-relaxed break-all ${revealed ? 'text-text select-all' : 'text-text-muted select-none'}`}
-                                >
-                                    {revealed ? token : MASK}
-                                </div>
-                            )}
-                        </div>
-                        {tokenState === 'ready' && (
-                            <div className="flex flex-wrap items-center gap-2 mt-3">
-                                <button type="button" onClick={() => setRevealed((v) => !v)} className={SMALL_BTN} aria-pressed={revealed}>
-                                    {revealed ? <EyeOff className="w-[14px] h-[14px]" aria-hidden /> : <Eye className="w-[14px] h-[14px]" aria-hidden />}
-                                    {revealed ? 'Hide' : 'Reveal'}
-                                </button>
-                                <button type="button" onClick={doCopy} className={SMALL_BTN}>
-                                    {copied ? <Check className="w-[14px] h-[14px]" aria-hidden /> : <Copy className="w-[14px] h-[14px]" aria-hidden />}
-                                    {copied ? 'Copied' : 'Copy'}
-                                </button>
-                                <button type="button" onClick={() => setConfirmReset(true)} disabled={resetState === 'busy'} className={SMALL_BTN}>
-                                    <RotateCcw className="w-[14px] h-[14px]" aria-hidden />
-                                    {resetState === 'busy' ? 'Resetting' : 'Reset token'}
-                                </button>
-                            </div>
-                        )}
-                        <div role="status" aria-live="polite">
-                            {resetState === 'done' && (
-                                <p className="mt-2.5 text-[13px] text-text-secondary leading-snug">
-                                    New token issued. The old one stopped working.
-                                    {resetPushed ? ' The extension in this browser already has the new one.' : ''}
-                                    {' '}Reconnect the extension in any other browser.
-                                </p>
-                            )}
-                            {resetState === 'error' && (
-                                <p className="mt-2.5 text-[13px] text-text leading-snug">Could not reset the token. Try again in a moment.</p>
-                            )}
-                        </div>
-                        <p className="mt-3 text-[12.5px] text-text-muted leading-snug">
-                            Anything saved with this token lands in this account, so keep it to yourself. If it ever leaks,
-                            Reset token makes the old one useless right away.
-                        </p>
+                <div className="rounded-[14px] border border-border-subtle bg-card px-[14px] py-3">
+                    <p className="text-[14px] text-text-secondary leading-snug">
+                        The extension and the iPhone share sheet save to your account with a private token. If you think
+                        it leaked, reset it: the old one stops working right away.
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2 mt-3">
+                        <button
+                            type="button"
+                            onClick={() => setConfirmReset(true)}
+                            disabled={!uid || tokenState !== 'ready' || resetState === 'busy'}
+                            className={SMALL_BTN}
+                        >
+                            <RotateCcw className="w-[14px] h-[14px]" aria-hidden />
+                            {resetState === 'busy' ? 'Resetting' : 'Reset token'}
+                        </button>
                     </div>
-                </details>
+                    <div role="status" aria-live="polite">
+                        {resetState === 'done' && (
+                            <p className="mt-2.5 text-[13px] text-text-secondary leading-snug">
+                                New token issued. The old one stopped working.
+                                {resetPushed ? ' The extension in this browser already has the new one.' : ''}
+                                {' '}Reconnect the extension in any other browser.
+                            </p>
+                        )}
+                        {resetState === 'error' && (
+                            <p className="mt-2.5 text-[13px] text-text leading-snug">Could not reset the token. Try again in a moment.</p>
+                        )}
+                    </div>
+                </div>
             </>)}
 
             <ConfirmDialog

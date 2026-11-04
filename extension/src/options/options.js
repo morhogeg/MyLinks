@@ -1,26 +1,15 @@
 /**
- * Settings: which account this browser saves to, connecting with a pasted
- * token, saves waiting to be sent, keyboard shortcuts, and what the
- * extension reads. All changes go through the service worker.
+ * Settings: which account this browser saves to (connecting happens on
+ * Machina's website, in one click), saves waiting to be sent, keyboard
+ * shortcuts, and what the extension reads. All changes go through the
+ * service worker.
  */
 
 import { localize, t } from '../lib/i18n.js';
 import { CONNECT_URL, PRIVACY_URL } from '../lib/config.js';
-import { TOKEN_RE } from '../lib/account.js';
 import { displayUrl } from '../lib/urls.js';
 
 const $ = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
-
-/** Words for a failed token connect (account.js / api.js reasons). */
-const TOKEN_ERRORS = {
-    'bad-token': 'tokenBadFormat',
-    invalid: 'tokenInvalid',
-    offline: 'tokenOffline',
-    network: 'tokenNetwork',
-    server: 'tokenServer',
-    'rate-limited': 'tokenRateLimited',
-    unexpected: 'tokenUnexpected',
-};
 
 /** Words for why a queued save failed for good. */
 const FAILURE_TITLES = {
@@ -136,39 +125,6 @@ async function renderShortcuts() {
     }
 }
 
-function setTokenMessage(text, tone) {
-    const el = $('token-message');
-    el.textContent = text;
-    if (tone) el.dataset.tone = tone;
-    else delete el.dataset.tone;
-}
-
-async function onTokenSubmit(event) {
-    event.preventDefault();
-    const input = /** @type {HTMLInputElement} */ ($('token-input'));
-    const token = input.value.trim();
-    if (!TOKEN_RE.test(token)) {
-        setTokenMessage(t('tokenBadFormat'), 'error');
-        input.setAttribute('aria-invalid', 'true');
-        input.focus();
-        return;
-    }
-    input.removeAttribute('aria-invalid');
-    $('token-submit').setAttribute('disabled', '');
-    setTokenMessage(t('tokenChecking'));
-    const res = await ask({ type: 'connect-token', token });
-    $('token-submit').removeAttribute('disabled');
-    if (res?.ok) {
-        input.value = '';
-        setTokenMessage(t('tokenOk'), 'ok');
-        await renderAccount();
-        await renderQueue();
-    } else {
-        setTokenMessage(t(TOKEN_ERRORS[res?.reason] || 'tokenUnexpected'), 'error');
-        input.setAttribute('aria-invalid', 'true');
-    }
-}
-
 async function onDisconnect() {
     const status = await ask({ type: 'status' });
     if (status.waiting > 0) {
@@ -199,7 +155,6 @@ async function main() {
     $('connect').addEventListener('click', () => chrome.tabs.create({ url: CONNECT_URL }));
     $('disconnect').addEventListener('click', onDisconnect);
     $('disconnect-confirm').addEventListener('click', disconnectNow);
-    $('token-form').addEventListener('submit', onTokenSubmit);
     $('change-shortcuts').addEventListener('click', () => chrome.tabs.create({ url: 'chrome://extensions/shortcuts' }));
     $('send-all').addEventListener('click', async () => {
         $('send-all').setAttribute('disabled', '');
@@ -220,7 +175,6 @@ async function main() {
     await renderAccount();
     await renderQueue();
     await renderShortcuts();
-    if (new URLSearchParams(location.search).has('token')) /** @type {HTMLDetailsElement} */ ($('token-details')).open = true;
 }
 
 main();

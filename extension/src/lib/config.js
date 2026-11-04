@@ -27,3 +27,10 @@ export const PRIVACY_URL = `${APP_ORIGIN}/privacy`;
 
 /** Origins whose top-frame root page may connect or disconnect the extension. */
 export const BRIDGE_ORIGINS = [APP_ORIGIN];
+
+/**
+ * The popup's one-click save waits this long before sending, so Undo can stop
+ * it: until then nothing has left the browser. Closing the popup doesn't
+ * cancel it. (Right-click and shortcut saves are deliberate and send at once.)
+ */
+export const UNDO_HOLD_MS = 3000;

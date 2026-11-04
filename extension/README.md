@@ -15,12 +15,14 @@ tested here). Store listing, privacy answers and the publishing steps:
 ## Using it
 
 1. **Connect.** A new install opens `mymachina.app/?connect=extension`; if you
-   are signed in, it connects in one click. Otherwise: popup, **Connect to
-   Machina**, or Settings (right-click the icon, Options), **Connect with a
-   token** (the token is in Machina's Settings, Browser extension, Advanced).
+   are signed in, it connects in one click (otherwise right after you sign
+   in). The popup's **Connect to Machina** does the same. There is no
+   paste-a-token field (owner, 2026-11-04).
 2. **Save.**
    - Click the icon, or press **Ctrl+Shift+S** (Command+Shift+S on a Mac): the
-     popup saves the page at once. Selected text goes with it as a quote.
+     popup saves the page. For 3 seconds it shows **Undo**; nothing is sent
+     until that window ends, and closing the popup doesn't cancel the save.
+     Selected text goes with it as a quote.
    - **Alt+Shift+S**: a screenshot of what you see.
    - Right-click a page, link, image or selection: **Save to Machina**.
 3. **Results** show in the popup, or (for right-click and shortcut saves) as a
@@ -28,6 +30,7 @@ tested here). Store listing, privacy answers and the publishing steps:
 
 | Server answer | What the user sees |
 |---|---|
+| Undo within 3 s (popup) | **Not saved**: nothing was sent; **Save this page** sends it after all |
 | 200 queued / saved | **Saved to Machina** (with the quote, if any) |
 | 200 `duplicate` | **Already in your library** (a new quote is not added: server limit) |
 | 200 `waiting` | **Saved for later** with the server's message |

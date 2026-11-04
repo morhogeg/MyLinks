@@ -27,20 +27,6 @@
                 <button class="button secondary" id="disconnect" type="button" data-i18n="disconnectButton" hidden></button>
                 <button class="button secondary danger" id="disconnect-confirm" type="button" data-i18n="disconnectConfirm" hidden></button>
             </div>
-
-            <details class="token" id="token-details">
-                <summary data-i18n="tokenHeading"></summary>
-                <p class="help" data-i18n="tokenHelp"></p>
-                <form id="token-form" novalidate>
-                    <label for="token-input" data-i18n="tokenLabel"></label>
-                    <div class="row">
-                        <input id="token-input" name="token" type="text" autocomplete="off" spellcheck="false"
-                               autocapitalize="off" inputmode="text" aria-describedby="token-message">
-                        <button class="button primary" id="token-submit" type="submit" data-i18n="tokenConnect"></button>
-                    </div>
-                    <p class="message" id="token-message" aria-live="polite"></p>
-                </form>
-            </details>
         </section>
 
         <section class="card" aria-labelledby="queue-heading">

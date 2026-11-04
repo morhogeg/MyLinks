@@ -4,14 +4,15 @@
  *
  * Result outcomes are the server's (api.js Outcome) plus the client-side
  * ones saves.js adds: queued, unsure, private-failed, queue-full,
- * not-connected, unsavable, image-unsavable, screenshot-failed, no-tab.
+ * not-connected, unsavable, image-unsavable, screenshot-failed, no-tab, and
+ * the popup's undone.
  */
 
 import { t } from './i18n.js';
 
 /**
  * @typedef {'ok' | 'neutral' | 'warn' | 'error'} Tone
- * @typedef {{tone: Tone, icon: 'check' | 'clock' | 'alert' | 'link', title: string, detail: string}} Description
+ * @typedef {{tone: Tone, icon: 'check' | 'clock' | 'alert' | 'link' | 'undo', title: string, detail: string}} Description
  */
 
 const UNSAVABLE_REASON = {
@@ -29,6 +30,8 @@ export function describe(r) {
     const screenshot = r.kind === 'screenshot';
     const hasQuote = Boolean(r.quote);
     switch (r.outcome) {
+        case 'undone':
+            return { tone: 'neutral', icon: 'undo', title: t('undoneTitle'), detail: t('undoneDetail') };
         case 'saved':
             return screenshot
                 ? { tone: 'ok', icon: 'check', title: t('screenshotSavedTitle'), detail: t('screenshotSavedDetail') }
@@ -74,7 +77,7 @@ export function describe(r) {
         case 'network':
         case 'server':
         case 'rate-limited':
-            return { tone: 'error', icon: 'alert', title: t('privateFailedTitle'), detail: t('tokenNetwork') };
+            return { tone: 'error', icon: 'alert', title: t('privateFailedTitle'), detail: t('networkDetail') };
         default:
             return { tone: 'warn', icon: 'alert', title: t('unsureTitle'), detail: t('unexpectedDetail') };
     }

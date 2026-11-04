@@ -1,8 +1,9 @@
 /**
  * The popup saves the page the moment it opens (one click), then says what
- * happened in plain words. The save itself runs in the service worker over a
- * port, so closing the popup early never cancels it: the worker shows the
- * result on the page instead.
+ * happened in plain words. The save runs in the service worker over a port:
+ * it waits a few seconds first (UNDO_HOLD_MS) so Undo can stop it before
+ * anything is sent, and closing the popup never cancels it (the worker shows
+ * the result on the page instead).
  */
 
 import { localize, t } from '../lib/i18n.js';
@@ -47,6 +48,7 @@ function setBusy(kind) {
     $('result-detail').textContent = '';
     $('quote').hidden = true;
     $('hint').hidden = true;
+    $('hold').hidden = true;
     $('actions').replaceChildren();
 }
 
@@ -81,7 +83,6 @@ function actionsFor(result) {
         case 'not-connected':
             return [
                 button(t('connectButton'), 'primary', () => openTab(CONNECT_URL), 'link'),
-                button(t('useToken'), 'link', () => openTab(chrome.runtime.getURL('src/options/options.html?token=1'))),
                 button(t('privacyLink'), 'link', () => openTab(PRIVACY_URL)),
             ];
         case 'reconnect':
@@ -100,6 +101,11 @@ function actionsFor(result) {
         case 'unsavable':
         case 'no-tab':
             return [button(t('openMachina'), 'secondary', open, 'open')];
+        case 'undone':
+            return [
+                button(t('saveThisPage'), 'primary', () => save('page')),
+                button(t('openMachina'), 'secondary', open, 'open'),
+            ];
         default: {
             const list = [];
             if (result.kind === 'page' && screenshotAllowed) {
@@ -113,6 +119,7 @@ function actionsFor(result) {
 
 function show(result) {
     state.busy = false;
+    $('hold').hidden = true;
     const view = describe(result);
     $('result').dataset.tone = view.tone;
     setIcon(view.icon);
@@ -135,6 +142,34 @@ function show(result) {
     // the live region it lives in.
     const primary = actions.find((el) => el.classList.contains('primary')) || actions[0];
     primary?.focus();
+}
+
+/**
+ * The one-click save is waiting out its Undo window: nothing has been sent.
+ * Undo stops it; closing the popup lets it go.
+ */
+function showHeld({ holdMs, quote }) {
+    $('result-detail').textContent = t('holdDetail');
+    const bar = document.createElement('span');
+    bar.style.setProperty('--hold-ms', `${holdMs}ms`);
+    $('hold-bar').replaceWith(bar);
+    bar.id = 'hold-bar';
+    $('hold').hidden = false;
+    $('quote').hidden = !quote;
+    $('quote-text').textContent = quote ? quote.slice(0, 600) : '';
+    const undo = button(t('undo'), 'primary', () => {
+        undo.setAttribute('disabled', '');
+        state.port?.postMessage({ type: 'undo' });
+    }, 'undo');
+    $('actions').replaceChildren(undo);
+    undo.focus();
+}
+
+/** The Undo window closed: the save is on its way. */
+function showSending() {
+    $('hold').hidden = true;
+    $('result-detail').textContent = '';
+    $('actions').replaceChildren();
 }
 
 function renderPage(tab) {
@@ -189,6 +224,14 @@ function connectPort() {
     if (state.port) return state.port;
     const port = chrome.runtime.connect({ name: 'popup' });
     port.onMessage.addListener((msg) => {
+        if (msg?.type === 'held') {
+            showHeld(msg);
+            return;
+        }
+        if (msg?.type === 'sending') {
+            showSending();
+            return;
+        }
         if (msg?.type !== 'result') return;
         state.status = msg.status || state.status;
         renderFooter();
@@ -203,10 +246,11 @@ function connectPort() {
     return port;
 }
 
-function save(kind) {
+/** @param {'page' | 'screenshot'} kind @param {{hold?: boolean}} [opts] hold: offer Undo first */
+function save(kind, { hold = false } = {}) {
     if (!state.tab || state.busy) return;
     setBusy(kind);
-    connectPort().postMessage({ type: 'save', kind, tabId: state.tab.id });
+    connectPort().postMessage({ type: 'save', kind, tabId: state.tab.id, hold });
 }
 
 async function main() {
@@ -239,7 +283,8 @@ async function main() {
         show({ outcome: 'unsavable', reason: check.reason, kind: 'page' });
         return;
     }
-    save('page');
+    // One click: save at once, with a short Undo window before it is sent.
+    save('page', { hold: true });
 }
 
 main();

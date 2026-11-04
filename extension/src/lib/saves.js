@@ -75,15 +75,17 @@ async function finish(result, job, tab) {
 }
 
 /**
- * The page in `tab`, with the text selected in it (or `quote` when the caller
- * read the selection itself, e.g. from the right-clicked frame).
+ * Read the page in `tab` and build its save, without sending it (the popup
+ * holds it for Undo first). The text selected in it goes along, or `quote`
+ * when the caller read the selection itself (e.g. from the right-clicked
+ * frame). Returns `{job}`, or `{result}` when the page can't be saved.
  * @param {chrome.tabs.Tab} tab
  * @param {{quote?: string}} [opts]
  */
-export async function savePage(tab, { quote } = {}) {
-    if (!tab || typeof tab.id !== 'number') return { outcome: 'no-tab', kind: 'page' };
+export async function preparePage(tab, { quote } = {}) {
+    if (!tab || typeof tab.id !== 'number') return { result: { outcome: 'no-tab', kind: 'page' } };
     const check = savability(tab.url);
-    if (!check.ok) return { outcome: 'unsavable', reason: check.reason, kind: 'page', title: tab.title || '' };
+    if (!check.ok) return { result: { outcome: 'unsavable', reason: check.reason, kind: 'page', title: tab.title || '' } };
 
     const facts = await readPage(tab.id); // null where the browser forbids reading
     const job = {
@@ -95,8 +97,18 @@ export async function savePage(tab, { quote } = {}) {
     if (selected) job.quote = selected;
     const preview = socialPreview(tab.url, facts);
     if (preview) job.preview = preview;
+    return { job };
+}
 
-    return finish(await deliver(job, { incognito: tab.incognito }), job, tab);
+/** Send a save built by preparePage. */
+export async function sendJob(job, tab) {
+    return finish(await deliver(job, { incognito: tab?.incognito }), job, tab);
+}
+
+/** The page in `tab`, sent at once (right-click and retries). */
+export async function savePage(tab, opts) {
+    const prepared = await preparePage(tab, opts);
+    return prepared.result || sendJob(prepared.job, tab);
 }
 
 /** A right-clicked link. */

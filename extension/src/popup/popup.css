@@ -48,6 +48,14 @@ body { width: 360px; }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* The Undo window: a thin bar that empties as the save is about to be sent. */
+.hold { height: 3px; border-radius: 2px; background: var(--border-strong); overflow: hidden; margin-top: -6px; }
+.hold span {
+    display: block; height: 100%; background: var(--text-muted); transform-origin: left center;
+    animation: hold var(--hold-ms, 3000ms) linear forwards;
+}
+@keyframes hold { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+
 .quote {
     margin: 0; padding: 8px 12px; border-inline-start: 3px solid var(--border-strong);
     background: var(--background); border-radius: 0 10px 10px 0;
