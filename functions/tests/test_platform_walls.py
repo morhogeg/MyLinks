@@ -207,3 +207,98 @@ def test_share_byline_tiktok_screenshot_gets_the_mark():
 def test_tiktok_lookalike_host_is_not_tiktok():
     import share_service
     assert share_service._platform_of("https://tiktok.com.evil.test/@x/video/1") is None
+
+
+# ── TikTok oEmbed: the desktop path (website, extension, + sheet) ───────────
+# TikTok's public oEmbed answer for a video (shape per developers.tiktok.com).
+TT_OEMBED = {
+    "version": "1.0", "type": "video", "provider_name": "TikTok",
+    "title": "One Pot Creamy Chicken Pasta. Full recipe on my website. #pasta",
+    "author_name": "Dad's Food", "author_unique_id": "dadsfoodtoday",
+    "author_url": "https://www.tiktok.com/@dadsfoodtoday",
+    "thumbnail_url": "https://p16-sign-va.tiktokcdn.com/obj/cover.jpeg",
+    "html": "<blockquote></blockquote>",
+}
+
+
+class _JsonResp(_Resp):
+    def __init__(self, data, ok=True):
+        super().__init__("", ok=ok)
+        self._data = data
+
+    def json(self):
+        return self._data
+
+
+def _tiktok_server(oembed, seen=None, page_url="https://www.tiktok.com/@dadsfoodtoday/video/7560000000000000001"):
+    def fake_get(u, **k):
+        if seen is not None:
+            seen.append(u)
+        if u.startswith("https://www.tiktok.com/oembed"):
+            return oembed if isinstance(oembed, _Resp) else _JsonResp(oembed)
+        return _Resp(TT_SHELL, url=page_url)
+    return fake_get
+
+
+def test_tiktok_desktop_save_is_a_full_card_from_oembed(monkeypatch):
+    seen = []
+    monkeypatch.setattr(scraper, "safe_get", _tiktok_server(TT_OEMBED, seen))
+    r = scraper.scrape_url("https://vt.tiktok.com/ZSgx3txGb/")
+    assert "One Pot Creamy Chicken Pasta" in r["text"]
+    assert r["title"].startswith("One Pot Creamy Chicken Pasta")
+    assert r["source_name"] == "@dadsfoodtoday"
+    assert "Dad's Food" in r["text"]
+    assert r["video_thumbnail_url"] == "https://p16-sign-va.tiktokcdn.com/obj/cover.jpeg"
+    assert not r.get("truncated")
+    # oEmbed is asked about the resolved video address, not the short link.
+    oe = [u for u in seen if "/oembed" in u]
+    assert len(oe) == 1 and "video%2F7560000000000000001" in oe[0]
+
+
+def test_tiktok_oembed_handle_falls_back_to_author_url(monkeypatch):
+    data = {**TT_OEMBED}
+    data.pop("author_unique_id")
+    monkeypatch.setattr(scraper, "safe_get", _tiktok_server(data))
+    r = scraper._scrape_tiktok_url("https://www.tiktok.com/@dadsfoodtoday/video/1")
+    assert r["source_name"] == "@dadsfoodtoday"
+
+
+def test_tiktok_phone_read_skips_oembed(monkeypatch):
+    seen = []
+    monkeypatch.setattr(scraper, "safe_get", _tiktok_server(TT_OEMBED, seen))
+    r = scraper.scrape_url("https://vt.tiktok.com/ZSgx3txGb/", page_preview={
+        "description": "Phone read caption, long enough to count", "author": "x",
+        "url": "https://www.tiktok.com/@x/video/1"})
+    assert "Phone read caption" in r["text"]
+    assert not any("/oembed" in u for u in seen)
+
+
+def test_tiktok_page_data_skips_oembed(monkeypatch):
+    seen = []
+    def fake_get(u, **k):
+        seen.append(u)
+        return _Resp(TT_FULL, url="https://www.tiktok.com/@dadsfoodtoday/video/1")
+    monkeypatch.setattr(scraper, "safe_get", fake_get)
+    scraper._scrape_tiktok_url("https://www.tiktok.com/@dadsfoodtoday/video/1")
+    assert not any("/oembed" in u for u in seen)
+
+
+@pytest.mark.parametrize("oembed", [
+    _JsonResp({}, ok=False),                       # 400/404: private or deleted video
+    _JsonResp({"title": ""}),                      # a video with no caption
+    _JsonResp(["not", "a", "dict"]),
+    _JsonResp({"title": "Watch this video on TikTok"}),
+    _Resp("<html>not json</html>"),                # .json() missing → exception
+])
+def test_tiktok_oembed_miss_stays_an_honest_partial_card(monkeypatch, oembed):
+    monkeypatch.setattr(scraper, "safe_get", _tiktok_server(oembed))
+    r = scraper._scrape_tiktok_url("https://www.tiktok.com/@dadsfoodtoday/video/1")
+    assert r.get("truncated") is True
+    assert "Watch this video" not in r.get("text", "")
+
+
+def test_tiktok_oembed_http_cover_is_dropped(monkeypatch):
+    monkeypatch.setattr(scraper, "safe_get",
+                        _tiktok_server({**TT_OEMBED, "thumbnail_url": "http://p16.tiktokcdn.com/c.jpg"}))
+    r = scraper._scrape_tiktok_url("https://www.tiktok.com/@dadsfoodtoday/video/1")
+    assert r["video_thumbnail_url"] == ""

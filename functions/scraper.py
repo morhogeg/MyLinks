@@ -1984,6 +1984,35 @@ def _tiktok_item_from_html(html: str) -> dict:
         return {}
 
 
+_TT_OEMBED_URL = "https://www.tiktok.com/oembed?url={url}"
+
+
+def _tiktok_oembed(url: str) -> dict:
+    """The video as TikTok's public oEmbed endpoint describes it, or {}.
+
+    TikTok gives cloud servers an empty app shell for the post page (§2), but
+    its oEmbed endpoint is built for servers: no key, no login. It returns the
+    caption as `title`, the display name as `author_name`, the profile link as
+    `author_url` (and usually `author_unique_id`), and the cover as
+    `thumbnail_url`. Used only when neither the page nor the phone gave the
+    caption, so the iPhone's path (which sends `pagePreview`) never calls it."""
+    from urllib.parse import quote
+    try:
+        resp = safe_get(_TT_OEMBED_URL.format(url=quote(url, safe="")),
+                        headers={"Accept": "application/json"}, timeout=8)
+        if not resp.ok:
+            return {}
+        data = resp.json()
+    except Exception as e:
+        logger.warning(f"TikTok oEmbed failed: {e}")
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    s = lambda k: data.get(k).strip() if isinstance(data.get(k), str) else ""
+    return {"desc": s("title"), "author": s("author_unique_id"), "author_url": s("author_url"),
+            "nickname": s("author_name"), "cover": s("thumbnail_url")}
+
+
 def _tiktok_handle(*candidates: str) -> str:
     """The first candidate that is a valid TikTok username (an "@" is
     tolerated, and a /@handle/ URL path is read too), else ""."""
@@ -2044,6 +2073,19 @@ def _scrape_tiktok_url(url: str, message_body: Optional[str] = None,
             nickname = nickname or _preview(page_preview, "authorName")
             final_url = _preview(page_preview, "url") or final_url
             logger.info("TikTok: using the post as read on the phone")
+
+    if not desc:
+        # TikTok's oEmbed wants the full video address; a vt./vm. short link
+        # is first resolved by the page fetch above (final_url).
+        oe_target = final_url if re.search(r"/(?:video|photo)/\d+", final_url or "") else url
+        oe = _tiktok_oembed(oe_target)
+        oe_desc = oe.get("desc", "")
+        if oe_desc and not any(n.lower() in oe_desc.lower() for n in _TT_SHARE_NOISE):
+            desc = oe_desc
+            author = author or _tiktok_handle(oe.get("author", ""), oe.get("author_url", ""))
+            nickname = nickname or oe.get("nickname", "")
+            cover = cover or oe.get("cover", "")
+            logger.info("TikTok: using the post from oEmbed")
 
     teaser_only = False
     if not desc and og_teaser:

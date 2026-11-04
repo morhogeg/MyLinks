@@ -234,6 +234,8 @@ def test_entitlement_summary_adds_the_trial_and_import_fields(monkeypatch):
     launch = _ms(ent.PRO_LAUNCH_AT)
     doc = {"plan": "pro", "source": "trial", "proUntil": launch + 60 * DAY,
            "trialEndsAt": None, "trialAnchorAt": None}
+    # Freeze the clock inside proUntil: real time passed it on 2026-11-04.
+    monkeypatch.setattr(ent, "_now_ms", lambda: launch + DAY)
     monkeypatch.setattr(ent, "get_entitlement", lambda uid: dict(doc))
     import quota
     monkeypatch.setattr(quota, "quota_usage", lambda uid: {"saves": 2, "asks": 1, "imports": 40})
