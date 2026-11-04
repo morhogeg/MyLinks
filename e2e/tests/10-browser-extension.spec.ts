@@ -8,8 +8,8 @@ import { launchExtension } from '../extension/fixtures';
 // 24, "Chrome Web Store listing for the extension"):
 //   - no store listing yet: an honest "Coming soon", never load-unpacked steps,
 //     and nothing else (no How to save, no Advanced) until an extension is here;
-//   - once one is here, Advanced comes back with Reset token (the token itself
-//     is never shown: the extension has no paste field, owner 2026-11-04);
+//   - once one is here, Advanced comes back with "Disconnect other browsers"
+//     (it resets the token; the token itself is never shown, owner 2026-11-04);
 //   - with the real extension installed, one click (or the extension's own
 //     Connect button) connects it, no copy and paste.
 
@@ -46,7 +46,7 @@ test('no listing yet: coming soon alone, no developer steps, no usage or Advance
     // Nothing to install and nothing here: no instructions for a button that
     // doesn't exist, and saving stays possible through the + button.
     await expect(dialog).toContainText('pasting its link with the + button');
-    await expect(dialog).not.toContainText(/How to save|Pin Machina|Reset token|Connect with a token/);
+    await expect(dialog).not.toContainText(/How to save|Pin Machina|Disconnect other browsers|Connect with a token/);
     await expect(dialog.getByTestId('extension-token')).toHaveCount(0);
     expect(errors).toEqual([]);
 });
@@ -111,10 +111,10 @@ test('with the extension installed: one click connects it, and a deep link conne
         await expect(dialog.getByTestId('extension-status')).toContainText('Connected in this browser', { timeout: 20_000 });
         await expect.poll(async () => (await ext.storage()).token).toBe(TOKEN);
         expect((await ext.storage()).account).toBe(user.email);
-        // With an extension here, usage and Advanced (Reset token only: the
-        // token itself is never shown, owner 2026-11-04) come back.
+        // With an extension here, usage and Advanced ("Disconnect other
+        // browsers" only: the token itself is never shown) come back.
         await expect(dialog).toContainText('How to save');
-        await expect(dialog.getByRole('button', { name: 'Reset token' })).toBeVisible();
+        await expect(dialog.getByRole('button', { name: 'Disconnect other browsers' })).toBeVisible();
         await expect(dialog).not.toContainText('Connect with a token');
         // The param is consumed, so a reload doesn't reconnect.
         expect(new URL(page.url()).searchParams.get('connect')).toBeNull();
