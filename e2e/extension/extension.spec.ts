@@ -255,6 +255,14 @@ const TT_FOR_YOU = `<!doctype html><html><head><title>TikTok - Make Your Day</ti
  <article><div id="xgwrapper-0-7600000000000000002"><video muted></video></div><a href="/@someoneelse">someoneelse</a></article>
 </main></body></html>`;
 
+const TT_EXPLORE = `<!doctype html><html><head><title>Explore - Find your favorite videos on TikTok</title></head><body>
+ <div data-e2e="explore-item-list">
+  <div data-e2e="explore-item"><div><a href="https://www.tiktok.com/@shaharhenfoodik/video/7650000000000000001"><img alt="" width="200" height="260"></a></div>
+   <div><a href="/@shaharhenfoodik">shaharhenfoodik</a></div></div>
+  <div data-e2e="explore-item"><div><a href="https://www.tiktok.com/@other/video/7650000000000000002"><img alt="" width="200" height="260"></a></div>
+   <div><a href="/@other">other</a></div></div>
+ </div><a href="/@nobody">nobody</a></body></html>`;
+
 const TT_TWO_UP = `<!doctype html><html><head><style>video{width:200px;height:200px}</style></head><body>
  <div id="xgwrapper-0-7600000000000000003"><video muted></video></div><a href="/@a">a</a>
  <div id="xgwrapper-0-7600000000000000004"><video muted></video></div><a href="/@b">b</a>
@@ -262,7 +270,9 @@ const TT_TWO_UP = `<!doctype html><html><head><style>video{width:200px;height:20
 
 test('TikTok feeds: the video on screen is saved, not the feed', async () => {
     await ext.connect();
-    const pages: Record<string, string> = { '/search': TT_SEARCH, '/foryou': TT_FOR_YOU, '/following': TT_TWO_UP };
+    const pages: Record<string, string> = {
+        '/search': TT_SEARCH, '/foryou': TT_FOR_YOU, '/following': TT_TWO_UP, '/explore': TT_EXPLORE,
+    };
     await ext.context.route('https://www.tiktok.com/**', (route) => route.fulfill({
         contentType: 'text/html', body: pages[new URL(route.request().url()).pathname] || '<p>?</p>',
     }));
@@ -290,6 +300,16 @@ test('TikTok feeds: the video on screen is saved, not the feed', async () => {
         url: 'https://www.tiktok.com/@chefana/video/7600000000000000001',
     });
     await popup.close();
+
+    // Explore grid, nothing playing: right-click on a creator's name saves
+    // the video beside that name; a creator with no video beside stays a profile.
+    await page.goto('https://www.tiktok.com/explore');
+    await click({ menuItemId: 'machina-link', linkUrl: 'https://www.tiktok.com/@shaharhenfoodik', frameId: 0 });
+    expect(ext.stub.shareCalls().at(-1)!.body).toEqual({
+        url: 'https://www.tiktok.com/@shaharhenfoodik/video/7650000000000000001',
+    });
+    await click({ menuItemId: 'machina-link', linkUrl: 'https://www.tiktok.com/@nobody', frameId: 0 });
+    expect(ext.stub.shareCalls().at(-1)!.body).toEqual({ url: 'https://www.tiktok.com/@nobody' });
 
     // Two videos fully in view and neither playing: no guess, the page itself.
     await page.goto('https://www.tiktok.com/following');

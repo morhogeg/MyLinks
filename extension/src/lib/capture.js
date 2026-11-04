@@ -98,6 +98,59 @@ export function readPageInFrame() {
     };
 }
 
+/**
+ * Injected: the video links next to every link to `href` on the page (a
+ * creator's name under a video in a TikTok grid). For each such link, walk up
+ * to the nearest box holding any video link; one video there counts, more
+ * than one means a list, and the walk stops. Self-contained (injected).
+ */
+export function videosNearLinkInFrame(href) {
+    const key = (raw) => {
+        try {
+            const u = new URL(raw, location.href);
+            return u.origin + u.pathname.replace(/\/+$/, '');
+        } catch {
+            return '';
+        }
+    };
+    const videoOf = (raw) => {
+        try {
+            const u = new URL(raw, location.href);
+            return /\/(?:video|photo)\/\d+/.test(u.pathname) ? u.origin + u.pathname : '';
+        } catch {
+            return '';
+        }
+    };
+    const want = key(href);
+    const found = new Set();
+    if (!want) return [];
+    for (const a of document.querySelectorAll('a[href]')) {
+        if (key(a.href) !== want) continue;
+        for (let el = a.parentElement, depth = 0; el && depth < 12; el = el.parentElement, depth++) {
+            const near = new Set([...el.querySelectorAll('a[href]')].map((x) => videoOf(x.href)).filter(Boolean));
+            if (near.size === 1) found.add([...near][0]);
+            if (near.size) break;
+        }
+        if (found.size > 3) break;
+    }
+    return [...found].slice(0, 4);
+}
+
+/** The links Chrome reports for a TikTok video next to the right-clicked link. */
+export async function readVideosNearLink(tabId, frameId, href) {
+    try {
+        const [first] = await chrome.scripting.executeScript({
+            target: { tabId, frameIds: [frameId] },
+            func: videosNearLinkInFrame,
+            args: [href],
+        });
+        const list = first && Array.isArray(first.result) ? first.result : [];
+        return list.filter((x) => typeof x === 'string').slice(0, 4).map((x) => x.slice(0, LIMITS.url));
+    } catch {
+        return [];
+    }
+}
+
 /** Injected: the selection in one frame (keeps line breaks, unlike menu text). */
 export function readSelectionInFrame() {
     return window.getSelection ? String(window.getSelection() || '').slice(0, 20000) : '';

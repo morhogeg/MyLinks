@@ -10,8 +10,10 @@
 import { Outcome, buildBody, cleanQuote, isDelivered, isRetryable, postShare } from './api.js';
 import { getConnection, markNeedsReconnect } from './account.js';
 import * as queue from './queue.js';
-import { captureVisible, readPage, socialPreview, tiktokVideoUrl } from './capture.js';
-import { previewOnlySite, savability } from './urls.js';
+import { captureVisible, readPage, readVideosNearLink, socialPreview, tiktokVideoUrl } from './capture.js';
+import {
+    httpsOn, previewOnlySite, savability, socialHandle, socialPostId, socialPostSite, tiktokProfileHandle,
+} from './urls.js';
 import { refreshBadge } from './feedback.js';
 
 /** A screenshot can be a few MB on a slow uplink; pages are tiny requests. */
@@ -113,10 +115,31 @@ export async function savePage(tab, opts) {
     return prepared.result || sendJob(prepared.job, tab);
 }
 
+/**
+ * On a TikTok feed, a right-click often lands on the creator's name under a
+ * video (a profile link). When a video by that same creator is playing right
+ * there, that video is what the user means; otherwise the profile is saved.
+ */
+export function pickVideoForProfile(handle, near, playing) {
+    const mine = (v) => v && socialPostId(v) && socialHandle(v).toLowerCase() === handle.toLowerCase();
+    const beside = [...new Set(near.map((v) => httpsOn(v, ['tiktok.com'])))].filter(mine);
+    if (beside.length === 1) return beside[0];
+    return mine(playing) ? playing : '';
+}
+
+async function tiktokVideoForProfileLink(tab, linkUrl, frameId) {
+    const handle = tiktokProfileHandle(linkUrl);
+    if (!handle || !tab || typeof tab.id !== 'number' || socialPostSite(tab.url) !== 'tiktok') return '';
+    const near = await readVideosNearLink(tab.id, frameId, linkUrl);
+    const playing = tiktokVideoUrl(tab.url, await readPage(tab.id));
+    return pickVideoForProfile(handle, near, playing);
+}
+
 /** A right-clicked link. */
-export async function saveLink(tab, linkUrl) {
+export async function saveLink(tab, linkUrl, frameId = 0) {
     if (!savability(linkUrl).ok) return { outcome: 'unsavable', reason: savability(linkUrl).reason, kind: 'link' };
-    const job = { kind: 'link', url: linkUrl, title: linkUrl };
+    const video = await tiktokVideoForProfileLink(tab, linkUrl, frameId);
+    const job = { kind: 'link', url: video || linkUrl, title: video || linkUrl };
     return finish(await deliver(job, { incognito: tab?.incognito }), job, tab);
 }
 

@@ -163,3 +163,20 @@ test('TikTok feed: a video page and other sites are left alone', () => {
     assert.equal(tiktokVideoUrl('https://www.instagram.com/', facts), '');
     assert.equal(tiktokVideoUrl('https://example.com/', facts), '');
 });
+
+test('TikTok: a right-clicked creator name saves their video beside it', async () => {
+    const { tiktokProfileHandle } = await import('../src/lib/urls.js');
+    const { pickVideoForProfile } = await import('../src/lib/saves.js');
+    assert.equal(tiktokProfileHandle('https://www.tiktok.com/@shaharhenfoodik'), 'shaharhenfoodik');
+    assert.equal(tiktokProfileHandle('https://www.tiktok.com/@a/video/1'), '');
+    assert.equal(tiktokProfileHandle('https://evil.test/@a'), '');
+    const mine = 'https://www.tiktok.com/@chef/video/7600000000000000001';
+    const theirs = 'https://www.tiktok.com/@other/video/7600000000000000002';
+    assert.equal(pickVideoForProfile('chef', [mine], ''), mine);
+    assert.equal(pickVideoForProfile('Chef', [mine, theirs], ''), mine);           // only theirs is filtered out
+    assert.equal(pickVideoForProfile('chef', [theirs], ''), '');                   // not this creator
+    assert.equal(pickVideoForProfile('chef', [mine, 'https://www.tiktok.com/@chef/video/7600000000000000009'], ''), ''); // two of theirs
+    assert.equal(pickVideoForProfile('chef', [], mine), mine);                     // the one playing
+    assert.equal(pickVideoForProfile('chef', [], theirs), '');
+    assert.equal(pickVideoForProfile('chef', ['http://www.tiktok.com/@chef/video/1'], ''), '');
+});

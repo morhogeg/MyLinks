@@ -72,7 +72,7 @@ export async function onMenuClick(info, tab) {
             break;
         }
         case MENU.link:
-            result = await saveLink(tab, info.linkUrl);
+            result = await saveLink(tab, info.linkUrl, info.frameId ?? 0);
             break;
         case MENU.image:
             result = await saveImage(tab, info.srcUrl);

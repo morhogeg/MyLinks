@@ -130,6 +130,19 @@ export function socialHandle(url) {
     return '';
 }
 
+/** The handle of a TikTok profile address (tiktok.com/@handle), or ''. */
+export function tiktokProfileHandle(url) {
+    let u;
+    try {
+        u = new URL(String(url));
+    } catch {
+        return '';
+    }
+    if (!hostIs(u.hostname.toLowerCase(), 'tiktok.com')) return '';
+    const m = u.pathname.match(/^\/@([A-Za-z0-9._]{1,64})\/?$/);
+    return m ? m[1] : '';
+}
+
 /** An https URL on the given CDN domains, or ''. */
 export function httpsOn(url, domains) {
     let u;

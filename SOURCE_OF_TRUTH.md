@@ -1470,7 +1470,10 @@ The multi-user auth work described below **was** fully written but not live:
     (`xgwrapper-<n>-<videoId>`, owner's console 2026-11-04) and the nearest
     video/author link; `tiktokVideoUrl` builds the address only when that is
     unambiguous, else the page is saved as before. Right-click on a playing
-    video now offers "This page" (`video` context). Upload zip:
+    video now offers "This page" (`video` context). "Save link" on a creator's
+    name (a profile link) saves the video beside that name
+    (`videosNearLinkInFrame`, `pickVideoForProfile`), or that creator's
+    playing video; else the profile (owner hit this on Explore 2026-11-04). Upload zip:
     `machina-chrome-1.0.2.zip`.
 
 26d. **[ ] Web payments for people who never use the App Store — OWNER
@@ -2832,7 +2835,10 @@ exact-match, capped.
   the author ambiguous, so that save stays the feed page. Tests: unit 63/63
   (3 new), extension Playwright 19 passed incl. a new TikTok feeds test; the
   "web app's own connect code" test needs `web/node_modules` and could not run
-  here (fails identically without this change). Manual: load 1.0.2 unpacked,
+  here (fails identically without this change). Owner's first 1.0.2 try
+  (Explore grid, right-click → Save link) landed on the creator's name and
+  saved the profile; fixed in the same PR (name → the video beside it).
+  Manual: load 1.0.2 unpacked,
   For You → let a video play → toolbar button; check the card.
 - **2026-11-04 (night) — TikTok desktop cards (owner ask: "all saved links from
   Instagram and TikTok on desktop get proper cards like the app").** Fix is
