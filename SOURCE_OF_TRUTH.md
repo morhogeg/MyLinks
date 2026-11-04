@@ -1500,7 +1500,10 @@ The multi-user auth work described below **was** fully written but not live:
     caption-only. Options: (1) paid scraping service (full cards, per-save
     cost, against Instagram's terms; research providers + prices first);
     (2) Meta oEmbed, caption-only; (3) stay partial. iPhone saves are full
-    already (`pagePreview`).
+    already (`pagePreview`), and so are **Chrome extension saves (owner
+    verified on device 2026-11-04, extension 1.0.2: the extension reads the
+    post on the page and sends `pagePreview`)**. What's left is pasting an
+    Instagram link on the website / the + sheet.
 
 26c. **[ ] Machina for Safari on the Mac App Store — DEFERRED TO POST-LAUNCH
     (owner, 2026-10-19: iOS launches first).** Until either store link is
