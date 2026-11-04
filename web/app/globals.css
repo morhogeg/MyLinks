@@ -25,6 +25,17 @@
      the near-black rows) — a quiet graphite with a light glyph instead. */
   --tile: #3A3A44;
   --tile-ink: #F2F2F6;
+  /* Toggled-ON state for the desktop toolbar (Filter, Sources, view switcher).
+     Was --accent, but a porcelain slab for "this filter is on" read as harsh
+     and as loud as a primary CTA (owner, 2026-11-04). Dark: lit graphite —
+     a raised fill, a hairline, and a top-edge highlight. Light keeps the
+     graphite accent it always had. */
+  --selected: #2A2A32;
+  --selected-ink: #F2F2F6;
+  --selected-border: rgba(255, 255, 255, 0.12);
+  --selected-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 1px 2px rgba(0, 0, 0, 0.5);
 
   /* Surface fill / inset / strong-border tokens (theme-aware materials).
      The app was built dark-first with hardcoded white/black alphas
@@ -128,6 +139,10 @@
   --accent-hover: #34343F;
   /* Light: the tile IS the graphite accent (the look that already read right). */
   --tile: #22222A;
+  --selected: #22222A;
+  --selected-ink: #F7F7F9;
+  --selected-border: #22222A;
+  --selected-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
   --tile-ink: #F7F7F9;
 
   /* Light-theme materials: dark alphas over the light card/bg so fills, insets
@@ -198,6 +213,9 @@
   --color-accent-hover: var(--accent-hover);
   --color-tile: var(--tile);
   --color-tile-ink: var(--tile-ink);
+  --color-selected: var(--selected);
+  --color-selected-ink: var(--selected-ink);
+  --color-selected-border: var(--selected-border);
   --color-apple-button: var(--apple-button);
   --color-apple-button-ink: var(--apple-button-ink);
   --color-danger: var(--danger);
