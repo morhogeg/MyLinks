@@ -1,11 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { RotateCcw } from 'lucide-react';
 import { Bell, Sun, Moon, Monitor, Clock, Compass, Lock, BarChart3, Heart, Crown, Puzzle, Upload, Mail, ExternalLink } from 'lucide-react';
 import { policyUrl, openExternal } from '@/lib/share';
 import { isNativeApp } from '@/lib/api';
-import { browserKind, chromeWebStoreUrl, extensionInAStore, macAppStoreUrl } from '@/lib/extension';
+import {
+    browserKind, chromeWebStoreUrl, detectExtension, extensionInAStore, macAppStoreUrl, onExtensionReady,
+} from '@/lib/extension';
 import ProfileAvatar from '../ProfileAvatar';
 import DataExport from './DataExport';
 import { accountTitle, isPrivateRelay } from './AccountSection';
@@ -113,6 +115,19 @@ export function MainView({
     };
     // The same sheet the first run opens, reachable for good from Settings.
     const [importing, setImporting] = useState(false);
+
+    // An extension already in this browser (installed from the store, or
+    // side-loaded before the listing is public) is described as such rather
+    // than "Coming soon". Desktop web only; the native app never has one.
+    const [extHere, setExtHere] = useState(false);
+    useEffect(() => {
+        if (isNativeApp() || browserKind() === 'other') return;
+        let live = true;
+        const look = () => { void detectExtension().then((found) => { if (live) setExtHere(!!found); }); };
+        look();
+        const off = onExtensionReady(look);
+        return () => { live = false; off(); };
+    }, []);
     return (
         <>
             <ImportSheet isOpen={importing} onClose={() => setImporting(false)} />
@@ -193,13 +208,15 @@ export function MainView({
                     reads as an unfinished feature to App Review. Once a store
                     link is set (lib/extension.ts) the row comes back on native
                     with a sub-line saying it's a computer thing. On the web the
-                    row always shows; it is honest about the store and also holds
-                    the token and Reset. */}
+                    row always shows; it says "Installed in this browser" when
+                    an extension answers here, else it is honest about the store.
+                    The screen behind it holds Disconnect other browsers. */}
                 {(!isNativeApp() || extensionInAStore()) && (
                     <NavRow
                         tile={<Puzzle className="w-[16px] h-[16px]" />}
                         title="Browser extension"
                         sub={isNativeApp() ? 'For Chrome or Safari on your computer'
+                            : extHere ? 'Installed in this browser'
                             : browserKind() === 'safari' ? (macAppStoreUrl() ? 'Safari on your Mac' : 'Coming soon to Safari')
                                 : chromeWebStoreUrl() ? 'Chrome, Edge, and Brave' : 'Coming soon to Chrome'}
                         onClick={() => go('extension')}
