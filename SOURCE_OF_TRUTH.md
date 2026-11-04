@@ -2808,7 +2808,11 @@ exact-match, capped.
   Also answered: web payments for non-App-Store users → §4 26d (owner
   decision pending). Verified: unit 60/60, extension Playwright 19/19 (two new
   Undo tests), web tsc 0, eslint and em-dash checks clean, package check
-  (1.0.1); store images re-rendered. Test 10 (emulators) runs in CI.
+  (1.0.1); store images re-rendered. **SHIPPED as merge `24db146` (PR #22):** CI
+  e2e-journeys green on the PR (unit 60/60, extension 19/19, journeys 71
+  passed / 4 skipped incl. all five desktop `10-browser-extension` tests);
+  Vercel deploys the Reset-only Advanced section. Upload zip: `node
+  extension/scripts/package.mjs` → `machina-chrome-1.0.1.zip`.
 - **2026-11-04 — Chrome extension: PRODUCTION SAVE VERIFIED by the owner; two
   owner decisions.** Owner loaded the shipped zip unpacked (`main` `7bcbbe4`),
   connected from mymachina.app and saved a real page: the last unverified item
