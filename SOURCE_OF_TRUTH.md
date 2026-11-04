@@ -1454,7 +1454,10 @@ The multi-user auth work described below **was** fully written but not live:
     for reminders; add `sourceUrl`/`sourceTitle` on image saves); (3) logged-in,
     paywalled and LinkedIn/Facebook pages stay partial (accept page text the
     browser read, like `pagePreview`); (4) token check returns no account, so the
-    popup's "Saving to …" is the website's word, not the server's.
+    popup's "Saving to …" is the website's word, not the server's; (5) an
+    Undo in the popup for accidental saves (owner asked 2026-11-04 about a
+    confirm step; decided: keep one-click save, no confirmation; Undo needs a
+    token-scoped "delete my last save" endpoint, since the token is add-only).
 
 26c. **[ ] Machina for Safari on the Mac App Store — DEFERRED TO POST-LAUNCH
     (owner, 2026-10-19: iOS launches first).** Until either store link is
@@ -2777,6 +2780,17 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-11-04 — Chrome extension: PRODUCTION SAVE VERIFIED by the owner; two
+  owner decisions.** Owner loaded the shipped zip unpacked (`main` `7bcbbe4`),
+  connected from mymachina.app and saved a real page: the last unverified item
+  of 2026-10-31 (the endpoint and CORS through the Vercel → Hosting rewrite)
+  works. Decisions: (1) **no reviewer token**: reviewers sign up with any
+  Google account; test instructions in `extension/store/LISTING.md` §3 (fallback
+  if rejected: send the `machinareviewer` token, reset after); (2) **no confirm
+  step before saving**: the click is the confirmation (one-click save is the
+  listing's promise, and Machina has no destination to choose); an Undo for
+  accidental saves is a post-launch follow-up (§4 26b, item 5). Next: owner
+  submits per `LISTING.md` §4; send the item id after approval.
 - **2026-10-31 (night) — CHROME EXTENSION REBUILT FROM SCRATCH (owner ask:
   "delete it and start from scratch"; §4 26b). SHIPPED as merge `d8211eb`
   (PR #21): the web changes are live on Vercel; the extension itself is NOT

@@ -190,23 +190,23 @@ Use requirements, and §4 names Google Gemini as the AI provider. Published text
 
 ---
 
-## 3. Reviewer access (Test instructions, or the notes box)
+## 3. Reviewer access (Test instructions box)
 
-The extension needs a Machina account. Give the reviewer the review account's
-token so they don't need to sign in:
+Owner decision 2026-11-04: **no shared token.** Sign-up is free and self-serve,
+so reviewers make their own account. Paste into the Test instructions box (never
+into the description, which is public):
 
 ```
-1. Install the extension, then right-click its icon > Options (or open the popup and choose "Use a token instead").
-2. Under "Connect with a token", paste: <REVIEW ACCOUNT TOKEN>  and press Connect.
-3. Open any article and click the Machina icon (or press Ctrl+Shift+S). The popup says "Saved to Machina".
-4. Select some text and right-click > Save to Machina > Selected text, with this page.
-5. Press Alt+Shift+S to save a screenshot.
-Saved items appear at https://mymachina.app when signed in to the same account.
+Machina needs a free account. After installing, a Machina tab opens (or click "Connect to Machina" in the extension popup). Sign in at mymachina.app with any Google account and finish the short welcome; the extension then connects in one click. Then:
+1. Open any article and click the Machina icon (or press Ctrl+Shift+S). The popup says "Saved to Machina".
+2. Select some text, right-click > Save to Machina > Selected text, with this page.
+3. Press Alt+Shift+S to save a screenshot.
+Saved items appear in the library at https://mymachina.app.
 ```
 
-Get the token from the review account (`machinareviewer`) in Machina on the web:
-Settings, Browser extension, Advanced. **Reset it there after approval** (owner
-decision 2026-10-10 for App Review applies here too).
+Residual risk: a reviewer who won't create an account could reject with "could
+not test". If that happens, reply with the review account's token (Settings,
+Browser extension, Advanced, signed in as `machinareviewer`) and reset it after.
 
 ---
 
@@ -221,7 +221,7 @@ decision 2026-10-10 for App Review applies here too).
    **Featured** badge is being retired (nominations closed 20 Aug 2026).
 3. **Upload** `extension/dist/machina-chrome-1.0.0.zip` (New item).
 4. Fill **Store listing** (§1), **Privacy practices** (§2), **Distribution**:
-   Public, all regions. Add the reviewer notes (§3).
+   Public, all regions. Paste the test instructions (§3).
 5. **Submit for review.** Typical reviews have taken from a day to a few days;
    broad permissions slow them, and this package requests none.
 6. **After approval:** put the 32-letter item id (the end of the listing URL) in
