@@ -125,6 +125,11 @@ test('with the extension installed: one click connects it, and a deep link conne
         await ext.worker.evaluate(() => chrome.storage.local.set({ token: 'e2e_SomeoneElse_0000000000' }));
         await page.reload();
         await expect(page.getByRole('button', { name: 'Add to Machina' })).toBeVisible();
+        // The Settings row describes the extension that is here, not the store.
+        await page.getByRole('button', { name: 'Settings' }).click();
+        await expect(page.getByRole('dialog', { name: 'Settings' }).getByRole('button', { name: /Browser extension/ }))
+            .toContainText('Installed in this browser');
+        await page.keyboard.press('Escape');
         const again = await openExtensionSettings(page);
         await expect(again.getByTestId('extension-status')).toContainText('Connected to another account');
         await again.getByRole('button', { name: 'Connect this browser' }).click();
