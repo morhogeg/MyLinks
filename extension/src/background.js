@@ -37,9 +37,10 @@ export async function createMenus() {
     // onInstalled also fires on every extension and Chrome update; the menu
     // persists across those, so recreate it from scratch (duplicate ids throw).
     await chrome.contextMenus.removeAll();
-    const all = ['page', 'link', 'selection', 'image'];
+    // 'video': right-clicking a playing video (a TikTok feed) saves that video.
+    const all = ['page', 'link', 'selection', 'image', 'video'];
     chrome.contextMenus.create({ id: MENU.parent, title: t('menuParent'), contexts: all, documentUrlPatterns: WEB_ONLY });
-    chrome.contextMenus.create({ id: MENU.page, parentId: MENU.parent, title: t('menuPage'), contexts: ['page'] });
+    chrome.contextMenus.create({ id: MENU.page, parentId: MENU.parent, title: t('menuPage'), contexts: ['page', 'video'] });
     chrome.contextMenus.create({
         id: MENU.link, parentId: MENU.parent, title: t('menuLink'), contexts: ['link'], targetUrlPatterns: WEB_ONLY,
     });
@@ -71,7 +72,7 @@ export async function onMenuClick(info, tab) {
             break;
         }
         case MENU.link:
-            result = await saveLink(tab, info.linkUrl);
+            result = await saveLink(tab, info.linkUrl, info.frameId ?? 0);
             break;
         case MENU.image:
             result = await saveImage(tab, info.srcUrl);

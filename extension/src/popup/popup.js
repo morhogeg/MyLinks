@@ -9,7 +9,7 @@
 import { localize, t } from '../lib/i18n.js';
 import { describe } from '../lib/describe.js';
 import { APP_URL, CONNECT_URL, PRIVACY_URL } from '../lib/config.js';
-import { displayUrl, savability } from '../lib/urls.js';
+import { displayUrl, savability, tiktokVideoLabel } from '../lib/urls.js';
 
 const $ = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
 
@@ -174,7 +174,7 @@ function showSending() {
 
 function renderPage(tab) {
     $('page').hidden = false;
-    $('page-title').textContent = tab.title || displayUrl(tab.url);
+    $('page-title').textContent = tiktokVideoLabel(tab.url) || tab.title || displayUrl(tab.url);
     $('page-url').textContent = displayUrl(tab.url);
     const icon = tab.favIconUrl || '';
     const usable = /^(https:|data:image\/)/.test(icon);

@@ -237,6 +237,112 @@ test('Instagram: the post as the page shows it travels as pagePreview', async ()
     });
 });
 
+// TikTok feeds keep their own address while a video plays. Shapes from
+// tiktok.com's search grid on 2026-11-04 (owner's console): the player box is
+// id="xgwrapper-<n>-<videoId>" inside the item's link to the video.
+const TT_SEARCH = `<!doctype html><html><head><title>Find 'recipes' on TikTok</title>
+<style>video{display:block;width:240px;height:320px;background:#000}.grid{display:flex;gap:8px}</style></head>
+<body><div id="search_top-item-list" data-e2e="search_top-item-list" class="grid">
+ <div data-e2e="search_top-item"><a href="https://www.tiktok.com/@nada/video/7654273990533434657"><img alt="" width="240" height="320"></a><a href="/@nada">nada</a></div>
+ <div id="grid-item-container-10"><div data-e2e="search_top-item"><div><div><a href="https://www.tiktok.com/@iramsfoodstory/video/7701067892107775246"><div><div><div><div id="xgwrapper-1-7701067892107775246"><div><video muted></video></div></div></div></div></div></a></div></div></div><a href="/@iramsfoodstory">iram</a></div>
+ <div data-e2e="search_top-item"><a href="https://www.tiktok.com/@britscookin/video/7629084489569832222"><img alt="" width="240" height="320"></a></div>
+</div></body></html>`;
+
+const TT_FOR_YOU = `<!doctype html><html><head><title>TikTok - Make Your Day</title>
+<style>body{margin:0}article{height:100vh;position:relative}video{display:block;width:360px;height:90vh;background:#000}</style></head>
+<body><main>
+ <article><div id="xgwrapper-0-7600000000000000001"><video muted></video></div><a href="/@chefana">chefana</a><p>Five-minute pasta</p></article>
+ <article><div id="xgwrapper-0-7600000000000000002"><video muted></video></div><a href="/@someoneelse">someoneelse</a></article>
+</main></body></html>`;
+
+const TT_EXPLORE = `<!doctype html><html><head><title>Explore - Find your favorite videos on TikTok</title></head><body>
+ <div data-e2e="explore-item-list">
+  <div data-e2e="explore-item"><div><a href="https://www.tiktok.com/@shaharhenfoodik/video/7650000000000000001"><img alt="" width="200" height="260"></a></div>
+   <div><a href="/@shaharhenfoodik">shaharhenfoodik</a></div></div>
+  <div data-e2e="explore-item"><div><a href="https://www.tiktok.com/@other/video/7650000000000000002"><img alt="" width="200" height="260"></a></div>
+   <div><a href="/@other">other</a></div></div>
+ </div><a href="/@nobody">nobody</a></body></html>`;
+
+// A video opened over the Explore grid: the address names the video, the
+// tab title still says Explore, and a word right-clicked earlier in the grid
+// is still selected underneath the overlay.
+const TT_MODAL = `<!doctype html><html><head><title>Explore - Find your favorite videos on TikTok</title>
+<style>#modal{position:fixed;inset:0;background:#000;color:#fff}</style></head><body>
+ <div><a href="/@alya.cookss">Alya.Cooks</a></div>
+ <div id="modal"><p>gone in 3 minz</p></div></body></html>`;
+
+const TT_TWO_UP = `<!doctype html><html><head><style>video{width:200px;height:200px}</style></head><body>
+ <div id="xgwrapper-0-7600000000000000003"><video muted></video></div><a href="/@a">a</a>
+ <div id="xgwrapper-0-7600000000000000004"><video muted></video></div><a href="/@b">b</a>
+</body></html>`;
+
+test('TikTok feeds: the video on screen is saved, not the feed', async () => {
+    await ext.connect();
+    const pages: Record<string, string> = {
+        '/search': TT_SEARCH, '/foryou': TT_FOR_YOU, '/following': TT_TWO_UP, '/explore': TT_EXPLORE,
+        '/@gone.in.3minz/video/7694294491481607446': TT_MODAL,
+    };
+    await ext.context.route('https://www.tiktok.com/**', (route) => route.fulfill({
+        contentType: 'text/html', body: pages[new URL(route.request().url()).pathname] || '<p>?</p>',
+    }));
+    const page = await ext.context.newPage();
+    await page.setViewportSize({ width: 1200, height: 800 });
+    await page.goto('https://www.tiktok.com/search?q=recipes&t=1793783757816');
+    const tabId = await ext.tabIdOf(page);
+    const click = (info: Record<string, unknown>) => ext.worker.evaluate(async ([i, id]) => {
+        const tab = await chrome.tabs.get(id as number);
+        await (globalThis as any).__machina.onMenuClick(i, tab);
+    }, [info, tabId] as const);
+
+    // Search grid: the one previewing video, by its own link (right-click on the player).
+    await click({ menuItemId: 'machina-page', frameId: 0 });
+    expect(ext.stub.shareCalls().at(-1)!.body).toEqual({
+        url: 'https://www.tiktok.com/@iramsfoodstory/video/7701067892107775246',
+    });
+
+    // For You: the video filling the screen, from its player id + author;
+    // the next one (mostly below the fold) is ignored. Toolbar popup path.
+    await page.goto('https://www.tiktok.com/foryou');
+    const popup = await ext.openPopup(page);
+    await expect(title(popup)).toHaveText('Saved to Machina');
+    expect(ext.stub.shareCalls().at(-1)!.body).toEqual({
+        url: 'https://www.tiktok.com/@chefana/video/7600000000000000001',
+    });
+    await popup.close();
+
+    // Explore grid, nothing playing: right-click on a creator's name saves
+    // the video beside that name; a creator with no video beside stays a profile.
+    await page.goto('https://www.tiktok.com/explore');
+    await click({ menuItemId: 'machina-link', linkUrl: 'https://www.tiktok.com/@shaharhenfoodik', frameId: 0 });
+    expect(ext.stub.shareCalls().at(-1)!.body).toEqual({
+        url: 'https://www.tiktok.com/@shaharhenfoodik/video/7650000000000000001',
+    });
+    await click({ menuItemId: 'machina-link', linkUrl: 'https://www.tiktok.com/@nobody', frameId: 0 });
+    expect(ext.stub.shareCalls().at(-1)!.body).toEqual({ url: 'https://www.tiktok.com/@nobody' });
+
+    // A video opened over the grid, with a word still selected under it:
+    // the hidden selection stays behind, and the popup names the video.
+    await page.goto('https://www.tiktok.com/@gone.in.3minz/video/7694294491481607446');
+    await page.evaluate(() => {
+        const range = document.createRange();
+        range.selectNodeContents(document.querySelector('a')!);
+        getSelection()!.removeAllRanges();
+        getSelection()!.addRange(range);
+    });
+    const modalPopup = await ext.openPopup(page);
+    await expect(title(modalPopup)).toHaveText('Saved to Machina');
+    await expect(modalPopup.locator('#page-title')).toHaveText('TikTok video');
+    expect(ext.stub.shareCalls().at(-1)!.body).toEqual({
+        url: 'https://www.tiktok.com/@gone.in.3minz/video/7694294491481607446',
+    });
+    await modalPopup.close();
+
+    // Two videos fully in view and neither playing: no guess, the page itself.
+    await page.goto('https://www.tiktok.com/following');
+    await click({ menuItemId: 'machina-page', frameId: 0 });
+    expect(ext.stub.shareCalls().at(-1)!.body).toEqual({ url: 'https://www.tiktok.com/following' });
+});
+
 test('LinkedIn: honest hint, and a screenshot from the popup becomes an image save', async () => {
     await ext.connect();
     await ext.context.route('https://www.linkedin.com/**', (route) => route.fulfill({ contentType: 'text/html', body: LINKEDIN_POST }));

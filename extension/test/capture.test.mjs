@@ -4,7 +4,7 @@ import { installFakeChrome } from './fake-chrome.mjs';
 import {
     displayUrl, hostIs, httpsOn, previewOnlySite, savability, socialHandle, socialPostId, socialPostSite,
 } from '../src/lib/urls.js';
-import { cleanFacts, socialPreview } from '../src/lib/capture.js';
+import { cleanFacts, socialPreview, tiktokVideoUrl } from '../src/lib/capture.js';
 import { decodeDataUrl, toBase64 } from '../src/lib/image.js';
 
 installFakeChrome();
@@ -129,4 +129,54 @@ test('image: data URL decode and base64 round trip', () => {
     assert.equal(back.mimeType, 'image/jpeg');
     assert.deepEqual(Buffer.from(back.bytes), Buffer.from(bytes));
     assert.throws(() => decodeDataUrl('data:text/plain,hello'));
+});
+
+// What tiktok.com's search grid showed around a playing preview (2026-11-04,
+// owner's console): player box id="xgwrapper-1-<id>", one link to the video.
+const V = 'https://www.tiktok.com/@iramsfoodstory/video/7701067892107775246';
+const feed = (tiktokVideo) => cleanFacts({ url: 'x', og: {}, tiktokVideo });
+
+test('TikTok feed: the playing video is saved, not the feed', () => {
+    const search = 'https://www.tiktok.com/search?q=recipes&t=1793783757816';
+    assert.equal(tiktokVideoUrl(search, feed({ id: '7701067892107775246', links: [V], handles: ['iramsfoodstory'] })), V);
+    // For You with only the player id and the author link.
+    assert.equal(tiktokVideoUrl('https://www.tiktok.com/foryou', feed({ id: '7701067892107775246', links: [], handles: ['iramsfoodstory'] })), V);
+    assert.equal(tiktokVideoUrl('https://www.tiktok.com/', feed({ id: '', links: [V], handles: [] })), V);
+});
+
+test('TikTok feed: anything ambiguous saves the page as it is', () => {
+    const fy = 'https://www.tiktok.com/foryou';
+    const other = 'https://www.tiktok.com/@someone/video/7600000000000000001';
+    assert.equal(tiktokVideoUrl(fy, feed(null)), '');                                   // no video on screen
+    assert.equal(tiktokVideoUrl(fy, feed({ id: '', links: [V, other], handles: [] })), ''); // two videos
+    assert.equal(tiktokVideoUrl(fy, feed({ id: '7600000000000000001', links: [V], handles: [] })), ''); // id disagrees
+    assert.equal(tiktokVideoUrl(fy, feed({ id: '7701067892107775246', links: [], handles: ['a', 'b'] })), ''); // two authors
+    assert.equal(tiktokVideoUrl(fy, feed({ id: '', links: [], handles: ['a'] })), '');  // no id
+    assert.equal(tiktokVideoUrl(fy, feed({ id: '', links: ['https://evil.test/@a/video/1'], handles: [] })), '');
+    assert.equal(tiktokVideoUrl(fy, feed({ id: '', links: ['http://www.tiktok.com/@a/video/1'], handles: [] })), '');
+    assert.equal(tiktokVideoUrl(fy, feed({ id: '1x', links: [], handles: ['a'] })), '');
+});
+
+test('TikTok feed: a video page and other sites are left alone', () => {
+    const facts = feed({ id: '7701067892107775246', links: [V], handles: [] });
+    assert.equal(tiktokVideoUrl('https://www.tiktok.com/@chef/video/123', facts), '');
+    assert.equal(tiktokVideoUrl('https://www.instagram.com/', facts), '');
+    assert.equal(tiktokVideoUrl('https://example.com/', facts), '');
+});
+
+test('TikTok: a right-clicked creator name saves their video beside it', async () => {
+    const { tiktokProfileHandle } = await import('../src/lib/urls.js');
+    const { pickVideoForProfile } = await import('../src/lib/saves.js');
+    assert.equal(tiktokProfileHandle('https://www.tiktok.com/@shaharhenfoodik'), 'shaharhenfoodik');
+    assert.equal(tiktokProfileHandle('https://www.tiktok.com/@a/video/1'), '');
+    assert.equal(tiktokProfileHandle('https://evil.test/@a'), '');
+    const mine = 'https://www.tiktok.com/@chef/video/7600000000000000001';
+    const theirs = 'https://www.tiktok.com/@other/video/7600000000000000002';
+    assert.equal(pickVideoForProfile('chef', [mine], ''), mine);
+    assert.equal(pickVideoForProfile('Chef', [mine, theirs], ''), mine);           // only theirs is filtered out
+    assert.equal(pickVideoForProfile('chef', [theirs], ''), '');                   // not this creator
+    assert.equal(pickVideoForProfile('chef', [mine, 'https://www.tiktok.com/@chef/video/7600000000000000009'], ''), ''); // two of theirs
+    assert.equal(pickVideoForProfile('chef', [], mine), mine);                     // the one playing
+    assert.equal(pickVideoForProfile('chef', [], theirs), '');
+    assert.equal(pickVideoForProfile('chef', ['http://www.tiktok.com/@chef/video/1'], ''), '');
 });

@@ -44,12 +44,12 @@ test('menu: one parent, items per context, web pages only, safe to recreate', as
     const byId = Object.fromEntries(fake.menus.map((m) => [m.id, m]));
     assert.deepEqual(Object.keys(byId), Object.values(bg.MENU));
     assert.deepEqual(byId.machina.documentUrlPatterns, ['http://*/*', 'https://*/*']);
-    assert.deepEqual(byId['machina-page'].contexts, ['page']);
+    assert.deepEqual(byId['machina-page'].contexts, ['page', 'video']);
     assert.deepEqual(byId['machina-link'].contexts, ['link']);
     assert.deepEqual(byId['machina-link'].targetUrlPatterns, ['http://*/*', 'https://*/*']);
     assert.deepEqual(byId['machina-selection'].contexts, ['selection']);
     assert.deepEqual(byId['machina-image'].contexts, ['image']);
-    assert.deepEqual(byId['machina-screenshot'].contexts, ['page', 'link', 'selection', 'image']);
+    assert.deepEqual(byId['machina-screenshot'].contexts, ['page', 'link', 'selection', 'image', 'video']);
     for (const m of fake.menus) assert.ok(m.title && !m.title.startsWith('menu'), `localized title for ${m.id}`);
 });
 

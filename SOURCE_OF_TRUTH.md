@@ -1463,6 +1463,18 @@ The multi-user auth work described below **was** fully written but not live:
     one-click save for 3 s (`UNDO_HOLD_MS`) with an Undo button, so Undo means
     nothing was sent; an undo AFTER the save lands would still need a
     token-scoped "delete my last save" endpoint (the token is add-only).
+    **1.0.2 (2026-11-04): TikTok feeds save the video on screen**, not the
+    feed page (For You, search, Following, profiles keep their own address
+    while a video plays). `readPageInFrame` finds the only playing video (or
+    the only one mostly in view), reads its id from the player box
+    (`xgwrapper-<n>-<videoId>`, owner's console 2026-11-04) and the nearest
+    video/author link; `tiktokVideoUrl` builds the address only when that is
+    unambiguous, else the page is saved as before. Right-click on a playing
+    video now offers "This page" (`video` context). "Save link" on a creator's
+    name (a profile link) saves the video beside that name
+    (`videosNearLinkInFrame`, `pickVideoForProfile`), or that creator's
+    playing video; else the profile (owner hit this on Explore 2026-11-04). Upload zip:
+    `machina-chrome-1.0.2.zip`.
 
 26d. **[ ] Web payments for people who never use the App Store — OWNER
     DECISION PENDING (asked 2026-11-04).** Today the web paywall says
@@ -2811,6 +2823,29 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-11-04 (late) — Extension 1.0.2: TikTok feed saves become the video
+  (owner device report).** Owner verified: TikTok links pasted on the website
+  and the toolbar button on an open video both give full cards (server oEmbed,
+  `8b3fed1`). Saving from the For You feed or search grid gave a generic card
+  because the extension sent the feed's address. Fix: see §4 26b "1.0.2". The
+  DOM shape came from the owner running a console snippet on
+  tiktok.com/search (player box `xgwrapper-1-<id>` inside the item's link);
+  the For You shape is assumed to match (same player), **not verified**. A
+  caption that @mentions someone, with no video link near the player, makes
+  the author ambiguous, so that save stays the feed page. Tests: unit 63/63
+  (3 new), extension Playwright 19 passed incl. a new TikTok feeds test; the
+  "web app's own connect code" test needs `web/node_modules` and could not run
+  here (fails identically without this change). Owner's first 1.0.2 try
+  (Explore grid, right-click → Save link) landed on the creator's name and
+  saved the profile; fixed in the same PR (name → the video beside it).
+  Second try: a video opened over Explore saved with "Alya.Cooks" as the
+  quote (a Mac right-click had selected that word in the grid underneath)
+  and the popup said "Explore…" (TikTok keeps the tab title). Fixed: a
+  selection covered by something else on screen is dropped
+  (`elementFromPoint` at its centre), and TikTok video pages are labelled
+  "TikTok video" (`tiktokVideoLabel`).
+  Manual: load 1.0.2 unpacked,
+  For You → let a video play → toolbar button; check the card.
 - **2026-11-04 (night) — TikTok desktop cards (owner ask: "all saved links from
   Instagram and TikTok on desktop get proper cards like the app").** Fix is
   server-side, not in the extension: every desktop save goes through the same
