@@ -29,25 +29,9 @@ body { background: var(--background); }
 .lead { color: var(--text); }
 .help { color: var(--text-secondary); }
 .warning { color: var(--warning); font-weight: 600; }
-.message { min-height: 1.4em; color: var(--text-secondary); }
-.message[data-tone="error"] { color: var(--danger); }
-.message[data-tone="ok"] { color: var(--success); }
 
 .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .button.danger { color: var(--danger); }
-
-.token summary {
-    cursor: pointer; font-weight: 600; min-height: 32px; display: flex; align-items: center;
-    border-radius: 6px;
-}
-.token[open] summary { margin-bottom: 8px; }
-.token form { display: flex; flex-direction: column; gap: 8px; }
-.token label { font-weight: 600; font-size: 13px; color: var(--text-secondary); }
-.token input {
-    flex: 1 1 260px; min-height: 40px; padding: 0 12px; border-radius: 10px;
-    font: 14px/1 var(--mono); color: var(--text); background: var(--background);
-    border: 1px solid var(--border-strong);
-}
 
 .queue { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .queue li {

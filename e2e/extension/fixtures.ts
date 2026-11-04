@@ -23,6 +23,8 @@ import { fileURLToPath } from 'url';
 export const EXTENSION_SRC = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'extension');
 export const GOOD_TOKEN = 'e2e_GoodToken_1234567890abc';
 export const ACCOUNT = 'e2e@example.com';
+/** The popup's Undo window in tests (3 s in the extension). */
+export const UNDO_HOLD_MS = 1000;
 
 export interface ShareCall { headers: IncomingMessage['headers']; body: Record<string, unknown> }
 export type Reply = { status: number; body: unknown };
@@ -162,6 +164,7 @@ export const CONNECT_URL = \`\${APP_ORIGIN}/?connect=extension\`;
 export const SETTINGS_URL = \`\${APP_ORIGIN}/?settings=extension\`;
 export const PRIVACY_URL = \`\${APP_ORIGIN}/privacy\`;
 export const BRIDGE_ORIGINS = [APP_ORIGIN];
+export const UNDO_HOLD_MS = ${UNDO_HOLD_MS};
 `);
 
     const manifestPath = join(dir, 'manifest.json');

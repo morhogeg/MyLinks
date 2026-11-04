@@ -6,14 +6,16 @@
  * never missed.
  */
 
-import { BRIDGE_ORIGINS, CONNECT_URL } from './lib/config.js';
+import { BRIDGE_ORIGINS, CONNECT_URL, UNDO_HOLD_MS } from './lib/config.js';
 import { t } from './lib/i18n.js';
 import {
     connect, disconnect, getConnection, restrictStorageToExtension, tokenTag,
 } from './lib/account.js';
 import * as queue from './lib/queue.js';
 import { readSelection } from './lib/capture.js';
-import { flushQueue, saveImage, saveLink, savePage, saveScreenshot } from './lib/saves.js';
+import {
+    flushQueue, preparePage, saveImage, saveLink, savePage, saveScreenshot, sendJob,
+} from './lib/saves.js';
 import { describe } from './lib/describe.js';
 import { flashBadge, refreshBadge, showToast } from './lib/feedback.js';
 
@@ -189,8 +191,6 @@ export async function handlePageMessage(msg) {
             await queue.remove(String(msg.id || ''));
             await refreshBadge();
             return status();
-        case 'connect-token':
-            return connectAndResume(msg.token, '');
         case 'disconnect':
             await disconnectAll();
             return status();
@@ -241,6 +241,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
  * The popup saves through a port, so the worker knows whether the popup is
  * still open when the answer arrives: if it was closed, the result goes to
  * the page as a toast instead of being lost.
+ *
+ * The popup's one-click save (`hold: true`) waits UNDO_HOLD_MS before it is
+ * sent, so the popup can offer Undo: nothing leaves the browser until then.
+ * Undo cancels it; closing the popup does not.
  */
 chrome.runtime.onConnect.addListener((port) => {
     if (port.name !== 'popup' || !isExtensionPage(port.sender)) {
@@ -248,24 +252,63 @@ chrome.runtime.onConnect.addListener((port) => {
         return;
     }
     let open = true;
+    /** @type {{job: object, timer: ReturnType<typeof setTimeout>} | null} */
+    let held = null;
     port.onDisconnect.addListener(() => {
         open = false;
     });
+    const post = (message) => {
+        if (!open) return;
+        try {
+            port.postMessage(message);
+        } catch {
+            open = false; // closed between the check and the send
+        }
+    };
+    const reply = async (tab, result) => {
+        const view = describe(result);
+        await flashBadge(tab?.id, view.tone);
+        if (open) post({ type: 'result', result, status: await status() });
+        else await showToast(tab?.id, view);
+    };
     port.onMessage.addListener(async (msg) => {
-        if (msg?.type !== 'save' || typeof msg.tabId !== 'number') return;
+        if (msg?.type === 'undo') {
+            if (!held) return; // already on its way
+            clearTimeout(held.timer);
+            const { job } = held;
+            held = null;
+            post({ type: 'result', result: { outcome: 'undone', kind: job.kind, title: job.title, quote: job.quote || '' }, status: await status() });
+            return;
+        }
+        if (msg?.type !== 'save' || typeof msg.tabId !== 'number' || held) return;
         let tab = null;
         try {
             tab = await chrome.tabs.get(msg.tabId);
         } catch {
             tab = null;
         }
-        const result = msg.kind === 'screenshot' ? await saveScreenshot(tab) : await savePage(tab);
-        const view = describe(result);
-        await flashBadge(tab?.id, view.tone);
-        if (open) {
-            port.postMessage({ type: 'result', result, status: await status() });
-        } else {
-            await showToast(tab?.id, view);
+        if (msg.kind === 'screenshot') {
+            await reply(tab, await saveScreenshot(tab));
+            return;
         }
+        const prepared = await preparePage(tab);
+        if (prepared.result) {
+            await reply(tab, prepared.result);
+            return;
+        }
+        const { job } = prepared;
+        if (!msg.hold) {
+            await reply(tab, await sendJob(job, tab));
+            return;
+        }
+        held = {
+            job,
+            timer: setTimeout(async () => {
+                held = null;
+                post({ type: 'sending' });
+                await reply(tab, await sendJob(job, tab));
+            }, UNDO_HOLD_MS),
+        };
+        post({ type: 'held', holdMs: UNDO_HOLD_MS, title: job.title, quote: job.quote || '' });
     });
 });

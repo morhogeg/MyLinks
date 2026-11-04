@@ -1454,10 +1454,26 @@ The multi-user auth work described below **was** fully written but not live:
     for reminders; add `sourceUrl`/`sourceTitle` on image saves); (3) logged-in,
     paywalled and LinkedIn/Facebook pages stay partial (accept page text the
     browser read, like `pagePreview`); (4) token check returns no account, so the
-    popup's "Saving to …" is the website's word, not the server's; (5) an
-    Undo in the popup for accidental saves (owner asked 2026-11-04 about a
-    confirm step; decided: keep one-click save, no confirmation; Undo needs a
-    token-scoped "delete my last save" endpoint, since the token is add-only).
+    popup's "Saving to …" is the website's word, not the server's; (5) ~~Undo
+    for accidental saves~~ **DONE 2026-11-04 client-side**: the popup holds a
+    one-click save for 3 s (`UNDO_HOLD_MS`) with an Undo button, so Undo means
+    nothing was sent; an undo AFTER the save lands would still need a
+    token-scoped "delete my last save" endpoint (the token is add-only).
+
+26d. **[ ] Web payments for people who never use the App Store — OWNER
+    DECISION PENDING (asked 2026-11-04).** Today the web paywall says
+    "Subscribe in the Machina app on iPhone" (2026-09-02 decision: no web
+    checkout), so web-only users (Android, Windows, extension users) can't pay.
+    Findings 2026-11-04 (search, not verified with the providers): RevenueCat
+    Web unlocks the same `pro` entitlement from web purchases through its own
+    Stripe-backed billing, Stripe Billing, or Paddle Billing (Paddle as merchant
+    of record, which also collects and remits VAT/sales tax); Stripe does not
+    appear to take Israeli businesses directly yet (2026 hiring for Israel, no
+    clearing license found), so Paddle is the likely path. Apple's 3.1.3(b)
+    lets the iOS app honor a web subscription as long as IAP stays in the app;
+    the in-app link-out to web checkout is US-storefront only. Entitlements
+    already flow through the RevenueCat webhook into `entitlements/{uid}`, so the
+    app side is mostly config + a web paywall. Not started; post-launch.
 
 26c. **[ ] Machina for Safari on the Mac App Store — DEFERRED TO POST-LAUNCH
     (owner, 2026-10-19: iOS launches first).** Until either store link is
@@ -2780,6 +2796,19 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-11-04 (later) — Extension 1.0.1: token field removed, Undo added (owner
+  asks).** The extension's paste-a-token form and the popup's "Use a token
+  instead" are gone (connecting is one click from mymachina.app only); the
+  website's Settings → Browser extension → Advanced now holds only **Reset
+  token** (the token is never shown; test 10 updated). Undo: the popup's
+  one-click save waits `UNDO_HOLD_MS` (3 s) with an Undo button before it is
+  sent; Undo = nothing sent ("Not saved", with Save this page); closing the
+  popup still sends it. Right-click and shortcut saves stay immediate.
+  Reviewer access stays self-serve Google sign-up (no token exists to give).
+  Also answered: web payments for non-App-Store users → §4 26d (owner
+  decision pending). Verified: unit 60/60, extension Playwright 19/19 (two new
+  Undo tests), web tsc 0, eslint and em-dash checks clean, package check
+  (1.0.1); store images re-rendered. Test 10 (emulators) runs in CI.
 - **2026-11-04 — Chrome extension: PRODUCTION SAVE VERIFIED by the owner; two
   owner decisions.** Owner loaded the shipped zip unpacked (`main` `7bcbbe4`),
   connected from mymachina.app and saved a real page: the last unverified item

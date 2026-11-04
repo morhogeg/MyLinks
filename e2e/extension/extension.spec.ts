@@ -3,7 +3,7 @@ import AxeBuilder from '@axe-core/playwright';
 import { readFileSync } from 'fs';
 import { createRequire } from 'module';
 import { dirname, join } from 'path';
-import { ACCOUNT, EXTENSION_SRC, GOOD_TOKEN, launchExtension, type Ext } from './fixtures';
+import { ACCOUNT, EXTENSION_SRC, GOOD_TOKEN, UNDO_HOLD_MS, launchExtension, type Ext } from './fixtures';
 
 const REPO = dirname(EXTENSION_SRC);
 
@@ -46,8 +46,8 @@ test('not connected: the popup offers one-click connect and saves nothing', asyn
     const popup = await ext.openPopup(page);
     await expect(title(popup)).toHaveText('Connect Machina');
     await expect(popup.locator('#hint')).toHaveText(/reads a page only when you save it/);
-    await expect(popup.getByRole('button', { name: 'Use a token instead' })).toBeVisible();
     await expect(popup.getByRole('button', { name: 'Read the privacy policy' })).toBeVisible();
+    await expect(popup.getByText(/token/i)).toHaveCount(0);
     await a11y(popup);
     const [opened] = await Promise.all([
         ext.context.waitForEvent('page', (p) => p.url().includes('connect=extension')),
@@ -327,21 +327,18 @@ test('menu and shortcuts are registered as planned', async () => {
     await ext.worker.evaluate(() => (globalThis as any).__machina.createMenus());
 });
 
-test('settings: token form, waiting saves, two-step disconnect, accessible in both themes', async () => {
+test('settings: account, waiting saves, two-step disconnect, accessible in both themes', async () => {
     const page = await ext.context.newPage();
     await page.goto(`chrome-extension://${ext.id}/src/options/options.html`);
     await expect(page.locator('#account-status')).toHaveText("This browser isn't connected to Machina yet.");
+    // No paste-a-token form: connecting happens on Machina's website.
+    await expect(page.locator('input, form')).toHaveCount(0);
+    await expect(page.getByText(/connect with a token/i)).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Connect to Machina' })).toBeVisible();
 
-    await page.getByText('Connect with a token').click();
-    await page.getByLabel('Token').fill('nope');
-    await page.getByRole('button', { name: 'Connect', exact: true }).click();
-    await expect(page.locator('#token-message')).toContainText("doesn't look like a Machina token");
-
-    await page.getByLabel('Token').fill(GOOD_TOKEN);
-    await page.getByRole('button', { name: 'Connect', exact: true }).click();
-    await expect(page.locator('#token-message')).toHaveText('Connected. You can start saving.');
-    await expect(page.locator('#account-status')).toHaveText('This browser is connected to Machina.');
-    expect((await ext.storage()).token).toBe(GOOD_TOKEN);
+    await ext.connect();
+    await page.reload();
+    await expect(page.locator('#account-status')).toHaveText(`Connected to ${ACCOUNT}.`);
 
     ext.stub.down = true;
     const target = await article();
@@ -361,6 +358,37 @@ test('settings: token form, waiting saves, two-step disconnect, accessible in bo
     expect((await ext.storage()).queue).toEqual([]);
 });
 
+test('undo: nothing is sent while the popup waits, and Save this page sends it after all', async () => {
+    await ext.connect();
+    const page = await article();
+    const popup = await ext.openPopup(page);
+    const undo = popup.getByRole('button', { name: 'Undo' });
+    await expect(undo).toBeVisible();
+    await expect(undo).toBeFocused();
+    await expect(popup.locator('#result-detail')).toHaveText("Sending in a moment. Undo if you didn't mean to save it.");
+    await undo.click();
+    await expect(title(popup)).toHaveText('Not saved');
+    await expect(popup.locator('#result-detail')).toHaveText('Nothing was sent to Machina.');
+    await a11y(popup);
+    await popup.waitForTimeout(UNDO_HOLD_MS * 2);
+    expect(ext.stub.shareCalls()).toHaveLength(0);
+
+    await popup.getByRole('button', { name: 'Save this page' }).click();
+    await expect(title(popup)).toHaveText('Saved to Machina');
+    expect(ext.stub.shareCalls()).toHaveLength(1);
+});
+
+test('undo window: closing the popup still saves, and the page confirms it', async () => {
+    await ext.connect();
+    const page = await article();
+    const popup = await ext.openPopup(page);
+    await expect(popup.getByRole('button', { name: 'Undo' })).toBeVisible();
+    expect(ext.stub.shareCalls()).toHaveLength(0);
+    await popup.close();
+    await expect.poll(() => ext.stub.shareCalls().length, { timeout: 5000 }).toBe(1);
+    await expect(page.locator('machina-save-toast')).toHaveCount(1);
+});
+
 test('the web app\'s own connect code (web/lib/extension.ts) drives this extension', async () => {
     // Transpile the real module (web/node_modules/typescript; CI installs web first).
     const ts = createRequire(import.meta.url)(join(REPO, 'web/node_modules/typescript'));
@@ -375,7 +403,8 @@ test('the web app\'s own connect code (web/lib/extension.ts) drives this extensi
     const web = (fn: string, ...args: unknown[]) => site.evaluate(
         ([f, a]) => (window as any).machinaWeb[f as string](...(a as unknown[])), [fn, args] as const);
 
-    expect(await web('detectExtension')).toEqual({ version: '1.0.0', connected: false, tokenTag: null });
+    const version = JSON.parse(readFileSync(join(EXTENSION_SRC, 'manifest.json'), 'utf8')).version;
+    expect(await web('detectExtension')).toEqual({ version, connected: false, tokenTag: null });
     expect(await web('connectExtension', GOOD_TOKEN, ACCOUNT)).toEqual({ ok: true });
     expect(await ext.storage()).toMatchObject({ token: GOOD_TOKEN, account: ACCOUNT });
     const status = await web('detectExtension') as { connected: boolean; tokenTag: string };

@@ -189,7 +189,7 @@ test('popup port: only our popup may connect', () => {
 });
 
 test('describe: every outcome has real words (no missing message keys)', () => {
-    const outcomes = ['saved', 'duplicate', 'waiting', 'reconnect', 'queued', 'unsure', 'timeout', 'unexpected', 'too-large',
+    const outcomes = ['undone', 'saved', 'duplicate', 'waiting', 'reconnect', 'queued', 'unsure', 'timeout', 'unexpected', 'too-large',
         'rejected', 'quota', 'private-failed', 'queue-full', 'not-connected', 'unsavable', 'image-unsavable',
         'screenshot-failed', 'no-tab', 'offline', 'network', 'server', 'rate-limited', 'anything-else'];
     for (const outcome of outcomes) {

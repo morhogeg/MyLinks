@@ -51,6 +51,7 @@ If you have tried to keep a second brain and gave up on the filing, this is the 
 
 BUILT TO BE TRUSTED
 • It reads a page only when you save it, and sends nothing about pages you don't save.
+• Clicked by mistake? Press Undo in the popup, and nothing is sent.
 • No access to your browsing history. No ads, no tracking.
 • Offline? Your saves wait on this computer and go out when you are back online.
 
@@ -205,8 +206,9 @@ Saved items appear in the library at https://mymachina.app.
 ```
 
 Residual risk: a reviewer who won't create an account could reject with "could
-not test". If that happens, reply with the review account's token (Settings,
-Browser extension, Advanced, signed in as `machinareviewer`) and reset it after.
+not test". If that happens, reply with these steps again (sign-up is free and
+instant). The extension has no token field (owner, 2026-11-04), so there is no
+token to hand over.
 
 ---
 
