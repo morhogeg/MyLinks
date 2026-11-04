@@ -177,9 +177,11 @@ surface in the category and a knowledge graph computed on every save. The path t
   with no phone read (the in-app + sheet, the web app, the browser extension):
   **TikTok** is filled from TikTok's public oEmbed endpoint
   (`tiktok.com/oembed`, `_tiktok_oembed` in `scraper.py`, 2026-11-04; runs
-  only when the page and `pagePreview` gave no caption). **Instagram** still
-  lands as an honest partial card (§4 26e: Meta's oEmbed dropped author and
-  thumbnail on 2025-11-03, so only a paid scraper gives a full card).
+  only when the page and `pagePreview` gave no caption). **Instagram**: the
+  server's own read worked again on 2026-11-04 (owner pasted fresh posts,
+  full cards); if the login wall returns, these land as honest partial
+  cards (§4 26e: Meta's oEmbed dropped author and thumbnail on 2025-11-03,
+  so only a paid scraper gives a full card).
 - **Two parallel Claude sessions:** TestFlight runs share one concurrency group
   and one build-number sequence (1000 + run number) — runs queue, numbers never
   collide, but a build only contains its own branch's code. Sync with
@@ -1491,8 +1493,13 @@ The multi-user auth work described below **was** fully written but not live:
     already flow through the RevenueCat webhook into `entitlements/{uid}`, so the
     app side is mostly config + a web paywall. Not started; post-launch.
 
-26e. **[ ] Instagram saves from desktop (website, extension, + sheet) are
-    partial cards — OWNER DECISION PENDING (2026-11-04).** TikTok is fixed
+26e. **[~] Instagram saves from desktop — WORKING AS OF 2026-11-04, WATCH.**
+    Owner pasted several never-saved Instagram posts on the website and got
+    full cards (2026-11-04), so Instagram is currently serving the posts to
+    Cloud Functions again. Cause not verified (no code changed for it); it
+    went to a login wall once (late Oct) and can again. If partial
+    Instagram cards come back from the website, the options below stand.
+    Previous status: partial cards — owner decision pending. TikTok is fixed
     server-side via oEmbed (§9 2026-11-04 "TikTok desktop cards"). Instagram
     sends Cloud Functions its login page, and Meta's official
     `/instagram_oembed` (needs a Meta app + review) has returned no
