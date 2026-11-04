@@ -174,8 +174,12 @@ surface in the category and a knowledge graph computed on every save. The path t
   reading the post on the phone (`PagePreviewReader` → `pagePreview`, verified
   on device 2026-10-25). Don't revive server-side "bridges": ddinstagram is
   gone, kkinstagram empty, instagramez redirected to an ad network. Captures
-  with no phone read (the in-app + sheet, the web app, the browser extension)
-  still land as honest partial cards for these two sites.
+  with no phone read (the in-app + sheet, the web app, the browser extension):
+  **TikTok** is filled from TikTok's public oEmbed endpoint
+  (`tiktok.com/oembed`, `_tiktok_oembed` in `scraper.py`, 2026-11-04; runs
+  only when the page and `pagePreview` gave no caption). **Instagram** still
+  lands as an honest partial card (§4 26e: Meta's oEmbed dropped author and
+  thumbnail on 2025-11-03, so only a paid scraper gives a full card).
 - **Two parallel Claude sessions:** TestFlight runs share one concurrency group
   and one build-number sequence (1000 + run number) — runs queue, numbers never
   collide, but a build only contains its own branch's code. Sync with
@@ -1474,6 +1478,17 @@ The multi-user auth work described below **was** fully written but not live:
     the in-app link-out to web checkout is US-storefront only. Entitlements
     already flow through the RevenueCat webhook into `entitlements/{uid}`, so the
     app side is mostly config + a web paywall. Not started; post-launch.
+
+26e. **[ ] Instagram saves from desktop (website, extension, + sheet) are
+    partial cards — OWNER DECISION PENDING (2026-11-04).** TikTok is fixed
+    server-side via oEmbed (§9 2026-11-04 "TikTok desktop cards"). Instagram
+    sends Cloud Functions its login page, and Meta's official
+    `/instagram_oembed` (needs a Meta app + review) has returned no
+    `author_name`/`thumbnail_url` since 2025-11-03, so it would be
+    caption-only. Options: (1) paid scraping service (full cards, per-save
+    cost, against Instagram's terms; research providers + prices first);
+    (2) Meta oEmbed, caption-only; (3) stay partial. iPhone saves are full
+    already (`pagePreview`).
 
 26c. **[ ] Machina for Safari on the Mac App Store — DEFERRED TO POST-LAUNCH
     (owner, 2026-10-19: iOS launches first).** Until either store link is
@@ -2796,6 +2811,21 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-11-04 (night) — TikTok desktop cards (owner ask: "all saved links from
+  Instagram and TikTok on desktop get proper cards like the app").** Fix is
+  server-side, not in the extension: every desktop save goes through the same
+  scraper. `_scrape_tiktok_url` now asks TikTok's public oEmbed endpoint
+  (`_tiktok_oembed`; caption = `title`, handle = `author_unique_id` or
+  `author_url`, name = `author_name`, cover = `thumbnail_url`, https only) when
+  neither the page data nor `pagePreview` gave a caption, using the resolved
+  video address for vt./vm. short links. iPhone saves carry `pagePreview`, so
+  they never call it. A miss (private/deleted video, no caption, bad JSON)
+  stays the honest partial card. Tests: 11 new in `test_platform_walls.py`;
+  full suite 1993 passed, 1 failed: `test_entitlement_summary_adds_the_trial_and_import_fields`,
+  which fails on `main` too (a date time-bomb: its trial ends 60 days after
+  `PRO_LAUNCH_AT`, now past). **Not verified:** this sandbox can't reach
+  tiktok.com, so whether oEmbed answers Cloud Functions' addresses is checked
+  only after deploy. Instagram: §4 26e (owner decision).
 - **2026-11-04 (later) — Extension 1.0.1: token field removed, Undo added (owner
   asks).** The extension's paste-a-token form and the popup's "Use a token
   instead" are gone (connecting is one click from mymachina.app only); the
