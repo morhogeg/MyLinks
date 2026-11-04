@@ -2844,6 +2844,12 @@ exact-match, capped.
   selection covered by something else on screen is dropped
   (`elementFromPoint` at its centre), and TikTok video pages are labelled
   "TikTok video" (`tiktokVideoLabel`).
+  **OWNER VERIFIED on device (third build):** right-click, toolbar button and
+  pasting a TikTok link into Machina all give full cards. **SHIPPED as merge
+  `2675184` (PR #25)**, merged on the owner's word while the last CI run
+  (#87) was in progress; the previous commit's run (#86) was green. Owner
+  step: upload `machina-chrome-1.0.2.zip` (`node extension/scripts/package.mjs`)
+  to the Web Store; listing copy unchanged.
   Manual: load 1.0.2 unpacked,
   For You → let a video play → toolbar button; check the card.
 - **2026-11-04 (night) — TikTok desktop cards (owner ask: "all saved links from
