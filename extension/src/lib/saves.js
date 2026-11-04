@@ -13,6 +13,7 @@ import * as queue from './queue.js';
 import { captureVisible, readPage, readVideosNearLink, socialPreview, tiktokVideoUrl } from './capture.js';
 import {
     httpsOn, previewOnlySite, savability, socialHandle, socialPostId, socialPostSite, tiktokProfileHandle,
+    tiktokVideoLabel,
 } from './urls.js';
 import { refreshBadge } from './feedback.js';
 
@@ -95,7 +96,7 @@ export async function preparePage(tab, { quote } = {}) {
     const job = {
         kind: 'page',
         url: video || tab.url,
-        title: video ? 'TikTok video' : (facts?.title || tab.title || '').slice(0, TITLE_MAX),
+        title: video ? 'TikTok video' : (tiktokVideoLabel(tab.url) || facts?.title || tab.title || '').slice(0, TITLE_MAX),
     };
     const selected = cleanQuote(quote !== undefined ? quote : facts?.selection);
     if (selected) job.quote = selected;

@@ -2838,6 +2838,12 @@ exact-match, capped.
   here (fails identically without this change). Owner's first 1.0.2 try
   (Explore grid, right-click → Save link) landed on the creator's name and
   saved the profile; fixed in the same PR (name → the video beside it).
+  Second try: a video opened over Explore saved with "Alya.Cooks" as the
+  quote (a Mac right-click had selected that word in the grid underneath)
+  and the popup said "Explore…" (TikTok keeps the tab title). Fixed: a
+  selection covered by something else on screen is dropped
+  (`elementFromPoint` at its centre), and TikTok video pages are labelled
+  "TikTok video" (`tiktokVideoLabel`).
   Manual: load 1.0.2 unpacked,
   For You → let a video play → toolbar button; check the card.
 - **2026-11-04 (night) — TikTok desktop cards (owner ask: "all saved links from

@@ -263,6 +263,14 @@ const TT_EXPLORE = `<!doctype html><html><head><title>Explore - Find your favori
    <div><a href="/@other">other</a></div></div>
  </div><a href="/@nobody">nobody</a></body></html>`;
 
+// A video opened over the Explore grid: the address names the video, the
+// tab title still says Explore, and a word right-clicked earlier in the grid
+// is still selected underneath the overlay.
+const TT_MODAL = `<!doctype html><html><head><title>Explore - Find your favorite videos on TikTok</title>
+<style>#modal{position:fixed;inset:0;background:#000;color:#fff}</style></head><body>
+ <div><a href="/@alya.cookss">Alya.Cooks</a></div>
+ <div id="modal"><p>gone in 3 minz</p></div></body></html>`;
+
 const TT_TWO_UP = `<!doctype html><html><head><style>video{width:200px;height:200px}</style></head><body>
  <div id="xgwrapper-0-7600000000000000003"><video muted></video></div><a href="/@a">a</a>
  <div id="xgwrapper-0-7600000000000000004"><video muted></video></div><a href="/@b">b</a>
@@ -272,6 +280,7 @@ test('TikTok feeds: the video on screen is saved, not the feed', async () => {
     await ext.connect();
     const pages: Record<string, string> = {
         '/search': TT_SEARCH, '/foryou': TT_FOR_YOU, '/following': TT_TWO_UP, '/explore': TT_EXPLORE,
+        '/@gone.in.3minz/video/7694294491481607446': TT_MODAL,
     };
     await ext.context.route('https://www.tiktok.com/**', (route) => route.fulfill({
         contentType: 'text/html', body: pages[new URL(route.request().url()).pathname] || '<p>?</p>',
@@ -310,6 +319,23 @@ test('TikTok feeds: the video on screen is saved, not the feed', async () => {
     });
     await click({ menuItemId: 'machina-link', linkUrl: 'https://www.tiktok.com/@nobody', frameId: 0 });
     expect(ext.stub.shareCalls().at(-1)!.body).toEqual({ url: 'https://www.tiktok.com/@nobody' });
+
+    // A video opened over the grid, with a word still selected under it:
+    // the hidden selection stays behind, and the popup names the video.
+    await page.goto('https://www.tiktok.com/@gone.in.3minz/video/7694294491481607446');
+    await page.evaluate(() => {
+        const range = document.createRange();
+        range.selectNodeContents(document.querySelector('a')!);
+        getSelection()!.removeAllRanges();
+        getSelection()!.addRange(range);
+    });
+    const modalPopup = await ext.openPopup(page);
+    await expect(title(modalPopup)).toHaveText('Saved to Machina');
+    await expect(modalPopup.locator('#page-title')).toHaveText('TikTok video');
+    expect(ext.stub.shareCalls().at(-1)!.body).toEqual({
+        url: 'https://www.tiktok.com/@gone.in.3minz/video/7694294491481607446',
+    });
+    await modalPopup.close();
 
     // Two videos fully in view and neither playing: no guess, the page itself.
     await page.goto('https://www.tiktok.com/following');

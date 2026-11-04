@@ -130,6 +130,15 @@ export function socialHandle(url) {
     return '';
 }
 
+/**
+ * What to call a TikTok video page. TikTok opens a video over a grid without
+ * changing the tab's title ("Explore - Find your favorite videos…"), so the
+ * title can name a different page; '' for anything else.
+ */
+export function tiktokVideoLabel(url) {
+    return socialPostSite(url) === 'tiktok' && socialPostId(url) ? 'TikTok video' : '';
+}
+
 /** The handle of a TikTok profile address (tiktok.com/@handle), or ''. */
 export function tiktokProfileHandle(url) {
     let u;

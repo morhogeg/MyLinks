@@ -32,7 +32,23 @@ export function readPageInFrame() {
         return '';
     };
     const canonical = document.querySelector('link[rel="canonical"]');
-    const selection = window.getSelection ? String(window.getSelection() || '') : '';
+    // A selection the user can't see doesn't ride along: on a Mac a
+    // right-click selects the word under it, and on TikTok/Instagram that
+    // word stays selected in the grid underneath the post opened next.
+    const selection = (() => {
+        const sel = window.getSelection ? window.getSelection() : null;
+        const text = sel ? String(sel) : '';
+        if (!text || !sel.rangeCount) return text;
+        const range = sel.getRangeAt(0);
+        const r = range.getBoundingClientRect();
+        const x = r.left + r.width / 2;
+        const y = r.top + r.height / 2;
+        if (!r.width || x < 0 || y < 0 || x >= innerWidth || y >= innerHeight) return text;
+        const top = document.elementFromPoint(x, y);
+        let box = range.commonAncestorContainer;
+        if (box && box.nodeType !== 1) box = box.parentElement;
+        return top && box && !box.contains(top) && !top.contains(box) ? '' : text;
+    })();
 
     // TikTok's feeds (For You, Following, search, a profile) keep their own
     // address while a video plays, so the address doesn't say which video the
