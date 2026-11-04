@@ -10,7 +10,7 @@
 import { Outcome, buildBody, cleanQuote, isDelivered, isRetryable, postShare } from './api.js';
 import { getConnection, markNeedsReconnect } from './account.js';
 import * as queue from './queue.js';
-import { captureVisible, readPage, socialPreview } from './capture.js';
+import { captureVisible, readPage, socialPreview, tiktokVideoUrl } from './capture.js';
 import { previewOnlySite, savability } from './urls.js';
 import { refreshBadge } from './feedback.js';
 
@@ -88,10 +88,12 @@ export async function preparePage(tab, { quote } = {}) {
     if (!check.ok) return { result: { outcome: 'unsavable', reason: check.reason, kind: 'page', title: tab.title || '' } };
 
     const facts = await readPage(tab.id); // null where the browser forbids reading
+    // On a TikTok feed, the video playing is what the user means, not the feed.
+    const video = tiktokVideoUrl(tab.url, facts);
     const job = {
         kind: 'page',
-        url: tab.url,
-        title: (facts?.title || tab.title || '').slice(0, TITLE_MAX),
+        url: video || tab.url,
+        title: video ? 'TikTok video' : (facts?.title || tab.title || '').slice(0, TITLE_MAX),
     };
     const selected = cleanQuote(quote !== undefined ? quote : facts?.selection);
     if (selected) job.quote = selected;
