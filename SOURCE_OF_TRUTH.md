@@ -2848,6 +2848,19 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-11-04 — Desktop toolbar: subtler dark-mode active state (owner
+  request, web only).** Filter / Sources / view switcher / tablet Tags used the
+  porcelain `--accent` fill when on, as loud as a primary CTA. New token trio
+  `--selected` / `--selected-ink` / `--selected-border` (+ `--selected-shadow`)
+  in `globals.css`: dark = lit graphite `#2A2A32`, white ink, 12% hairline, top
+  highlight; light = the old graphite accent, so light mode is unchanged. Only
+  the `sm:` desktop toolbar in `Feed.tsx` uses it (`ctrlActive`); mobile sheets,
+  settings segmented control, tag picker and every CTA keep `--accent`.
+  `dbc26c4`, merged `64d68d6`, Vercel only. **No TestFlight triggered** (owner:
+  don't touch iOS); the next iOS build carries the token but never renders the
+  toolbar (iPhone-only, portrait, < 640px). Verified: tsc, before/after render
+  of the exact classes in dark + light; **not** seen on a signed-in feed.
+
 - **2026-11-04 (late) — Extension 1.0.2: TikTok feed saves become the video
   (owner device report).** Owner verified: TikTok links pasted on the website
   and the toolbar button on an open video both give full cards (server oEmbed,
