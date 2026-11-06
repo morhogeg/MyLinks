@@ -1506,7 +1506,15 @@ The multi-user auth work described below **was** fully written but not live:
     in the app), a refund policy with a 14–90 day window and refunds requested
     through Paddle (today Terms §6a says Apple handles refunds), and Terms +
     Privacy naming Paddle as merchant of record. Owner's Paddle signup is the
-    real test that Israel-based sellers are accepted.
+    real test that Israel-based sellers are accepted. For the build: Settings
+    assumes every RevenueCat subscriber is billed by Apple ("Billed by Apple" +
+    Manage subscription → Apple's page, `settings/MainView.tsx:64-93`,
+    `SettingsModal.tsx:233`), so the server must pass the store through and
+    a Paddle subscriber must see web billing instead (plain text on iPhone).
+    Pro follows the Firebase uid, so web-paid Pro shows on iPhone only when the
+    user taps the same sign-in button there. Apple's Hide My Email creates a
+    separate empty account unless Apple was linked first (Settings → Account
+    → Sign-in methods).
 
 26e. **[~] Instagram saves from desktop — WORKING AS OF 2026-11-04, WATCH.**
     Owner pasted several never-saved Instagram posts on the website and got
