@@ -903,3 +903,10 @@
     transition: none !important;
   }
 }
+
+/* App Store badge (LandingPage AppStoreBadge): Apple's white badge on the dark
+   ground, its black badge on light. The theme is class-based (.light on the
+   root), so this can't be a Tailwind dark: variant. */
+.mx-store-on-light { display: none; }
+.light .mx-store-on-light { display: block; }
+.light .mx-store-on-dark { display: none; }

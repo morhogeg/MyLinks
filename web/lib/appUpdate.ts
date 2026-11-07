@@ -19,6 +19,7 @@
 
 import { doc, getDocFromServer } from 'firebase/firestore';
 import { isNativeApp } from './api';
+import { APP_STORE_ID } from './site';
 
 export interface UpdateRequirement {
     /** Owner-written copy for the screen, if any. */
@@ -28,7 +29,7 @@ export interface UpdateRequirement {
 }
 
 /** Build-time fallback for the App Store id (the doc's `appStoreId` wins). */
-const APP_STORE_ID_FALLBACK = process.env.NEXT_PUBLIC_APP_STORE_ID || '';
+const APP_STORE_ID_FALLBACK = process.env.NEXT_PUBLIC_APP_STORE_ID || APP_STORE_ID || '';
 
 async function nativeBuildNumber(): Promise<number | null> {
     try {

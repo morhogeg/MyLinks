@@ -22,11 +22,13 @@ export const HOME_DESCRIPTION =
 
 /**
  * The numeric App Store id (App Store Connect → App Information → Apple ID).
- * Not known to the repo yet. Setting it turns on Safari's Smart App Banner on
- * the website and adds the App Store install URL to the JSON-LD; nothing
- * else depends on it.
+ * Live since 2026-11-07 (1.0, build 1388). It turns on Safari's Smart App
+ * Banner on the website, the landing page's App Store badge, the blog/FAQ
+ * closing button, the JSON-LD install URL, and the native update screen's
+ * fallback store id. Share pages read their own copy, `APP_STORE_ID` in
+ * functions/.env (deploy-functions.yml).
  */
-export const APP_STORE_ID: string | null = null;
+export const APP_STORE_ID: string | null = '6785841284';
 export const APP_STORE_URL = APP_STORE_ID ? `https://apps.apple.com/app/id${APP_STORE_ID}` : null;
 
 /** Machina's own accounts (the landing footer's order). */
