@@ -2870,8 +2870,9 @@ exact-match, capped.
   `.mx-store-on-*`, class-based theme), 44px tall; **web only** (hidden when
   `isNativeApp()`). Share pages: `deploy-functions.yml` now writes
   `APP_STORE_ID=6785841284` into `functions/.env` (it was never written, so
-  `share_service._app_store_id()` was always empty); the workflow change
-  itself triggers a full functions deploy. Verified: tsc, `/welcome` rendered
+  `share_service._app_store_id()` was always empty). Shipped: commit
+  `49d7a4c`, merged `81cd4c0`; Vercel on push; **deploy-functions run #146
+  green** (full deploy, triggered by the workflow change). No TestFlight. Verified: tsc, `/welcome` rendered
   in dark + light at 1280px and 390px (badge swaps per theme, sits level with
   the pill, wraps under it in the Close card on a phone), `apple-itunes-app`
   meta present. **Not verified:** the Smart App Banner on a real iPhone, and a
