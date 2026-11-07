@@ -2856,6 +2856,27 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-11-07 — 1.0 (BUILD 1388) APPROVED AND RELEASED; 1.0.1 CARRIES THE
+  APP PREVIEW (owner).** Apple approved 1.0 with both subscriptions (owner:
+  Annual and Monthly both "Approved"); owner tapped Release This Version and
+  App Store Connect shows **Ready for Distribution**. Released 10 days before
+  Day 1 (Tue 17 Nov) on purpose: a few quiet days with no posts, and 1.0 has
+  to be out before 1.0.1 can be created. **Plan:** watch the quiet days, then
+  by **Tue 10 Nov** a session cuts a TestFlight build with
+  `marketing_version: 1.0.1` from `main` (list what changed since 1388 first),
+  resets `machinareviewer` (fresh 14-day trial + clear `aiConsentAt`; its
+  trial ended 5 Nov and the review notes say it's on one), and the owner adds
+  the App Preview (`Machina-App-Preview-886x1920.mp4`, poster frame 0s) to
+  1.0.1 and submits; release it by **Mon 16 Nov**. **Pricing decision (owner):
+  keep the no-card 14-day reverse trial**, no StoreKit intro offer; revisit
+  with ~6 weeks of trial→paid data. **Open:** App Store URL + numeric app id
+  not yet handed over (`web-appstore-link`: landing badge, `APP_STORE_ID`
+  Smart App Banner); no real-money purchase tested yet (suggested: buy Monthly
+  on a non-owner account, refund via reportaproblem.apple.com); Google 2FA
+  (`sec-2fa`) still unticked. Checklist: `mkt-warmup` (owner runs it with a
+  Grok bot; not checked whether it engages automatically, which X's rules
+  forbid) and `mkt-profile` set done; `lw-release` noted, not ticked.
+
 - **2026-11-04 — Desktop toolbar: subtler dark-mode active state (owner
   request, web only).** Filter / Sources / view switcher / tablet Tags used the
   porcelain `--accent` fill when on, as loud as a primary CTA. New token trio
