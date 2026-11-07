@@ -24,7 +24,7 @@ export function Header({ onGetStarted, homeHref }: {
     /** Pages other than the landing page link the lockup home. */
     homeHref?: string;
 }) {
-    const cls = 'text-sm font-medium text-text-secondary transition-colors hover:text-text';
+    const cls = 'cursor-pointer text-sm font-medium text-text-secondary transition-colors hover:text-text';
     const navRef = useHideOnScroll<HTMLDivElement>();
     return (
         /* `mx-nav` is inert in the classic page; the cinematic layer turns it

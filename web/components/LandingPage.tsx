@@ -109,7 +109,7 @@ function GetStarted({ onGetStarted, label = 'Get started', className = '' }: {
     className?: string;
 }) {
     const cls =
-        'mx-cta inline-flex items-center justify-center rounded-full bg-accent px-6 py-3 text-sm '
+        'mx-cta inline-flex cursor-pointer items-center justify-center rounded-full bg-accent px-6 py-3 text-sm '
         + 'font-semibold text-accent-ink shadow-sm shadow-accent/20 transition-colors '
         + `hover:bg-accent-hover ${className}`;
     return onGetStarted

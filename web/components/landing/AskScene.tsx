@@ -145,7 +145,7 @@ export default function AskScene() {
                             onClick={() => { setInteracted(true); setQIndex(i); setRunId((n) => n + 1); }}
                             aria-pressed={i === qIndex}
                             className={
-                                'shrink-0 rounded-full border px-4 py-2 text-[13px] transition-colors duration-200 '
+                                'shrink-0 cursor-pointer rounded-full border px-4 py-2 text-[13px] transition-colors duration-200 '
                                 + (i === qIndex
                                     ? 'border-transparent bg-accent text-accent-ink'
                                     : 'border-border-subtle text-text-secondary hover:border-border-strong hover:text-text')

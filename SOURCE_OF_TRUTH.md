@@ -2877,7 +2877,11 @@ exact-match, capped.
   instead of the hand; the badge images are now `pointer-events-none` +
   `select-none` and the link sets `cursor-pointer`, so the pointer hits the
   `<a>` (checked in Chromium; WebKit isn't installed here, so not seen in
-  Safari). Verified: tsc, `/welcome` rendered
+  Safari; owner then confirmed the hand in Safari). Same pass: on `/` Get
+  started and Sign in are `<button>`s and showed the arrow (Tailwind v4's
+  base styles give buttons `cursor: default`); `GetStarted`, the header Sign
+  in and the AskScene question chips now set `cursor-pointer`. Scope: landing
+  only; buttons inside the signed-in web app are unchanged. Verified: tsc, `/welcome` rendered
   in dark + light at 1280px and 390px (badge swaps per theme, sits level with
   the pill, wraps under it in the Close card on a phone), `apple-itunes-app`
   meta present. **Not verified:** the Smart App Banner on a real iPhone, and a
