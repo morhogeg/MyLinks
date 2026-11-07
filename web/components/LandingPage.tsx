@@ -13,6 +13,7 @@ import { useInView } from '@/components/landing/hooks';
 import { LiveMark } from '@/components/landing/parts';
 import { CINEMATIC_LANDING } from '@/components/landing/motion';
 import { isNativeApp } from '@/lib/api';
+import { APP_STORE_URL } from '@/lib/site';
 import { Header, Footer } from '@/components/landing/chrome';
 import '@/components/landing/landing.css';
 
@@ -114,6 +115,43 @@ function GetStarted({ onGetStarted, label = 'Get started', className = '' }: {
     return onGetStarted
         ? <button type="button" onClick={onGetStarted} className={cls}>{label}</button>
         : <Link href="/" className={cls}>{label}</Link>;
+}
+
+/** Apple's official "Download on the App Store" badge, beside Get started.
+ *
+ *  Apple's own artwork (public/app-store-badge-*.svg, from Apple's marketing
+ *  toolbox, unmodified): its guidelines forbid redrawing or recolouring it,
+ *  so this is the one place on the page that isn't drawn from our tokens.
+ *  White on the dark ground, black on light, the same rule Apple sets for the
+ *  Sign in with Apple button (--apple-button). 44px tall to sit level with the
+ *  pill; Apple's floor is 40.
+ *
+ *  WEB ONLY: inside the installed app it would point at itself. Native renders
+ *  the landing client-only, so this early return can't mismatch a prerender
+ *  (same as Watch). Absent until APP_STORE_ID is set in lib/site.ts. */
+function AppStoreBadge() {
+    if (!APP_STORE_URL || isNativeApp()) return null;
+    return (
+        <a
+            href={APP_STORE_URL}
+            className="mx-store inline-flex shrink-0 rounded-[10px] transition-opacity hover:opacity-85"
+            aria-label="Download Machina on the App Store"
+        >
+            <img src="/app-store-badge-white.svg" alt="" width={132} height={44} className="mx-store-on-dark h-11 w-auto" />
+            <img src="/app-store-badge-black.svg" alt="" width={132} height={44} className="mx-store-on-light h-11 w-auto" />
+        </a>
+    );
+}
+
+/** The page's actions: Get started, and the App Store badge once listed. One
+ *  row that wraps to two centred lines on a narrow phone. */
+function Actions({ onGetStarted, className = '' }: { onGetStarted?: () => void; className?: string }) {
+    return (
+        <div className={`flex flex-wrap items-center justify-center gap-3 ${className}`}>
+            <GetStarted onGetStarted={onGetStarted} />
+            <AppStoreBadge />
+        </div>
+    );
 }
 
 /** A prose section that arrives as one gesture when it scrolls into view. */
@@ -321,7 +359,7 @@ function Hero({ onGetStarted }: { onGetStarted?: () => void }) {
                     </div>
 
                     <div className="mx-rise mt-12" style={{ ['--i' as string]: 11 }}>
-                        <GetStarted onGetStarted={onGetStarted} />
+                        <Actions onGetStarted={onGetStarted} />
                     </div>
                 </div>
             </div>
@@ -508,7 +546,7 @@ function Close({ onGetStarted }: { onGetStarted?: () => void }) {
                     Sign in with Apple or Google, send Machina your next find, and watch it
                     come back understood.
                 </p>
-                <GetStarted onGetStarted={onGetStarted} className="mt-8" />
+                <Actions onGetStarted={onGetStarted} className="mt-8" />
             </div>
         </section>
     );

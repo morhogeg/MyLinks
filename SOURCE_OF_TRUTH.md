@@ -2856,6 +2856,48 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-11-07 — App Store link wired in: website badge, Safari banner,
+  share pages (owner ask; web + functions, no iOS build).** App Store id
+  **6785841284** (listing `apps.apple.com/app/id6785841284`, Ready for
+  Distribution). `web/lib/site.ts` `APP_STORE_ID` set: turns on the Smart App
+  Banner meta (`layout.tsx`), JSON-LD install URL (`seo.tsx`), the blog/FAQ
+  `AppCta` App Store button, and the native update screen's fallback store id
+  (`appUpdate.ts` now falls back to it; rides into the next TestFlight build).
+  Landing (`LandingPage.tsx`): new `Actions` row = Get started + Apple's
+  official "Download on the App Store" badge (`public/app-store-badge-
+  {white,black}.svg`, unmodified from Apple's marketing toolbox) in the hero
+  and the Close card; white on dark, black on light (`landing.css`
+  `.mx-store-on-*`, class-based theme), 44px tall; **web only** (hidden when
+  `isNativeApp()`). Share pages: `deploy-functions.yml` now writes
+  `APP_STORE_ID=6785841284` into `functions/.env` (it was never written, so
+  `share_service._app_store_id()` was always empty); the workflow change
+  itself triggers a full functions deploy. Verified: tsc, `/welcome` rendered
+  in dark + light at 1280px and 390px (badge swaps per theme, sits level with
+  the pill, wraps under it in the Close card on a phone), `apple-itunes-app`
+  meta present. **Not verified:** the Smart App Banner on a real iPhone, and a
+  live share page's button going to the App Store (after the deploy). Session
+  network: a personal "MyLinks" environment was created (adds Apple's badge
+  hosts) and this session moved onto it.
+
+- **2026-11-07 — 1.0 (BUILD 1388) APPROVED AND RELEASED; 1.0.1 CARRIES THE
+  APP PREVIEW (owner).** Apple approved 1.0 with both subscriptions (owner:
+  Annual and Monthly both "Approved"); owner tapped Release This Version and
+  App Store Connect shows **Ready for Distribution**. Released 10 days before
+  Day 1 (Tue 17 Nov) on purpose: a few quiet days with no posts, and 1.0 has
+  to be out before 1.0.1 can be created. **Plan:** watch the quiet days, then
+  by **Tue 10 Nov** a session cuts a TestFlight build with
+  `marketing_version: 1.0.1` from `main` (list what changed since 1388 first),
+  resets `machinareviewer` (fresh 14-day trial + clear `aiConsentAt`; its
+  trial ended 5 Nov and the review notes say it's on one), and the owner adds
+  the App Preview (`Machina-App-Preview-886x1920.mp4`, poster frame 0s) to
+  1.0.1 and submits; release it by **Mon 16 Nov**. **Pricing decision (owner):
+  keep the no-card 14-day reverse trial**, no StoreKit intro offer; revisit
+  with ~6 weeks of trial→paid data. **Open:** no real-money purchase tested yet (suggested: buy Monthly
+  on a non-owner account, refund via reportaproblem.apple.com); Google 2FA
+  (`sec-2fa`) still unticked. Checklist: `mkt-warmup` (owner runs it with a
+  Grok bot; not checked whether it engages automatically, which X's rules
+  forbid) and `mkt-profile` set done; `lw-release` noted, not ticked.
+
 - **2026-11-04 — Desktop toolbar: subtler dark-mode active state (owner
   request, web only).** Filter / Sources / view switcher / tablet Tags used the
   porcelain `--accent` fill when on, as loud as a primary CTA. New token trio

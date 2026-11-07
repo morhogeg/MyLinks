@@ -183,6 +183,10 @@ jobs:
           if [ -n "$REVENUECAT_WEBHOOK_AUTH" ]; then
             echo "REVENUECAT_WEBHOOK_AUTH=${REVENUECAT_WEBHOOK_AUTH}" >> "$env_file"
           fi
+          # The public App Store id (not a secret; same value as web/lib/site.ts).
+          # Share pages read it: the "Open in Machina" button goes to the App
+          # Store on iPhone/iPad (share_service._app_store_id).
+          echo "APP_STORE_ID=6785841284" >> "$env_file"
 
       # firebase-tools runs the Python functions codebase inside functions/venv.
       - name: Create functions venv
