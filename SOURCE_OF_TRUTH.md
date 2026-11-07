@@ -2696,7 +2696,14 @@ paid spend.
 `@machinaapp` over six weeks, plus a 6-post founder track from the owner's own
 account. It also holds the Day-1 checklist, an attachment plan, and the
 Product Hunt, Show HN, LinkedIn, Reddit and Meta-ad copy. **It supersedes the
-X thread and the Show HN line below.** Those are kept for the history only; don't
+X thread and the Show HN line below.
+**The education series, *How memory works*** (§10 of the same file, written
+2026-11-07): six threads (M1 to M6) and one X Article (M7), each built on one
+memory finding with its study cited (Henkel, Storm & Stone, Ebbinghaus,
+Cepeda, Sachs, Roediger & Karpicke, Gollwitzer, Bransford & Johnson). The
+rule that keeps it honest: Machina is the *coming back* (holds, finds by
+meaning, connects, reminds), never the remembering. Runs weekly on Thursdays
+before Day 1, paused during the six-week campaign, then every other Thursday.** Those are kept for the history only; don't
 post them (emoji, and "Free on the App Store" next to Pro features).
 
 **Launch assets — first set (superseded for X and Show HN; see above):**
@@ -2856,6 +2863,20 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-11-07 — X education series *How memory works* (owner request,
+  marketing only, no code).** Wrote `marketing/x-launch/CAMPAIGN.md` §10: six
+  3-tweet threads (saving isn't learning, the forgetting curve + spacing, gist
+  beats wording, test yourself, if-then plans, connecting ideas), an X Article
+  (~960 words, "Saving is the easy half") and its link post, each with attach
+  notes (new type cards A23 to A28), a first comment carrying the citation +
+  DOI, and a research-claims table. Every tweet is under 280 by X's weighted
+  count (script). House rules kept (no em dash, emoji, hashtag, "!", "AI").
+  Verified: the DOIs and findings against abstracts/summaries. **Not
+  verified against the full paper:** Roediger & Karpicke's 83/71 and 61/40
+  figures, and Bransford & Johnson's "about twice": check before M4/M6 go
+  out. M3.3 reuses T16's search example, with the same device-check rule.
+  Owner steps: make the A23 to A28 type cards, and confirm X Premium on
+  `@machinaapp` before M7.
 - **2026-11-04 — Desktop toolbar: subtler dark-mode active state (owner
   request, web only).** Filter / Sources / view switcher / tablet Tags used the
   porcelain `--accent` fill when on, as loud as a primary CTA. New token trio

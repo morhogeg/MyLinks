@@ -10,6 +10,10 @@
 > and why. Anything that needs a real screenshot, a real number or a real user is
 > marked `[fill]` and must never be invented.
 >
+> **§10 (added 2026-11-07)** is the education series, *How memory works*:
+> six research-backed threads and one X Article, run weekly before Day 1 and
+> every other Thursday after T32.
+>
 > **House rules every post keeps:**
 > - **The name** is `Machina`, never "Machina AI".
 > - **Banned words:** "second brain", "AI" and "AI-powered" (the one exception is
@@ -1074,3 +1078,325 @@ Every product claim in these posts, and where it was verified on 2026-10-02 (`ma
 **Not verified here** (check on a device before the post goes out): T16's exact
 query, the text of any screenshot you attach, and that the Daily Brew push
 reads as shown in A21.
+
+---
+
+## 10. How memory works: the education series (written 2026-11-07)
+
+Six short threads and one X Article from `@machinaapp`, each built on one memory
+finding that has held up in research. These are the posts people bookmark and
+reshare, and they give a new account a reason to be followed before there's
+anything to download.
+
+**The rule that keeps them credible.** The research says rereading barely
+helps, and trying to remember is what makes things stick. Machina's reminders
+bring a save back, and on its own that's rereading. So the series never claims
+Machina does the remembering. **Machina is the coming back: it holds the save,
+finds it by meaning, connects it and brings it back on time. The remembering is
+the reader's part, and every episode hands them one way to do it.**
+
+**How each episode is built.** Three posts. The first opens with the series
+label and the finding, told as the experiment people can picture. The second
+gives the result and what it means. The third is one thing to do, and the part
+of Machina that fits it, in one or two sentences. The study is named in the
+post. The full citation and link go in the first comment.
+
+**When they run.**
+- **Before Day 1:** one a week, on Thursdays, in order. The account has
+  something worth reading while it waits for the launch.
+- **Weeks 1 to 6 of the campaign:** paused. The calendar is full, and §3's
+  Tuesday-to-Thursday series need the room.
+- **After T32:** every other Thursday, in the "one small feature" slot from §6.
+  Repeat the set from M1 once it runs out. A finding this good is new to most
+  of the people who see it.
+- **The X Article (M7)** goes out the week after M6, and M1 to M6 each get a
+  reply linking to it. Articles need X Premium on `@machinaapp`.
+
+**House rules** are §0's, unchanged: no em dashes, hashtags, emoji or
+exclamation marks; no "AI" or "second brain"; never "bookmark manager". Every
+tweet below was counted by script with X's rules and is under 280. Nothing here
+shows a Pro feature, so no first comment needs the Pro line.
+
+**Before the app is live**, the first comment carries the source only. **After
+Day 1**, add one line at its end: `Machina: apps.apple.com/[fill]`.
+
+#### M1 · saving isn't learning
+
+```tweet
+How memory works, 1/6: saving isn't learning.
+
+People on a museum tour photographed some objects and only looked at others.
+
+Later, they remembered fewer of the objects they'd photographed, and fewer details about them. The camera did the remembering, so they didn't.
+~
+But saving isn't the villain.
+
+In another study, people who saved one file before studying a second learned the second one better. Letting go of the first made room.
+
+The catch: it only worked when they trusted the save. Told it might not stick, the benefit was gone.
+~
+So save freely, as long as you trust the save. That's why Machina shows "Saved ✓" the moment your save is in, before the card is even finished.
+
+Saving makes room. Coming back is where the learning happens.
+
+The next five posts: how to come back well.
+```
+
+- **Attach:** M1.1, a type card in the app's style: two columns, "Photographed"
+  and "Looked at", with the finding in one line under them (A23). M1.3, the
+  share extension's "Saved ✓ · Making your card" (A3's last frame).
+- **First comment:** `Sources: Henkel (2014), Point-and-shoot memories, Psychological Science, doi.org/10.1177/0956797613504438 · Storm & Stone (2015), Saving-enhanced memory, Psychological Science, doi.org/10.1177/0956797614559285`
+- **If someone asks:** zooming in to photograph one detail of an object removed
+  the effect in Henkel's study. Attention is what does the work, not the camera.
+
+#### M2 · the forgetting curve, and how to flatten it
+
+```tweet
+How memory works, 2/6: the forgetting curve.
+
+In the 1880s, Hermann Ebbinghaus memorized lists of nonsense syllables, then timed how long it took to relearn them: 20 minutes later, an hour, a day, a month.
+
+Most of the forgetting came in the first day. Then it slowed right down.
+~
+A replication in 2015 found nearly the same curve, 130 years on.
+
+What flattens it is coming back. Across hundreds of experiments, the same amount of review, spread out over days, beats the same review crammed into one sitting.
+~
+And the longer you need to keep something, the wider the gaps should be.
+
+Set a reminder on a Machina save and it can come back three times, each further apart than the last.
+
+Forget a little in between. That's part of how it works.
+```
+
+- **Attach:** M2.1, the forgetting curve drawn in the app's style, with
+  Ebbinghaus's delays on the x-axis and no invented percentages on the y-axis
+  (A24). M2.3, the reminder sheet on a card (capture kit).
+- **First comment:** `Sources: Ebbinghaus (1885), Memory · Murre & Dros (2015), Replication and analysis of Ebbinghaus' forgetting curve, PLOS ONE, doi.org/10.1371/journal.pone.0120644 · Cepeda et al. (2006), Distributed practice in verbal recall tasks, Psychological Bulletin, doi.org/10.1037/0033-2909.132.3.354 · Cepeda et al. (2008), Spacing effects in learning, Psychological Science, doi.org/10.1111/j.1467-9280.2008.02209.x`
+- **Note:** the 2006 review pooled 839 comparisons from 317 experiments. That's
+  the "hundreds of experiments".
+
+#### M3 · you remember the meaning, not the words
+
+```tweet
+How memory works, 3/6: you remember the meaning, not the words.
+
+In 1967, Jacqueline Sachs played people recorded passages, then replayed one sentence, sometimes changed.
+
+A few sentences later, they couldn't tell if the wording had changed. They still noticed when the meaning had.
+~
+Studies since have kept finding the same thing. Memory keeps the gist and lets the exact words go.
+
+That's why searching your own saves so often fails. You type the words you think it used. What you actually remember is what it meant.
+~
+So Machina searches by meaning.
+
+Type "that talk about putting things off" and it finds Inside the mind of a master procrastinator. Not one word in common.
+
+Search the way you remember it.
+```
+
+- **Attach:** M3.1, a type card: one sentence, its reworded twin and its
+  changed-meaning twin, the meaning change marked (A25). M3.3, the T16 search
+  clip (A12).
+- **First comment:** `Source: Sachs (1967), Recognition memory for syntactic and semantic aspects of connected discourse, Perception & Psychophysics, doi.org/10.3758/BF03208784`
+- **Note:** M3.3 is T16's example, with T16's rule. Before posting, run the exact
+  query on a real account that has the talk saved. If it isn't the first result,
+  use a query that is, and change the post to match.
+
+#### M4 · test yourself, don't reread
+
+```tweet
+How memory works, 4/6: test yourself, don't reread.
+
+Students read a short passage. One group read it four times. Another read it once, then tried three times to write down everything they remembered.
+
+Five minutes later, the rereaders were ahead, 83% to 71%.
+~
+A week later, it flipped. The group that practiced recalling kept 61%. The rereaders kept 40%.
+
+And the rereaders were more confident they'd remember.
+
+That's the trap. Rereading feels like learning because it's familiar. Pulling it out of your head is what makes it stay.
+~
+Try this when a Machina reminder brings a save back: before you open it, say its main point in one sentence.
+
+Then open the card and check yourself against the summary.
+
+Ten seconds, and the reminder becomes a test instead of a reread.
+```
+
+- **Attach:** M4.1, two bar pairs in the app's style, "5 minutes" (83 / 71) and
+  "1 week" (40 / 61), labelled "read four times" and "read once, recalled three
+  times" (A26). M4.3, a reminder notification, then the card's summary.
+- **First comment:** `Source: Roediger & Karpicke (2006), Test-enhanced learning, Psychological Science, doi.org/10.1111/j.1467-9280.2006.01693.x`
+- **Note:** the figures are the paper's Experiment 2 (read four times vs read
+  once and recalled three times). Check them against the paper's Figure 2 before
+  posting; secondary sources quote them in different pairings.
+
+#### M5 · a plan with a when
+
+```tweet
+How memory works, 5/6: a plan with a when.
+
+"I'll read that article" rarely happens. "Saturday, after lunch, I'll read that article" happens far more often.
+
+Psychologists call it an implementation intention. If this moment comes, I'll do this.
+~
+A 2006 review of 94 studies found these if-then plans gave goals a medium to large boost.
+
+A larger 2024 review, 642 tests, found the effect is real but smaller than first thought.
+
+Still one of the cheapest boosts there is: one sentence that names the moment.
+~
+Machina writes the first half for you. When a save calls for action, its card gets a next step, and the step waits in Revisit under Do this.
+
+You add the when. Open the card and set a reminder for the moment you'll do it.
+
+What, plus when.
+```
+
+- **Attach:** M5.1, a type card: "I'll read it." above "Saturday, after lunch,
+  I'll read it." (A27). M5.3, the Do this list (ad 3 or the REVISIT clip).
+- **First comment:** `Sources: Gollwitzer & Sheeran (2006), Implementation intentions and goal achievement, Advances in Experimental Social Psychology, doi.org/10.1016/S0065-2601(06)38002-1 · Sheeran, Listrom & Gollwitzer (2024), The when and how of planning, European Review of Social Psychology, doi.org/10.1080/10463283.2024.2334563`
+- **Why M5.2 names the smaller number:** saying the effect shrank when more
+  studies came in is what makes the series trustworthy. It costs nothing, and
+  it's the post a researcher would reshare.
+
+#### M6 · new ideas stick to old ones
+
+```tweet
+How memory works, 6/6: new ideas stick to old ones.
+
+"First you arrange things into different groups. Of course, one pile may be sufficient depending on how much there is to do."
+
+Hard to follow, and hard to remember. Now add the topic: washing clothes.
+~
+In 1972, Bransford and Johnson read passages like this to people. Those told the topic first recalled about twice as much as those told nothing.
+
+Told it afterwards? No better.
+
+What you already know is the hook new ideas hang on, but only when it's in mind as they arrive.
+~
+That's what related saves are for. When a new card lands, Machina puts the things you've already saved on the same idea right on it.
+
+Open the graph and you see what your library is really about, each cluster named.
+
+Each save arrives next to what you already know.
+```
+
+- **Attach:** M6.1, the quoted paragraph as a type card, with "Washing clothes"
+  revealed as its title on a second frame (A28; a two-frame GIF works). M6.3,
+  a card's related row, then the graph with its cluster chips (A11).
+- **First comment:** `Source: Bransford & Johnson (1972), Contextual prerequisites for understanding, Journal of Verbal Learning and Verbal Behavior, doi.org/10.1016/S0022-5371(72)80006-9 · The whole series, in one piece: [fill: M7 link]`
+- **Note:** the quote is the passage's second and third sentences, verbatim. Summaries of the
+  paper disagree on the exact idea counts (2.8 vs 5.8, or 3.6 vs 8.0), but both
+  are about double, so the post says "about twice as much" and nothing more
+  precise.
+
+#### M7 · the X Article: Saving is the easy half
+
+Post it as an X Article, with A24 (the forgetting curve) as the cover image,
+then post the link as a normal tweet:
+
+```tweet
+Everything memory research says about the things you save, in one place.
+
+Why saving feels like learning, why most of it is gone in a day, and the ten-second habit that keeps it.
+```
+
+- **Attach:** none. The Article's link card is the image.
+- **First comment:** none. Reply to M1 to M6 with the link the same day.
+
+```article
+Saving is the easy half
+
+You saved it because it mattered. An article you meant to read properly, a talk someone swore would change how you work, a screenshot of advice you were going to take. Then it went where saved things go.
+
+That isn't a character flaw. It's how memory works, and memory has been studied in more detail than almost anything else in psychology. Here is what that research says about the things you save, and what to do about it.
+
+Saving feels like learning
+
+In 2014, Linda Henkel took people on a museum tour. They photographed some objects and only looked at others. Afterwards, they remembered fewer of the objects they'd photographed, and fewer details about them. The camera held the memory, so they didn't have to.
+
+Saving a link works the same way. It gives you the feeling of having dealt with something. You haven't learned it. You've scheduled learning it, with no date.
+
+But saving isn't the problem. In 2015, Benjamin Storm and Sean Stone had people save one file before studying a second, and they learned the second one better. Letting go of the first made room for the next. The benefit only appeared when people trusted the save. When they were told it might not stick, it disappeared.
+
+So save freely, into something you trust. The work is in coming back.
+
+Most of it is gone in a day
+
+In the 1880s, Hermann Ebbinghaus memorized lists of nonsense syllables and measured how much effort it took to relearn them after twenty minutes, an hour, a day, a month. Most of the forgetting happened in the first day. After that, it slowed. A replication in 2015 found nearly the same curve.
+
+The curve isn't a verdict. It's a schedule. Every time you come back to something, the next drop takes longer. In a 2006 review of 317 experiments, Nicholas Cepeda and colleagues found that the same amount of review, spread over days, beats the same review in one sitting. A follow-up in 2008 found that the longer you need to keep something, the wider the gaps should be.
+
+When you come back, don't just reread
+
+This is the finding that changes the most. In 2006, Henry Roediger and Jeffrey Karpicke had students read a short passage. One group read it four times. Another read it once, then tried three times to write down what they remembered. Five minutes later, the rereaders were ahead. A week later, the group that had practiced recalling remembered 61% of the passage. The rereaders remembered 40%.
+
+The rereaders were also more confident they'd remember. Rereading feels productive because the material looks familiar. Familiar isn't the same as known. In a 2013 review of ten study techniques, John Dunlosky and colleagues rated rereading and highlighting as low utility, and practice testing and spaced practice as the two that work best.
+
+The fix takes seconds. Before you reopen something you saved, try to say its main point. Then check.
+
+You remember what it meant, not what it said
+
+In 1967, Jacqueline Sachs had people listen to short passages and then hear one sentence again, sometimes changed. A few sentences later, they couldn't tell if the wording had changed, but they still noticed when the meaning had. Memory keeps the gist and lets the words go.
+
+That's why keyword search over your own saves so often comes up empty. You remember the idea, not the title. Search the way you remember: describe what it was about.
+
+A step without a when doesn't happen
+
+Some saves aren't for knowing. They're for doing. "I'll try that" rarely becomes anything. "Saturday, after lunch, I'll try that" often does. Peter Gollwitzer calls this an implementation intention, a plan of the form: if this moment comes, I'll do this. A 2006 review of 94 studies found a medium to large boost from these plans. A larger 2024 review found the effect is real but smaller than first thought. It's still one sentence, and it still helps.
+
+New ideas need something to hang on
+
+In 1972, John Bransford and Marcia Johnson read people a paragraph that began: "The procedure is actually quite simple. First you arrange things into different groups." Without context, it's nearly meaningless. People told beforehand that it was about washing clothes recalled about twice as much as people told nothing. People told afterwards did no better than those told nothing.
+
+What you already know is what new ideas stick to, but only when it's in mind while the new thing arrives. A save on its own is a loose page. A save next to the three other things you kept on the same idea is the start of understanding it.
+
+The ten-second habit
+
+1. Save into one place you trust, so you can let go of it.
+2. Come back on a schedule, and space it out.
+3. Before you reopen it, say the main point. Then check.
+4. When a save is a thing to do, give it a when.
+5. Put it next to what you already know.
+
+Where Machina fits
+
+We built Machina for the coming back. It keeps everything you save from any app in one place and confirms the save the moment it's in. It finds things by what they meant, not what they were called. When you set a reminder, the save comes back three times, each further apart. A save that calls for action becomes a next step in Revisit. And every new card shows the things you already saved on the same idea.
+
+What Machina can't do is remember for you. Nothing can. That part is yours, and now you know how it works.
+
+Saving was never the hard part. Recalling it is how you learn it.
+```
+
+- **Article rules:** the same house rules as the posts, so no em dashes in it
+  either. Headings become the Article's section titles; the numbered list stays
+  a list.
+- **Note:** "We built Machina" is the brand's voice. If the founder posts it
+  instead, change it to "I built Machina".
+
+#### Claims and sources in this series
+
+Every product claim here is already in §9 ("Saved ✓ · Making your card";
+reminders that repeat, spaced out; search by meaning; Do this in Revisit;
+related saves and named graph clusters). The research claims, and what was
+checked on 2026-11-07:
+
+| Claim | Source | Checked |
+|---|---|---|
+| Photographed objects remembered worse; zooming in removed the effect | Henkel 2014 | abstract and DOI |
+| Saving one file improved learning of the next, only when the save was trusted | Storm & Stone 2015 | abstract, DOI and APS release; replicated in 2019 |
+| Most forgetting in the first day; replicated in 2015 | Ebbinghaus 1885; Murre & Dros 2015 | abstract and DOI |
+| Spaced review beats massed review (839 comparisons, 317 experiments); the optimal gap grows with how long you need to keep it | Cepeda et al. 2006, 2008 | abstracts and DOIs |
+| Meaning remembered, wording lost within 80 to 160 syllables | Sachs 1967 | abstract and DOI |
+| 83% vs 71% at five minutes, 61% vs 40% at one week; rereaders more confident | Roediger & Karpicke 2006 | **secondary sources only**: check the paper's Figure 2 before M4 goes out |
+| Rereading and highlighting low utility; practice testing and spaced practice high | Dunlosky et al. 2013 | review summaries and DOI |
+| If-then plans: d = .65 over 94 tests (2006); smaller in 642 tests (2024) | Gollwitzer & Sheeran 2006; Sheeran, Listrom & Gollwitzer 2024 | abstracts and DOIs |
+| Topic first doubled recall; topic after didn't help | Bransford & Johnson 1972 | **secondary sources** (they agree on "about double", not on the counts) |
+
+**Deliberately left out:** the Zeigarnik effect and learning styles (both fail
+replication), and the "Google effect" on where people remember things are
+kept (mixed replications). None of them is worth the credibility.
