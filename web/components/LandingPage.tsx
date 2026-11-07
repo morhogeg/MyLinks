@@ -134,11 +134,14 @@ function AppStoreBadge() {
     return (
         <a
             href={APP_STORE_URL}
-            className="mx-store inline-flex shrink-0 rounded-[10px] transition-opacity hover:opacity-85"
+            className="mx-store inline-flex shrink-0 cursor-pointer rounded-[10px] transition-opacity hover:opacity-85"
             aria-label="Download Machina on the App Store"
         >
-            <img src="/app-store-badge-white.svg" alt="" width={132} height={44} className="mx-store-on-dark h-11 w-auto" />
-            <img src="/app-store-badge-black.svg" alt="" width={132} height={44} className="mx-store-on-light h-11 w-auto" />
+            {/* pointer-events-none: Safari showed the text I-beam over the
+                badge images instead of the link's hand (owner, 2026-11-07),
+                so the pointer hits the link itself. */}
+            <img src="/app-store-badge-white.svg" alt="" width={132} height={44} draggable={false} className="mx-store-on-dark pointer-events-none h-11 w-auto select-none" />
+            <img src="/app-store-badge-black.svg" alt="" width={132} height={44} draggable={false} className="mx-store-on-light pointer-events-none h-11 w-auto select-none" />
         </a>
     );
 }

@@ -2872,7 +2872,12 @@ exact-match, capped.
   `APP_STORE_ID=6785841284` into `functions/.env` (it was never written, so
   `share_service._app_store_id()` was always empty). Shipped: commit
   `49d7a4c`, merged `81cd4c0`; Vercel on push; **deploy-functions run #146
-  green** (full deploy, triggered by the workflow change). No TestFlight. Verified: tsc, `/welcome` rendered
+  green** (full deploy, triggered by the workflow change). No TestFlight.
+  Follow-up (owner, Safari on Mac): the badge showed the text I-beam on hover
+  instead of the hand; the badge images are now `pointer-events-none` +
+  `select-none` and the link sets `cursor-pointer`, so the pointer hits the
+  `<a>` (checked in Chromium; WebKit isn't installed here, so not seen in
+  Safari). Verified: tsc, `/welcome` rendered
   in dark + light at 1280px and 390px (badge swaps per theme, sits level with
   the pill, wraps under it in the Close card on a phone), `apple-itunes-app`
   meta present. **Not verified:** the Smart App Banner on a real iPhone, and a
